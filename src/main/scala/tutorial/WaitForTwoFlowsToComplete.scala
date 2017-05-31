@@ -11,20 +11,20 @@ import akka.{Done, NotUsed}
 
 import scala.concurrent._
 
-object WaitForTwoSinksToComplete {
+object WaitForTwoFlowsToComplete {
 
   def main(args: Array[String]) = {
 
-    implicit val system = ActorSystem("WaitForTwoSinksToComplete")
+    implicit val system = ActorSystem("WaitForTwoFlowsToComplete")
     implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
     val source: Source[Int, NotUsed] = Source(1 to 100)
 
-    val f1Fut: Future[Done] = source.runForeach(i => println(i))(materializer)
+    val f1Fut: Future[Done] = source.runForeach(i => println(i))
 
-    //a description of what happens when we scan (= transform) the source
-    val factorials = source.scan(BigInt(1))((acc, next) => acc * next)
+    //declaration of what happens when we scan (= transform) the source
+    val factorials: Source[BigInt, NotUsed] = source.scan(BigInt(1))((acc, next) => acc * next)
     val f2fut: Future[IOResult] =
       factorials
         .map(num => ByteString(s"$num\n"))
@@ -35,8 +35,8 @@ object WaitForTwoSinksToComplete {
       f2Result <- f2fut
     } yield (f1Result, f2Result)
 
-    aggFut.onComplete{  results =>
-      println("Futures completed with results: " + results + " - about to terminate")
+    aggFut.onComplete {  results =>
+      println("Resulting futures from flows completed with results: " + results + " - about to terminate")
       system.terminate()
     }}
 }
