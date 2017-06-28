@@ -1,18 +1,16 @@
 package sample.stream
 
 import akka.actor.ActorSystem
-import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{ Flow, Sink, Source, Tcp }
+import akka.stream.scaladsl.{Flow, Sink, Source, Tcp}
 import akka.util.ByteString
-import scala.concurrent.duration._
-import scala.util.{ Failure, Success }
+
+import scala.util.{Failure, Success}
 
 object TcpEcho {
 
   /**
-   * Use without parameters to start both client and
-   * server.
+   * Use without parameters to start both client and server.
    *
    * Use parameters `server 0.0.0.0 6001` to start server listening on port 6001.
    *
@@ -25,7 +23,7 @@ object TcpEcho {
       val system = ActorSystem("ClientAndServer")
       val (address, port) = ("127.0.0.1", 6000)
       server(system, address, port)
-      client(system, address, port)
+      for ( a <- 1 to 10) client(system, address, port)
     } else {
       val (address, port) =
         if (args.length == 3) (args(1), args(2).toInt)
@@ -65,15 +63,17 @@ object TcpEcho {
 
   def client(system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
-    import system.dispatcher
+    implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
     val testInput = ('a' to 'z').map(ByteString(_))
 
-    val result = Source(testInput).via(Tcp().outgoingConnection(address, port)).
-      runFold(ByteString.empty) { (acc, in) ⇒ acc ++ in }
+    val resultFuture = Source(testInput)
+      .via(Tcp()
+      .outgoingConnection(address, port))
+      .runFold(ByteString.empty) { (acc, in) => acc ++ in }
 
-    result.onComplete {
+    resultFuture.onComplete {
       case Success(result) =>
         println(s"Result: " + result.utf8String)
         println("Shutting down client")
