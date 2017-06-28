@@ -6,6 +6,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import sample.WindTurbineSimulator
 
 import scala.concurrent.duration._
+
 /**
   Sample Implementation
   http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-ii
@@ -14,13 +15,12 @@ object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
-  //TODO Define endpoint
-  val endpoint = ""
+  val endpoint = "http://localhost:8080"
 
   Source(1 to 1000)
     .throttle(
       elements = 100,
-      per = 1 second,
+      per = 1.second,
       maximumBurst = 100,
       mode = ThrottleMode.shaping
     )
