@@ -69,8 +69,7 @@ object TcpEcho {
     val testInput = ('a' to 'z').map(ByteString(_))
 
     val resultFuture = Source(testInput)
-      .via(Tcp()
-      .outgoingConnection(address, port))
+      .via(Tcp().outgoingConnection(address, port))
       .runFold(ByteString.empty) { (acc, in) => acc ++ in }
 
     resultFuture.onComplete {
