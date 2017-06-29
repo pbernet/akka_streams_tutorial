@@ -24,14 +24,13 @@ object WebsocketEcho extends WebSocketDirectives {
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
-    for ( a <- 1 to 10) clientProprietary(address, port)
+    for ( a <- 1 to 10) clientNettyBased(address, port)
     for ( a <- 1 to 10) clientSingleWebSocketRequest(address, port)
-
   }
 
   private def server(address: String, port: Int) = {
 
-    def echo: Flow[Message, Message, Any] =
+    def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
         case tm: TextMessage =>
           println(s"Server recieved: $tm")
@@ -44,7 +43,7 @@ object WebsocketEcho extends WebSocketDirectives {
 
     val websocketRoute: Route =
       path("echo") {
-        handleWebSocketMessages(echo)
+        handleWebSocketMessages(echoFlow)
       }
 
     val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
@@ -57,9 +56,9 @@ object WebsocketEcho extends WebSocketDirectives {
     }
   }
 
-  private def clientProprietary(address: String, port: Int) = {
+  private def clientNettyBased(address: String, port: Int) = {
 
-    // prepare ws-client and define a message callback handler
+    // see https://github.com/andyglow/websocket-scala-client
     val cli = WebsocketClient[String](s"ws://$address:$port/echo") {
       case str => println(s"Client recieved String: $str")
     }
@@ -72,6 +71,7 @@ object WebsocketEcho extends WebSocketDirectives {
 
     val printSink: Sink[Message, Future[Done]] =
       Sink.foreach {
+        //see https://github.com/akka/akka-http/issues/65
         case TextMessage.Strict(text)             => println(s"Client recieved Strict: $text")
         case TextMessage.Streamed(textStream)     => textStream.runFold("")(_ + _).onComplete(value => println(s"Client recieved Streamed: ${value.get}"))
         case BinaryMessage.Strict(binary)         => //do nothing
@@ -90,7 +90,6 @@ object WebsocketEcho extends WebSocketDirectives {
     Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), flow)
 
     val connected = upgradeResponse.map { upgrade =>
-      // just like a regular http request we can access response status which is available via upgrade.response.status
       // status code 101 (Switching Protocols) indicates that server support WebSockets
       if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
         Done
