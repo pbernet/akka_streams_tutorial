@@ -15,7 +15,7 @@ object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
-  val endpoint = "http://localhost:8080"
+  val endpoint = "ws://localhost:8080"
 
   Source(1 to 1000)
     .throttle(
