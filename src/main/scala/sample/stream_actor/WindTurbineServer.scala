@@ -69,15 +69,12 @@ object WindTurbineServer {
 
 
     val route =
-      //PathMatchers.uuid / JavaUUID
-      path("measurements" ) {
+      path("measurements" / JavaUUID ) { id =>
         get {
-          println(s"Recieved request for path")
+          println(s"Recieving WindTurbineData form: $id")
           handleWebSocketMessages(measurementsWebSocket)
-          //complete {StatusCodes.OK}
         }
       }
-
 
     val httpInterface = "127.0.0.1"
     val httpPort = 8080
@@ -102,7 +99,4 @@ object WindTurbineServer {
       log.info("Terminated... Bye")
     }
   }
-
-
-
 }

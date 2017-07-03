@@ -28,9 +28,7 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
                       materializer: ActorMaterializer,
                       executionContext: ExecutionContext) {
   val webSocket: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = {
-    //val websocketUri = s"$endpoint/$id"
-    val websocketUri = s"$endpoint/measurements"
-    //vs Http().singleWebSocketRequest
+    val websocketUri = s"$endpoint/measurements/$id"
     Http().webSocketClientFlow(WebSocketRequest(websocketUri))
   }
 
@@ -38,7 +36,7 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
     val data = WindTurbineData(id)
 
     val flow = builder.add {
-      Source.tick(1.second, 1.second, ())
+      Source.tick(1.second, 1.second, ())  //valve for the WindTurbineData flow
         .map(_ => TextMessage(data.getNext))
     }
 

@@ -8,20 +8,20 @@ import sample.WindTurbineSimulator
 import scala.concurrent.duration._
 
 /**
-  Sample Implementation
+  Sample Implementation of:
   http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-ii
   **/
 object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
-  val endpoint = "ws://localhost:8080"
-
-  Source(1 to 1000)
+  val endpoint = "ws://127.0.0.1:8080"
+  val numberOfTurbines = 1000
+  Source(1 to numberOfTurbines)
     .throttle(
-      elements = 100,
+      elements = 100, //number of elements to be taken from bucket
       per = 1.second,
-      maximumBurst = 100,
+      maximumBurst = 100,  //capacity of the bucket
       mode = ThrottleMode.shaping
     )
     .map { _ =>
