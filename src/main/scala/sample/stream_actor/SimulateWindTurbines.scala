@@ -1,6 +1,7 @@
 package sample.stream_actor
 
 import akka.actor.ActorSystem
+import akka.pattern.{Backoff, BackoffSupervisor}
 import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.stream.scaladsl.{Sink, Source}
 import sample.WindTurbineSimulator
@@ -11,7 +12,8 @@ import scala.concurrent.duration._
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-ii
   *
-  * Starts n clients which generate WindTurbineData
+  * Starts n WindTurbineSimulator, which generate WindTurbineData via WebSocketClient
+  * Use a BackoffSupervisor as level of indirection
   * The server is started with WindTurbineServer
   */
 object SimulateWindTurbines extends App {
@@ -29,7 +31,17 @@ object SimulateWindTurbines extends App {
     )
     .map { _ =>
       val id = java.util.UUID.randomUUID.toString
-      system.actorOf(WindTurbineSimulator.props(id, endpoint), id)
+
+      val supervisor = BackoffSupervisor.props(
+        Backoff.onFailure(
+          WindTurbineSimulator.props(id, endpoint),
+          childName = id,
+          minBackoff = 1.second,
+          maxBackoff = 30.seconds,
+          randomFactor = 0.2
+        ))
+
+      system.actorOf(supervisor, name = s"$id-backoff-supervisor")
     }
     .runWith(Sink.ignore)
 }
