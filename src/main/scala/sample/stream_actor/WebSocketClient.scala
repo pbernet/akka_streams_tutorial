@@ -36,7 +36,7 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
     val data = WindTurbineData(id)
 
     val flow = builder.add {
-      Source.tick(1.second, 1.second, ())  //valve for the WindTurbineData flow
+      Source.tick(1.second, 100.millis,())  //valve for the WindTurbineData frequency
         .map(_ => TextMessage(data.getNext))
     }
 
@@ -54,7 +54,7 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
               .flatMap(Future.successful)
         }
         .mapAsync(1)(identity)
-        .map(println)
+        .map("Incomming Msg: " + println(_))
     }
 
     FlowShape(flow.in, flow.out)

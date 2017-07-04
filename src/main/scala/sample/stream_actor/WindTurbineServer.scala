@@ -69,7 +69,7 @@ object WindTurbineServer {
           case (lastMessage: String, measurements: Seq[WindTurbineServer.Measurements]) =>
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
-            //only send a single message at a time to the Total actor, backpressuring otherwise
+            //only send a single message at a time to the Total actor, backpressure otherwise
             (total ? Increment(measurements.size))
               .mapTo[Done]
               .map(_ => lastMessage)
