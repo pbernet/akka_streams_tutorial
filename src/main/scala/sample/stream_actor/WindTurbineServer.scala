@@ -5,10 +5,10 @@ import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import play.api.libs.json._
 import sample.stream_actor.Total.Increment
@@ -43,15 +43,15 @@ object WindTurbineServer {
       Json.fromJson[Measurements](parsed).getOrElse(Measurements(0,0,0))
     }
 
-    def ack(aString: String) = TextMessage(aString)
+    def ack(aString: String) = TextMessage(Source.single("Ack from server: " + aString))
   }
 
 
   def main(args: Array[String]): Unit = {
     val total = system.actorOf(Props[Total], "total")
 
-    //computes intermediate sums (= Number of measurements) and sends them to the Total actor, at least every second
-    val measurementsWebSocket: Flow[Message, Message, Any] =
+    //computes intermediate sums (= number of measurements) and sends them to the Total actor, at least every second
+    val measurementsWebSocketFlow: Flow[Message, Message, Any] =
       Flow[Message]
         .collect {
           case TextMessage.Strict(text) =>
@@ -61,7 +61,6 @@ object WindTurbineServer {
               .flatMap(Future.successful)
         }
         .mapAsync(1)(x => x) //identity function
-        //.map { elem => println(s"Before grouping $elem"); elem }
         .groupedWithin(1000, 1.second)
         .map(messages => (messages.last, Messages.parse(messages)))
         .map { elem => println(s"After parsing size: ${elem._2.size}"); elem}
@@ -74,14 +73,14 @@ object WindTurbineServer {
               .mapTo[Done]
               .map(_ => lastMessage)
         }
-        .map(Messages.ack)
+        .map(Messages.ack) //ack the last message only
 
 
     val route =
       path("measurements" / JavaUUID ) { id =>
         get {
           println(s"Recieving WindTurbineData form: $id")
-          handleWebSocketMessages(measurementsWebSocket)
+          handleWebSocketMessages(measurementsWebSocketFlow)
         }
       }
 
