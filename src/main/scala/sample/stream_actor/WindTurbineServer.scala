@@ -10,6 +10,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Flow
 import akka.util.Timeout
+import play.api.libs.json._
 import sample.stream_actor.Total.Increment
 
 import scala.collection.immutable
@@ -18,8 +19,11 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 
 /**
-  * Bootstrap a server
+  * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-i
+  *
+  * Server, which recieves Measurements via Websockets from n Clients
+  * Clients are started with SimulateWindTurbines
   */
 object WindTurbineServer {
 
@@ -29,13 +33,18 @@ object WindTurbineServer {
   protected val log = Logging(system.eventStream, "WindTurbineServer-main")
   protected implicit val materializer: ActorMaterializer = ActorMaterializer()
 
+  case class Measurements(power: Long, rotor_speed: Long, wind_speed: Long)
+
   object Messages  {
-    //TODO parse from TextMessage (= JSON) to case class Measurements, although not needed for Total
-    def parse(messages: immutable.Seq[String]): Seq[Measurements] = messages.map(message => Measurements(1,1,1))
+
+    def parse(messages: immutable.Seq[String]): Seq[Measurements] = messages.map { message =>
+      implicit val measurementsFormat = Json.format[Measurements]
+      val parsed =  Json.parse(message)
+      Json.fromJson[Measurements](parsed).getOrElse(Measurements(0,0,0))
+    }
+
     def ack(aString: String) = TextMessage(aString)
   }
-
-  case class Measurements(power: Long, rotor_speed: Long, wind_speed: Long)
 
 
   def main(args: Array[String]): Unit = {
