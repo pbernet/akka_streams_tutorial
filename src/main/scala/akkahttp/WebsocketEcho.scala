@@ -16,10 +16,29 @@ import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
-object WebsocketEcho extends WebSocketDirectives {
+
+trait ClientCommon {
   implicit val system = ActorSystem("my-system")
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
+
+  val printSink: Sink[Message, Future[Done]] =
+    Sink.foreach {
+      //see https://github.com/akka/akka-http/issues/65
+      case TextMessage.Strict(text)             => println(s"Client recieved Strict: $text")
+      case TextMessage.Streamed(textStream)     => textStream.runFold("")(_ + _).onComplete(value => println(s"Client recieved Streamed: ${value.get}"))
+      case BinaryMessage.Strict(binary)         => //do nothing
+      case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
+    }
+
+  //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
+  val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
+    .concatMat(Source.maybe[Message])(Keep.right)
+
+}
+
+object WebsocketEcho extends WebSocketDirectives with ClientCommon {
+
 
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
@@ -70,19 +89,6 @@ object WebsocketEcho extends WebSocketDirectives {
 
   private def clientSingleWebSocketRequest(address: String, port: Int) = {
 
-    val printSink: Sink[Message, Future[Done]] =
-      Sink.foreach {
-        //see https://github.com/akka/akka-http/issues/65
-        case TextMessage.Strict(text)             => println(s"Client recieved Strict: $text")
-        case TextMessage.Streamed(textStream)     => textStream.runFold("")(_ + _).onComplete(value => println(s"Client recieved Streamed: ${value.get}"))
-        case BinaryMessage.Strict(binary)         => //do nothing
-        case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
-      }
-
-    //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
-    val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
-      .concatMat(Source.maybe[Message])(Keep.right)
-
     // flow to use (note: not re-usable!)
     val webSocketFlow: Flow[Message, Message, Promise[Option[Message]]] =
       Flow.fromSinkAndSourceMat(
@@ -101,26 +107,11 @@ object WebsocketEcho extends WebSocketDirectives {
       }
     }
 
-    // in a real application you would not side effect here and handle errors more carefully
     connected.onComplete(println)
     closed.future.foreach(_ => println("closed"))
   }
 
   private def clientWebSocketClientFlow(address: String, port: Int) = {
-
-    val printSink: Sink[Message, Future[Done]] =
-      Sink.foreach {
-        //see https://github.com/akka/akka-http/issues/65
-        case TextMessage.Strict(text) => println(s"Client recieved Strict: $text")
-        case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client recieved Streamed: ${value.get}"))
-        case BinaryMessage.Strict(binary) => //do nothing
-        case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
-      }
-
-    //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
-    val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
-      .concatMat(Source.maybe[Message])(Keep.right)
-
 
     // flow to use (note: not re-usable!)
     val webSocketFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
@@ -141,7 +132,6 @@ object WebsocketEcho extends WebSocketDirectives {
       }
     }
 
-    // in a real application you would not side effect here
     connected.onComplete(println)
     closed.foreach(_ => println("closed"))
   }
