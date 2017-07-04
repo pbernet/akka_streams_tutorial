@@ -1,10 +1,10 @@
 package akkahttp
 
-import akka.{Done, NotUsed}
+import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
+import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
@@ -26,6 +26,7 @@ object WebsocketEcho extends WebSocketDirectives {
     server(address, port)
     for ( a <- 1 to 10) clientNettyBased(address, port)
     for ( a <- 1 to 10) clientSingleWebSocketRequest(address, port)
+    for ( a <- 1 to 10) clientWebSocketClientFlow(address, port)
   }
 
   private def server(address: String, port: Int) = {
@@ -78,16 +79,18 @@ object WebsocketEcho extends WebSocketDirectives {
         case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
       }
 
-    val helloSource: Source[TextMessage.Strict, NotUsed] = Source(List(TextMessage("world one"), TextMessage("world two")))
+    //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
+    val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
+      .concatMat(Source.maybe[Message])(Keep.right)
 
-    val flow: Flow[Message, Message, Promise[Option[Message]]] =
+    // flow to use (note: not re-usable!)
+    val webSocketFlow: Flow[Message, Message, Promise[Option[Message]]] =
       Flow.fromSinkAndSourceMat(
         printSink,
-        //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
-        helloSource.concatMat(Source.maybe[Message])(Keep.right))(Keep.right)
+        helloSource)(Keep.right)
 
     val (upgradeResponse, closed) =
-    Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), flow)
+    Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketFlow)
 
     val connected = upgradeResponse.map { upgrade =>
       // status code 101 (Switching Protocols) indicates that server support WebSockets
@@ -101,5 +104,45 @@ object WebsocketEcho extends WebSocketDirectives {
     // in a real application you would not side effect here and handle errors more carefully
     connected.onComplete(println)
     closed.future.foreach(_ => println("closed"))
+  }
+
+  private def clientWebSocketClientFlow(address: String, port: Int) = {
+
+    val printSink: Sink[Message, Future[Done]] =
+      Sink.foreach {
+        //see https://github.com/akka/akka-http/issues/65
+        case TextMessage.Strict(text) => println(s"Client recieved Strict: $text")
+        case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client recieved Streamed: ${value.get}"))
+        case BinaryMessage.Strict(binary) => //do nothing
+        case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
+      }
+
+    //see http://doc.akka.io/docs/akka-http/10.0.9/scala/http/client-side/websocket-support.html#half-closed-client-websockets
+    val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
+      .concatMat(Source.maybe[Message])(Keep.right)
+
+
+    // flow to use (note: not re-usable!)
+    val webSocketFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
+
+    val (upgradeResponse, closed) =
+    helloSource
+      .viaMat(webSocketFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
+      .toMat(printSink)(Keep.both) // also keep the Future[Done]
+      .run()
+
+
+    val connected = upgradeResponse.flatMap { upgrade =>
+      // status code 101 (Switching Protocols) indicates that server support WebSockets
+      if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
+        Future.successful(Done)
+      } else {
+        throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
+      }
+    }
+
+    // in a real application you would not side effect here
+    connected.onComplete(println)
+    closed.foreach(_ => println("closed"))
   }
 }
