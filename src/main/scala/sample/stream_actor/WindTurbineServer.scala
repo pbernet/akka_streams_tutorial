@@ -33,14 +33,12 @@ object WindTurbineServer {
   protected val log = Logging(system.eventStream, "WindTurbineServer-main")
   protected implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  case class Measurements(power: Long, rotor_speed: Long, wind_speed: Long)
-
   object Messages  {
 
-    def parse(messages: immutable.Seq[String]): Seq[Measurements] = messages.map { message =>
+    def parse(messages: immutable.Seq[String]): Seq[MeasurementsContainer] = messages.map { message =>
       implicit val measurementsFormat = Json.format[Measurements]
-      val parsed =  Json.parse(message)
-      Json.fromJson[Measurements](parsed).getOrElse(Measurements(0,0,0))
+      implicit val windTurbineDataFormat = Json.format[MeasurementsContainer]
+      Json.parse(message).as[MeasurementsContainer]
     }
 
     def ack(aString: String) = TextMessage(Source.single("Ack from server: " + aString))
@@ -65,11 +63,11 @@ object WindTurbineServer {
         .map(messages => (messages.last, Messages.parse(messages)))
         .map { elem => println(s"After parsing size: ${elem._2.size}"); elem}
         .mapAsync(1) {
-          case (lastMessage: String, measurements: Seq[WindTurbineServer.Measurements]) =>
+          case (lastMessage: String, measurements: Seq[MeasurementsContainer]) =>
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
             //only send a single message at a time to the Total actor, backpressure otherwise
-            (total ? Increment(measurements.size))
+            (total ? Increment(measurements.size, measurements.head.id))
               .mapTo[Done]
               .map(_ => lastMessage)
         }

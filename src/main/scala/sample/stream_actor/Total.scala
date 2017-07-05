@@ -7,14 +7,15 @@ import java.text.SimpleDateFormat
 import java.util.{Date, TimeZone}
 
 object Total {
-  case class Increment(value: Long)
+  case class Increment(value: Long, id: String)
 }
 
 class Total extends Actor {
   var total: Long = 0
 
   override def receive: Receive = {
-    case Increment(value) =>
+    case Increment(value, id) =>
+      //println(s"Recieved increment from id: $id")
       total = total + value
 
       val date = new Date()

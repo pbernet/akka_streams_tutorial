@@ -2,6 +2,10 @@ package sample.stream_actor
 
 import scala.util.Random
 
+case class MeasurementsContainer(id: String = "", timestamp: Long = 0, measurements: Measurements = Measurements())
+
+case class Measurements(power: Double = 0, rotor_speed : Double = 0, wind_speed: Double = 0)
+
 object WindTurbineData {
   def apply(id: String) = new WindTurbineData(id)
 }
