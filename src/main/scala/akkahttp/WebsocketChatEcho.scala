@@ -54,7 +54,9 @@ object WebsocketChatEcho {
   Materializing a BroadcastHub Sink yields a Source that broadcasts all elements being collected by the MergeHub Sink (the elements that are emitted/broadcasted in the Source are going to all WebSocket clients)
    */
     val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) =
-      MergeHub.source[String].toMat(BroadcastHub.sink[String])(Keep.both).run()
+      MergeHub.source[String]
+        .map { elem => println(s"Server recieved after MergeHub: $elem"); elem}
+        .toMat(BroadcastHub.sink[String])(Keep.both).run()
 
     val echoFlow: Flow[Message, Message, NotUsed] =
     Flow[Message].mapAsync(1) {
@@ -104,6 +106,4 @@ object WebsocketChatEcho {
     connected.onComplete(println)
     closed.foreach(_ => println("closed"))
   }
-
-
 }
