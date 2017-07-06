@@ -10,14 +10,18 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
 import akkahttp.WebsocketEcho.{helloSource, printSink}
+import akkastreams.SlidingWindows.SomeEvent
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
   * A simple WebSocket chat system using only Akka Streams with the help of MergeHubSource and BroadcastHub Sink
+  *
   * Shamelessly copied from:
   * https://github.com/calvinlfer/akka-http-streaming-response-examples/blob/master/src/main/scala/com/experiments/calvin/WebsocketStreamsMain.scala
-  * Doc: http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
+  * Doc:
+  * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
   */
 object WebsocketChatEcho {
   implicit val actorSystem = ActorSystem(name = "example-actor-system")
@@ -30,7 +34,7 @@ object WebsocketChatEcho {
     val (address, port) = ("127.0.0.1", 6000)
     val maxClients = 10
     server(address, port)
-    for ( a <- 1 to maxClients) clientWebSocketClientFlow(address, port)  //Resulting messages in stdout: 2 * maxClients^2
+    for ( a <- 1 to maxClients) clientWebSocketClientFlow(address, port)  //Without compression messages in stdout: numberOfMsg * maxClients^2
   }
 
   private def server(address: String, port: Int) = {
@@ -68,6 +72,12 @@ object WebsocketChatEcho {
       }
     }
       .via(Flow.fromSinkAndSource(chatSink, chatSource))
+      //Add compression
+      .groupedWithin(10, 2.second)
+      .map { eachSeq =>
+        println(s"Compressed ${eachSeq.size} messages within 2 seconds")
+        eachSeq.mkString("; ")
+      }
       .map[Message](string => TextMessage.Strict("Hello " + string + "!"))
 
     def wsChatStreamsOnlyRoute =
