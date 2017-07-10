@@ -10,6 +10,11 @@ import akka.util.ByteString
 import scala.concurrent.forkjoin.ThreadLocalRandom
 import scala.util.{Failure, Success}
 
+/**
+  * Show the possibilites of Constructing Graphs with the GraphDSL
+  * http://doc.akka.io/docs/akka/snapshot/scala/stream/stream-graphs.html#constructing-graphs
+  *
+  */
 object WritePrimes {
 
   def main(args: Array[String]): Unit = {
@@ -36,13 +41,16 @@ object WritePrimes {
     // console output sink
     val consoleSink = Sink.foreach[Int](println)
 
+    // Optional sample processing flow, to show the nature of the composition
+    val sharedDoubler = Flow[Int].map(_ * 2)
+
     // send primes to both slow file sink and console sink using graph API
     val graph = GraphDSL.create(slowSink, consoleSink)((slow, _) => slow) { implicit builder =>
       (slow, console) =>
         import GraphDSL.Implicits._
         val broadcast = builder.add(Broadcast[Int](2)) // the splitter - like a Unix tee
-        primeSource ~> broadcast ~> slow // connect primes to splitter, and one side to file
-        broadcast ~> console // connect other side of splitter to console
+        primeSource ~> broadcast ~> sharedDoubler ~> slow // connect primes to splitter, and one side to file (via sample processing flow)
+        broadcast ~> sharedDoubler ~> console // connect other side of splitter to console (via sample processing flow)
         ClosedShape
     }
     val materialized = RunnableGraph.fromGraph(graph).run()
@@ -55,7 +63,6 @@ object WritePrimes {
         println(s"Failure: ${e.getMessage}")
         system.terminate()
     }
-
   }
 
   def isPrime(n: Int): Boolean = {
