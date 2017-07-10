@@ -10,13 +10,12 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
 import akkahttp.WebsocketEcho.{helloSource, printSink}
-import akkastreams.SlidingWindows.SomeEvent
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * A simple WebSocket chat system using only Akka Streams with the help of MergeHubSource and BroadcastHub Sink
+  * A simple WebSocket chat system using only Akka Streams with the help of MergeHub Source and BroadcastHub Sink
   *
   * Shamelessly copied from:
   * https://github.com/calvinlfer/akka-http-streaming-response-examples/blob/master/src/main/scala/com/experiments/calvin/WebsocketStreamsMain.scala
@@ -57,9 +56,14 @@ object WebsocketChatEcho {
   Materializing a MergeHub Source yields a Sink that collects all the emitted elements and emits them in the MergeHub Source (the emitted elements that are collected in the Sink are coming from all WebSocket clients)
   Materializing a BroadcastHub Sink yields a Source that broadcasts all elements being collected by the MergeHub Sink (the elements that are emitted/broadcasted in the Source are going to all WebSocket clients)
    */
+
+    //Optional sample processing flow, to demonstrate the nature of the composition
+    val sampleProcessing  = Flow[String].map(i => i.toUpperCase)
+
     val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) =
       MergeHub.source[String]
         .map { elem => println(s"Server recieved after MergeHub: $elem"); elem}
+        .via(sampleProcessing)
         .toMat(BroadcastHub.sink[String])(Keep.both).run()
 
     val echoFlow: Flow[Message, Message, NotUsed] =
