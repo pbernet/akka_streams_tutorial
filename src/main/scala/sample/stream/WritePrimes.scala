@@ -1,15 +1,14 @@
 package sample.stream
 
-import java.io.File
+import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.stream.ClosedShape
+import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
 
 import scala.concurrent.forkjoin.ThreadLocalRandom
-import scala.util.{ Failure, Success }
+import scala.util.{Failure, Success}
 
 object WritePrimes {
 
@@ -28,7 +27,7 @@ object WritePrimes {
         filter(prime => isPrime(prime + 2))
 
     // write to file sink
-    val fileSink = FileIO.toFile(new File("target/primes.txt"))
+    val fileSink = FileIO.toPath(Paths.get("target/primes.txt"))
     val slowSink = Flow[Int]
       // act as if processing is really slow
       .map(i => { Thread.sleep(1000); ByteString(i.toString) })
@@ -62,6 +61,6 @@ object WritePrimes {
   def isPrime(n: Int): Boolean = {
     if (n <= 1) false
     else if (n == 2) true
-    else !(2 to (n - 1)).exists(x => n % x == 0)
+    else !(2 until n).exists(x => n % x == 0)
   }
 }
