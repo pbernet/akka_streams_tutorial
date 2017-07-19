@@ -10,7 +10,7 @@ import scala.util.{Failure, Success}
 object TcpEcho {
 
   /**
-   * Use without parameters to start both client and server.
+   * Use without parameters to start both server and 10 clients.
    *
    * Use parameters `server 0.0.0.0 6001` to start server listening on port 6001.
    *
@@ -23,7 +23,7 @@ object TcpEcho {
       val system = ActorSystem("ClientAndServer")
       val (address, port) = ("127.0.0.1", 6000)
       server(system, address, port)
-      for ( a <- 1 to 10) client(system, address, port)
+      (1 to 10).par.foreach(each => client(system, address, port))
     } else {
       val (address, port) =
         if (args.length == 3) (args(1), args(2).toInt)
@@ -79,6 +79,7 @@ object TcpEcho {
         system.terminate()
       case Failure(e) =>
         println("Failure: " + e.getMessage)
+        println("Shutting down client")
         system.terminate()
     }
   }
