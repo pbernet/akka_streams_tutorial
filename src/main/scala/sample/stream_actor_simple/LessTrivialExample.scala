@@ -9,7 +9,7 @@ object LessTrivialExample extends App {
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
   val actorRef = system.actorOf(Props(classOf[PrintMoreNumbers], materializer))
-  system.scheduler.scheduleOnce(10 seconds) {
+  system.scheduler.scheduleOnce(10.seconds) {
     actorRef ! "stop"
   }
 }
