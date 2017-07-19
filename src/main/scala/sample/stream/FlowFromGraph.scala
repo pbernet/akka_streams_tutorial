@@ -23,14 +23,14 @@ object FlowFromGraph {
     val processorFlow2: Flow[Int, Int, NotUsed] = Flow[Int].map(_ * 3)
     val listOfFlows = List(processorFlow1, processorFlow2)
 
-    def compoundFlowFrom[Int](indexFlows: Seq[Flow[Int, Int, NotUsed]]): Flow[Int, Int, NotUsed] = {
+    def compoundFlowFrom[T](indexFlows: Seq[Flow[T, T, NotUsed]]): Flow[T, T, NotUsed] = {
       require(indexFlows.nonEmpty, "Cannot create compound flow without any flows to combine")
 
       Flow.fromGraph(GraphDSL.create() { implicit b =>
         import akka.stream.scaladsl.GraphDSL.Implicits._
 
-        val broadcast: UniformFanOutShape[Int, Int] = b.add(Broadcast(indexFlows.size))
-        val merge: UniformFanInShape[Int, Int] = b.add(Merge(indexFlows.size))
+        val broadcast: UniformFanOutShape[T, T] = b.add(Broadcast(indexFlows.size))
+        val merge: UniformFanInShape[T, T] = b.add(Merge(indexFlows.size))
 
         indexFlows.foreach(broadcast ~> _ ~> merge)
 
