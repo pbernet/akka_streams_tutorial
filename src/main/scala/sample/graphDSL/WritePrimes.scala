@@ -1,4 +1,4 @@
-package sample.stream
+package sample.graphDSL
 
 import java.nio.file.Paths
 
@@ -11,7 +11,7 @@ import scala.concurrent.forkjoin.ThreadLocalRandom
 import scala.util.{Failure, Success}
 
 /**
-  * Show the possibilites of Constructing Graphs with the GraphDSL
+  * Show the possibilities of constructing a graph with the GraphDSL
   * http://doc.akka.io/docs/akka/snapshot/scala/stream/stream-graphs.html#constructing-graphs
   *
   */

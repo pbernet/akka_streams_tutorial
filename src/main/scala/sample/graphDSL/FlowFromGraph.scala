@@ -1,4 +1,4 @@
-package sample.stream
+package sample.graphDSL
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -6,8 +6,9 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
 import akka.stream.{ActorMaterializer, FlowShape, UniformFanInShape, UniformFanOutShape}
 
 /**
+  * A GraphDSL example, which shows the possibility to inject operations (= flows) on a
+  * compound flow.
   *
-  * A GraphDSL example, which shows the possibility to inject operations (= flows) on Int
   * Inspired by:
   * https://groups.google.com/forum/#!topic/akka-user/Dh8q7TcP2SI
   *
