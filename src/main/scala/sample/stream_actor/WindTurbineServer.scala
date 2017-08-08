@@ -22,8 +22,9 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-i
   *
-  * Server, which recieves Measurements via Websockets from n Clients
+  * WindTurbineServer recieves Measurements via Websockets from n clients
   * Clients are started with SimulateWindTurbines
+  *
   */
 object WindTurbineServer {
 
@@ -48,6 +49,11 @@ object WindTurbineServer {
   def main(args: Array[String]): Unit = {
     val total = system.actorOf(Props[Total], "total")
 
+    def average[T]( ts: Iterable[T] )( implicit num: Numeric[T] ) = {
+      val avg = num.toDouble( ts.sum ) / ts.size
+      (math floor avg * 100) / 100
+    }
+
     //computes intermediate sums (= number of measurements) and sends them to the Total actor, at least every second
     val measurementsWebSocketFlow: Flow[Message, Message, Any] =
       Flow[Message]
@@ -67,7 +73,8 @@ object WindTurbineServer {
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
             //only send a single message at a time to the Total actor, backpressure otherwise
-            (total ? Increment(measurements.size, measurements.head.id))
+            val avgWindSpeeds = measurements.map(each => each.measurements.wind_speed)
+            (total ? Increment(measurements.size, average(avgWindSpeeds), measurements.head.id))
               .mapTo[Done]
               .map(_ => lastMessage)
         }

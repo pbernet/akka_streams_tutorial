@@ -81,8 +81,10 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
     case Success(_) => supervisor ! Connected
     case Failure(ex) => supervisor ! ConnectionFailure(ex)
   }
+  connected.onFailure{case ex: Throwable => supervisor ! ConnectionFailure(ex)}
 
   closed.map { _ =>
     supervisor ! Terminated
   }
+  closed.onFailure{case ex: Throwable => supervisor ! ConnectionFailure(ex)}
 }
