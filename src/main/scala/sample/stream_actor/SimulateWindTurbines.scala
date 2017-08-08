@@ -14,6 +14,7 @@ import scala.concurrent.duration._
   *
   * Starts n WindTurbineSimulator, which generate WindTurbineData via WebSocketClient
   * Use a BackoffSupervisor as level of indirection
+  *
   * The server is started with WindTurbineServer
   */
 object SimulateWindTurbines extends App {
@@ -21,7 +22,7 @@ object SimulateWindTurbines extends App {
   implicit val materializer = ActorMaterializer()
 
   val endpoint = "ws://127.0.0.1:8080"
-  val numberOfTurbines = 1000
+  val numberOfTurbines = 5
   Source(1 to numberOfTurbines)
     .throttle(
       elements = 100, //number of elements to be taken from bucket
