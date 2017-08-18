@@ -6,25 +6,32 @@ import java.time.format.DateTimeFormatter
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream._
+import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
-import akka.http.scaladsl.client.RequestBuilding.Get
 
+/**
+  * Basic heartbeat example, enhanced with "delayed restarts with a backoff stage" on client side:
+  * http://doc.akka.io/docs/akka/current/scala/stream/stream-error.html#delayed-restarts-with-a-backoff-stage
+  *
+  *
+  */
 object SSEHeartbeat {
-  implicit val system = ActorSystem("my-system")
-  implicit val materializer = ActorMaterializer()
+  implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
+  implicit val materializerServer = ActorMaterializer()
 
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
-    client(address, port)
+    simpleClient(address, port) //is not recovering
+    backoffClient(address, port) //is recovering
   }
 
   private def server(address: String, port: Int) = {
@@ -36,12 +43,18 @@ object SSEHeartbeat {
      def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
       def events =
-        path("events") {
+        path("events" / Segment ){ clientName =>
+          println(s"Server received request from $clientName")
           get {
             complete {
               Source
                 .tick(2.seconds, 2.seconds, NotUsed)
-                .map(_ => LocalTime.now())
+                .map(_ => {
+                  val time = LocalTime.now()
+                  if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
+                  println(s"Send to client: $time")
+                  time
+                })
                 .map(timeToServerSentEvent)
                 .keepAlive(1.second, () => ServerSentEvent.heartbeat)
             }
@@ -60,13 +73,42 @@ object SSEHeartbeat {
     }
   }
 
-  private def client(address: String, port: Int) = {
+  private def simpleClient(address: String, port: Int) = {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
     Http()
-      .singleRequest(Get(s"http://$address:$port/events"))
+      .singleRequest(HttpRequest(
+        uri = s"http://$address:$port/events/simpleClient"
+      ))
       .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-      .foreach(_.runForeach(println))
+      .foreach(_.runForeach(event => println(s"simpleClient got event: $event")))
+  }
+
+  private def backoffClient(address: String, port: Int) = {
+
+    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+
+    val restartSource = RestartSource.withBackoff(
+      minBackoff = 3.seconds,
+      maxBackoff = 30.seconds,
+      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
+    ) { () =>
+      Source.fromFutureSource {
+        Http()
+          .singleRequest(HttpRequest(
+          uri = s"http://$address:$port/events/backoffClient"
+        ))
+          .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
+      }
+    }
+
+    val (killSwitch: UniqueKillSwitch, done) = restartSource
+      .viaMat(KillSwitches.single)(Keep.right)
+      .toMat(Sink.foreach(event => println(s"backoffClient got event: $event")))(Keep.both)
+      .run()
+
+    //See PrintMoreNumbers for correctly stopping the stream
+    done.map(_ => {println("Reached shutdown..."); killSwitch.shutdown()} )
   }
 }
