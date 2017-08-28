@@ -5,10 +5,10 @@ import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, Source}
 import akka.util.Timeout
 import play.api.libs.json._
 import sample.stream_actor.Total.Increment
@@ -22,7 +22,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-i
   *
-  * WindTurbineServer recieves Measurements via Websockets from n clients
+  * WindTurbineServer receives Measurements via Websockets from n clients
   * Clients are started with SimulateWindTurbines
   *
   */
@@ -54,7 +54,7 @@ object WindTurbineServer {
       (math floor avg * 100) / 100
     }
 
-    //computes intermediate sums (= number of measurements) and sends them to the Total actor, at least every second
+    //compute intermediate sums (= number of measurements) and send them to the Total actor, at least every second
     val measurementsWebSocketFlow: Flow[Message, Message, Any] =
       Flow[Message]
         .collect {
@@ -65,7 +65,7 @@ object WindTurbineServer {
               .flatMap(Future.successful)
         }
         .mapAsync(1)(x => x) //identity function
-        .groupedWithin(1000, 1.second)
+        .groupedWithin(100, 1.second)
         .map(messages => (messages.last, Messages.parse(messages)))
         .map { elem => println(s"After parsing size: ${elem._2.size}"); elem}
         .mapAsync(1) {
@@ -73,8 +73,8 @@ object WindTurbineServer {
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
             //only send a single message at a time to the Total actor, backpressure otherwise
-            val avgWindSpeeds = measurements.map(each => each.measurements.wind_speed)
-            (total ? Increment(measurements.size, average(avgWindSpeeds), measurements.head.id))
+            val windSpeeds = measurements.map(each => each.measurements.wind_speed)
+            (total ? Increment(measurements.size, average(windSpeeds), measurements.head.id))
               .mapTo[Done]
               .map(_ => lastMessage)
         }
@@ -84,7 +84,7 @@ object WindTurbineServer {
     val route =
       path("measurements" / JavaUUID ) { id =>
         get {
-          println(s"Recieving WindTurbineData form: $id")
+          println(s"Receiving WindTurbineData form: $id")
           handleWebSocketMessages(measurementsWebSocketFlow)
         }
       }

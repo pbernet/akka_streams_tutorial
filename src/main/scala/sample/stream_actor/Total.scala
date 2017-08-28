@@ -1,10 +1,11 @@
 package sample.stream_actor
 
+import java.text.SimpleDateFormat
+import java.util.{Date, TimeZone}
+
 import akka.Done
 import akka.actor.Actor
 import sample.stream_actor.Total.Increment
-import java.text.SimpleDateFormat
-import java.util.{Date, TimeZone}
 
 object Total {
   case class Increment(value: Long, avg: Double, id: String)
@@ -15,7 +16,7 @@ class Total extends Actor {
 
   override def receive: Receive = {
     case Increment(value, avg, id) =>
-      println(s"Recieved $value new measurements from id: $id -  Avg wind speed is: $avg")
+      println(s"Received $value new measurements from turbine with id: $id -  Avg wind speed is: $avg")
       total = total + value
 
       val date = new Date()

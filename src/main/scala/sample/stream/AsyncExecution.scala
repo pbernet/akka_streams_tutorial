@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 
 /**
   * Inspired by:
-  * http://www.beyondthelines.net/computing/akka-streams-patterns
+  * http://akka.io/blog/2016/07/06/threading-and-concurrency-in-akka-streams-explained
   *
   * Each flow stage is executed in parallel
   *
