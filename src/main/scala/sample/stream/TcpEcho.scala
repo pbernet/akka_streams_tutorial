@@ -1,15 +1,21 @@
 package sample.stream
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source, Tcp}
+import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object TcpEcho {
 
   /**
+   * Inspired by:
+   * http://doc.akka.io/docs/akka/2.5.4/scala/stream/stream-io.html
+   *
    * Use without parameters to start both server and 10 clients.
    *
    * Use parameters `server 0.0.0.0 6001` to start server listening on port 6001.
@@ -40,15 +46,33 @@ object TcpEcho {
 
   def server(system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
-    import system.dispatcher
+    implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
-    val handler = Sink.foreach[Tcp.IncomingConnection] { conn =>
-      println("Client connected from: " + conn.remoteAddress)
-      conn handleWith Flow[ByteString]
+    val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
+
+      // parse incoming commands and add ! at the end to show the client
+      val commandParser = Flow[String].takeWhile(_ != "BYE").map(_ + "!")
+
+      val welcomeMsg = s"Welcome to: ${connection.localAddress}, you are: ${connection.remoteAddress}!"
+      val welcome = Source.single(welcomeMsg)
+
+      val serverFlow = Flow[ByteString]
+        .via(Framing.delimiter(  //chunk the inputs up into actual lines of text
+          ByteString("\n"),
+          maximumFrameLength = 256,
+          allowTruncation = true))
+        .map(_.utf8String)
+        .via(commandParser)
+        .merge(welcome) // merge in the initial banner after parser
+        .map(_ + "\n")
+        .map(ByteString(_))
+
+      connection.handleWith(serverFlow)
     }
 
-    val connections = Tcp().bind(address, port)
+    //The idleTimeout setting results in this message on the client: "Connection reset by peer"
+    val connections = Tcp().bind(interface = address, port = port, idleTimeout = 10.seconds)
     val binding = connections.to(handler).run()
 
     binding.onComplete {
@@ -59,6 +83,8 @@ object TcpEcho {
         system.terminate()
     }
 
+    //TODO How would I shutdown the server on timeout, that is all clients are shutdown?
+    //The doc says: It is also possible to shut down the server’s socket by cancelling the IncomingConnection source connections
   }
 
   def client(system: ActorSystem, address: String, port: Int): Unit = {
@@ -66,21 +92,16 @@ object TcpEcho {
     implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
-    val testInput = ('a' to 'z').map(ByteString(_))
+    val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
 
-    val resultFuture = Source(testInput)
-      .via(Tcp().outgoingConnection(address, port))
-      .runFold(ByteString.empty) { (acc, in) => acc ++ in }
+    val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
 
-    resultFuture.onComplete {
-      case Success(result) =>
-        println(s"Result: " + result.utf8String)
-        println("Shutting down client")
-        system.terminate()
-      case Failure(e) =>
-        println("Failure: " + e.getMessage)
-        println("Shutting down client")
-        system.terminate()
-    }
+    val (conn: Future[Tcp.OutgoingConnection], closed: Future[Done]) =
+      Source(testInput)
+        .viaMat(connection)(Keep.right)
+        .toMat(Sink.foreach(each => println(each.utf8String)))(Keep.both)
+        .run()
+
+    closed.foreach(each => println(s"client closed: $each"))
   }
 }
