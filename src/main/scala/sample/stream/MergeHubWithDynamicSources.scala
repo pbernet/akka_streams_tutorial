@@ -30,11 +30,11 @@ object MergeHubWithDynamicSources {
     // be consumed by our consumer.
     val toConsumer: Sink[String, NotUsed] = runnableGraph.run()
 
-    // Feed two independent sources into the hub.
+    // Feed two dynamic fan-in sources into the hub
     Source.single("Hello!").runWith(toConsumer)
     Source.single("Hub!").runWith(toConsumer)
 
-    // Add another source and materialize it
+    // Feed another dynamic fan-in source
     val tickSource: Source[String, Cancellable] = Source.tick(1.seconds, 1.second, 1)
       .scan(0)(_ + _)
       .map(_.toString)
