@@ -73,7 +73,7 @@ object TcpEcho {
 
     //The idleTimeout setting results in this message on the client: "Connection reset by peer"
     val connections = Tcp().bind(interface = address, port = port, idleTimeout = 10.seconds)
-    val binding = connections.to(handler).run()
+    val (binding , done) = connections.watchTermination()(Keep.both).to(handler).run()
 
     binding.onComplete {
       case Success(b) =>
@@ -83,8 +83,9 @@ object TcpEcho {
         system.terminate()
     }
 
-    //TODO How would I shutdown the server on timeout, that is all clients are shutdown?
+    //TODO This does not work. How would I shutdown the server on timeout, that is all clients are shutdown?
     //The doc says: It is also possible to shut down the server’s socket by cancelling the IncomingConnection source connections
+    done.onComplete(_ => system.terminate())
   }
 
   def client(system: ActorSystem, address: String, port: Int): Unit = {
@@ -102,6 +103,6 @@ object TcpEcho {
         .toMat(Sink.foreach(each => println(each.utf8String)))(Keep.both)
         .run()
 
-    closed.foreach(each => println(s"client closed: $each"))
+    closed.onComplete(each => println(s"client closed: $each"))
   }
 }
