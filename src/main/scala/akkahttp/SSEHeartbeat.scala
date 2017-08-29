@@ -17,9 +17,9 @@ import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 /**
-  * Basic heartbeat example, enhanced with "delayed restarts with a backoff stage" on client side:
+  * Basic heartbeat example, enhanced with an additional backoffClient which is recovering
+  * thanks to the new RestartSource feature in akka 2.5.4 - see:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-error.html#delayed-restarts-with-a-backoff-stage
-  *
   *
   */
 object SSEHeartbeat {
@@ -30,8 +30,8 @@ object SSEHeartbeat {
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
-    simpleClient(address, port) //is not recovering
-    backoffClient(address, port) //is recovering
+    simpleClient(address, port) //is not recovering after RuntimeException on server
+    backoffClient(address, port) //is recovering after RuntimeException on server
   }
 
   private def server(address: String, port: Int) = {
