@@ -1,10 +1,10 @@
 package sample.stream
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -94,15 +94,9 @@ object TcpEcho {
     implicit val materializer = ActorMaterializer()
 
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
-
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
-
-    val (conn: Future[Tcp.OutgoingConnection], closed: Future[Done]) =
-      Source(testInput)
-        .viaMat(connection)(Keep.right)
-        .toMat(Sink.foreach(each => println(each.utf8String)))(Keep.both)
-        .run()
-
-    closed.onComplete(each => println(s"client closed: $each"))
+    val source: Source[ByteString, NotUsed] =  Source(testInput).via(connection)
+    val closed: Future[Done] = source.runForeach(each => println(each.utf8String))
+    closed.onComplete(each => println(s"Client closed: $each"))
   }
 }
