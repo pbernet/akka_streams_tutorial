@@ -21,6 +21,10 @@ import scala.util.{Failure, Success}
   * thanks to the new RestartSource feature in akka 2.5.4 - see:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-error.html#delayed-restarts-with-a-backoff-stage
   *
+  * An even more resilient sse server->client implementation is here:
+  * http://developer.lightbend.com/docs/alpakka/current/sse.html
+  * see EventSourceSpec in this repo for a working example
+  *
   */
 object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
@@ -56,7 +60,7 @@ object SSEHeartbeat {
                   time
                 })
                 .map(timeToServerSentEvent)
-                .keepAlive(1.second, () => ServerSentEvent.heartbeat)
+                .keepAlive(1.second, () => ServerSentEvent.heartbeat) //works as well: intersperse(ServerSentEvent.heartbeat)
             }
           }
         }
