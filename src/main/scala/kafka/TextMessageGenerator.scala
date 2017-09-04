@@ -8,9 +8,11 @@ import scala.collection.mutable.ListBuffer
   * Inspired by:
   * https://github.com/oel/akka-streams-text-mining/blob/master/src/main/scala/ngrams/TextMessage.scala
   *
+  * see as well:
+  * https://alvinalexander.com/scala/creating-random-strings-in-scala
   *
   */
-object TextMessage {
+object TextMessageGenerator {
   val alphabetSet: Set[Char] = ('a' to 'z').toSet
   val alphabets = alphabetSet.toList
   val vowelSet: Set[Char] = Set('a', 'e', 'i', 'o', 'u')
