@@ -9,12 +9,18 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.5.4",
   "com.typesafe.akka" %% "akka-http" % "10.0.9",
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % "0.11",
+  //akka-stream-kafka officially currently only supports scala 2.11 und akka 2.4.18 - see
+  //http://doc.akka.io/docs/akka-stream-kafka/current/home.html
+  //But it seems to work...
+  "com.typesafe.akka" %% "akka-stream-kafka" % "0.17",
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.4"  % "test",
   "com.typesafe.play" %% "play" % "2.6.0",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.github.andyglow" %% "websocket-scala-client" % "0.2.4"
+  "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
+  "org.apache.kafka" %% "kafka" % "0.11.0.0",
+  "net.manub" %% "scalatest-embedded-kafka" % "0.15.1"
 )
 
 fork in run := true
