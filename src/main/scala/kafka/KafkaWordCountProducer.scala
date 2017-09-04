@@ -63,6 +63,6 @@ object KafkaWordCountProducer extends App {
   }
 
   initializeTopic("wordcount-input")
-  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split(" ").toList.zipWithIndex.toMap.map(_.swap)
+  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
   produce("wordcount-input", randomMap)
 }
