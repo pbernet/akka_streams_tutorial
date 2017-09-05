@@ -1,10 +1,13 @@
 package kafka
 
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
+import akka.util.Timeout
+import kafka.TotalFake.Increment
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 
@@ -21,6 +24,8 @@ object WordCountConsumer extends App {
   implicit val ec = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
+  val total = system.actorOf(Props[TotalFake], "totalFake")
+
   def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer, new StringDeserializer)
       .withBootstrapServers("localhost:9092")
@@ -35,6 +40,11 @@ object WordCountConsumer extends App {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
         println(s"Offset: ${msg.record.offset()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        if(msg.record.key() == "fakenews") {
+          import akka.pattern.ask
+          implicit val askTimeout = Timeout(30.seconds)
+          (total ? Increment(msg.record.value.toInt, "fakenews")).mapTo[Done]
+        }
         Future(msg)
       }
       .mapAsync(1) { msg =>
