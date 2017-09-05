@@ -16,7 +16,7 @@ import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSeriali
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-object KafkaWordCountProducer extends App {
+object WordCountProducer extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 

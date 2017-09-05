@@ -37,7 +37,8 @@ public class WordCountExample {
 
         KStream<String, String> source = builder.stream("wordcount-input");
 
-
+        //TODO Add println as mentioned in:
+        //https://stackoverflow.com/questions/39327868/print-kafka-stream-input-out-to-console
         final Pattern pattern = Pattern.compile("\\W+");
         KStream counts  = source.flatMapValues(value-> Arrays.asList(pattern.split(value.toLowerCase())))
                 .map((key, value) -> new KeyValue<Object, Object>(value, value))
@@ -45,6 +46,10 @@ public class WordCountExample {
                 .groupByKey()
                 .count("CountStore").mapValues(value->Long.toString(value)).toStream();
         counts.to("wordcount-output");
+
+        //TODO Add KTable input? What is the benefit?
+        //https://github.com/apache/kafka/blob/0.11.0/streams/examples/src/main/java/org/apache/kafka/streams/examples/wordcount/WordCountDemo.java
+
 
         KafkaStreams streams = new KafkaStreams(builder, props);
 
