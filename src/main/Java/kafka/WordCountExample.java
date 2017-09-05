@@ -37,11 +37,10 @@ public class WordCountExample {
 
         KStream<String, String> source = builder.stream("wordcount-input");
 
-        //TODO Add println as mentioned in:
-        //https://stackoverflow.com/questions/39327868/print-kafka-stream-input-out-to-console
         final Pattern pattern = Pattern.compile("\\W+");
         KStream counts  = source.flatMapValues(value-> Arrays.asList(pattern.split(value.toLowerCase())))
                 .map((key, value) -> new KeyValue<Object, Object>(value, value))
+                .peek((key, value) -> System.out.println("Working on value: " + value))
                 .filter((key, value) -> (!value.equals("truth")))
                 .groupByKey()
                 .count("CountStore").mapValues(value->Long.toString(value)).toStream();
@@ -53,16 +52,19 @@ public class WordCountExample {
 
         KafkaStreams streams = new KafkaStreams(builder, props);
 
-        // This is for reset to work. Don't use in production - it causes the app to re-load the state from Kafka on every start
+        // TODO Research: This is for reset to work. Don't use in production - it causes the app to re-load the state from Kafka on every start
         streams.cleanUp();
 
         streams.start();
 
-        // usually the stream application would be running forever,
-        // in this example we just let it run for some time and stop since the input data is finite.
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                System.out.println("Shutdown Hook is running - about to close stream!");
+                streams.close();
+                System.out.println("Shutdown Hook is running - stream closed!");
+            }
+        });
+        System.out.println("Application running for a loooong time...");
         Thread.sleep(500000000000000L);
-
-        streams.close();
-
     }
 }
