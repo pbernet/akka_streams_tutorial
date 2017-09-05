@@ -31,12 +31,18 @@ object KafkaServer extends App {
 
   zooKeeperThread.start()
 
-
+  //Maybe not all the properties below are needed, they were copied from a working standalone installation
   val kafkaProperties = new Properties()
   kafkaProperties.put("zookeeper.connect", "localhost:2181")
-  kafkaProperties.put("broker.id", "1")
-  kafkaProperties.put("offsets.topic.replication.factor", "3")
+  kafkaProperties.put("broker.id", "0")
+  kafkaProperties.put("offsets.topic.replication.factor", "1")
   kafkaProperties.put("log.dirs", Files.createTempDirectory("kafka-logs").toString)
+  kafkaProperties.put("delete.topic.enable", "true")
+  kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
+  kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
+  kafkaProperties.put("transaction.state.log.min.isr", "1")
+  kafkaProperties.put("transaction.state.log.replication.factor", "1")
+  kafkaProperties.put("zookeeper.connection.timeout.ms", "6000")
 
   val kafkaConfig = KafkaConfig.fromProps(kafkaProperties)
 
