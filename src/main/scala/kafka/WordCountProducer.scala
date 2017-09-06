@@ -11,7 +11,7 @@ import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.{Done, NotUsed}
 import net.manub.embeddedkafka.EmbeddedKafkaConfig
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
+import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -22,26 +22,24 @@ object WordCountProducer extends App {
 
   implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(9092, 2181, Map("offsets.topic.replication.factor" -> "1"))
   val bootstrapServers = s"localhost:${embeddedKafkaConfig.kafkaPort}"
-  //TODO Needed?
-  val InitialMsg = "initial msg in topic, required to create the topic before any consumer subscribes to it"
+  //initial msg in topic, required to create the topic before any consumer subscribes to it
+  val InitialMsg = "truth"
 
   val partition0 = 0
 
-  //A keySerializer must be specified
-  //https://github.com/akka/reactive-kafka/issues/212
-  val producerSettings = ProducerSettings(system, new ByteArraySerializer, new StringSerializer)
+  val producerSettings = ProducerSettings(system, new StringSerializer, new StringSerializer)
     .withBootstrapServers(bootstrapServers)
 
   def initializeTopic(topic: String): Unit = {
     val producer = producerSettings.createKafkaProducer()
-    producer.send(new ProducerRecord(topic, partition0, null: Array[Byte], InitialMsg))
+    producer.send(new ProducerRecord(topic, partition0, null: String, InitialMsg))
     producer.close(60, TimeUnit.SECONDS)
   }
 
   /**
     * Produce unbounded messages to the topic using the messageMap
     */
-  def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[Array[Byte], String] = producerSettings): Future[Done] = {
+  def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
 
     val source = Source.fromIterator(() => {
       Iterator.continually{
@@ -53,7 +51,7 @@ object WordCountProducer extends App {
     })
       .map(each => {
         //Kafka automatically adds current time to Producer records
-        val record = new ProducerRecord(topic, partition0, null: Array[Byte], each)
+        val record = new ProducerRecord(topic, partition0, null: String, each)
         Message(record, NotUsed)
       })
       .throttle(10, 1.second, 10, ThrottleMode.shaping) //TODO Check outOfMemory when higher throughput
