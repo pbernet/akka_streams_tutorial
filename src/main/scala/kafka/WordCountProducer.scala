@@ -54,7 +54,7 @@ object WordCountProducer extends App {
         val record = new ProducerRecord(topic, partition0, null: String, each)
         Message(record, NotUsed)
       })
-      .throttle(10, 1.second, 10, ThrottleMode.shaping) //TODO Check outOfMemory when higher throughput
+      .throttle(1000, 1.second, 10, ThrottleMode.shaping)
       .viaMat(Producer.flow(settings))(Keep.right)
 
     source.runWith(Sink.ignore)
