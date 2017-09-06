@@ -39,7 +39,7 @@ object WordCountConsumer extends App {
   createAndRunConsumer("A")
   createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
 
-  private def createAndRunConsumer(id: String) = {
+  def createAndRunConsumer(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
         println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
