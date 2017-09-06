@@ -9,7 +9,7 @@ import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import kafka.TotalFake.Increment
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -26,13 +26,13 @@ object WordCountConsumer extends App {
 
   val total = system.actorOf(Props[TotalFake], "totalFake")
 
-  def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
-    ConsumerSettings(system, new StringDeserializer, new StringDeserializer)
+  def createConsumerSettings(group: String): ConsumerSettings[String, java.lang.Long] = {
+    ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
       //behavior of the consumer when it starts reading a partition for which it doesn’t have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      .withWakeupTimeout(10 seconds)
+      .withWakeupTimeout(10.seconds)
       .withMaxWakeups(10)
   }
 
