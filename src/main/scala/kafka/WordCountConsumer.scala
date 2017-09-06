@@ -51,7 +51,7 @@ object WordCountConsumer extends App {
         Future(msg)
       }
       .mapAsync(1) { msg =>
-        msg.committableOffset.commitScaladsl()
+        msg.committableOffset.commitScaladsl() //commit after processing gives an “at-least once delivery”
       }
       .runWith(Sink.ignore)
   }
