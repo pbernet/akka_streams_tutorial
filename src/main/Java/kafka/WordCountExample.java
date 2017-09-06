@@ -38,7 +38,8 @@ public class WordCountExample {
         KStream<String, String> textLines = builder.stream("wordcount-input");
         KTable<String, Long> wordCounts = textLines
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
-                .peek((key, value) -> System.out.println("Working on value: " + value))
+                .filter((key, value) -> (!value.equals("truth")))
+                .peek((key, value) -> System.out.println("Processing value: " + value))
                 .groupBy((key, word) -> word)
                 .count("Counts");
         wordCounts.to(Serdes.String(), Serdes.Long(), "wordcount-output");
