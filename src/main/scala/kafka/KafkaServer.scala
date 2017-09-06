@@ -8,6 +8,11 @@ import kafka.server.{KafkaConfig, KafkaServerStartable}
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig
 import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
 
+/**
+  * Default KafkaServer which embedded Zookeeper, inspired by:
+  * https://github.com/jamesward/koober/blob/master/kafka-server/src/main/scala/KafkaServer.scala
+  *
+  */
 object KafkaServer extends App {
 
   val quorumConfiguration = new QuorumPeerConfig {
@@ -31,7 +36,7 @@ object KafkaServer extends App {
 
   zooKeeperThread.start()
 
-  //Maybe not all the properties below are needed, they were copied from a working standalone installation
+  //Maybe not all the properties below are needed, they were copied from a working standalone Kafka installation
   val kafkaProperties = new Properties()
   kafkaProperties.put("zookeeper.connect", "localhost:2181")
   kafkaProperties.put("broker.id", "0")
@@ -48,13 +53,15 @@ object KafkaServer extends App {
 
   val kafka = new KafkaServerStartable(kafkaConfig)
 
+  println("About to start...")
   kafka.startup()
 
+  sys.addShutdownHook{
+    println("About to shutdown...")
+    kafka.shutdown()
+    kafka.awaitShutdown()
+    zooKeeperServer.stop()
+  }
+
   zooKeeperThread.join()
-
-  kafka.shutdown()
-  kafka.awaitShutdown()
-
-  zooKeeperServer.stop()
-
 }
