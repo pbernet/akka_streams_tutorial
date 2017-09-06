@@ -36,13 +36,13 @@ object WordCountConsumer extends App {
       .withMaxWakeups(10)
   }
 
-  createAndRunConsumer("1")
-  createAndRunConsumer("2") //seems to work, maybe not the best strategy to run a consumer group
+  createAndRunConsumer("A")
+  createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
 
   private def createAndRunConsumer(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
-        println(s"$id - Offset: ${msg.record.offset()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
         if (msg.record.key() == "fakenews") {
           import akka.pattern.ask
           implicit val askTimeout = Timeout(30.seconds)
