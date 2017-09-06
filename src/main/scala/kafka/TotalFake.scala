@@ -17,7 +17,7 @@ class TotalFake extends Actor {
 
   override def receive: Receive = {
     case Increment(value, id) =>
-      println(s"The new current total for fakenews count is: $value. Plus ${value - total} from last count.")
+      println(s"$id - The new current total for fakenews count is: $value. Plus ${value - total} from last count")
       total = value
       sender ! Done
   }

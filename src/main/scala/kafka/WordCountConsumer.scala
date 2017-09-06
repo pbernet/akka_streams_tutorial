@@ -15,7 +15,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Consumer, which uses the offset storage in Kafka:
+  * Start two consumers, which use the offset storage in Kafka:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
   *
   */
@@ -36,14 +36,17 @@ object WordCountConsumer extends App {
       .withMaxWakeups(10)
   }
 
-  val done =
+  createAndRunConsumer("1")
+  createAndRunConsumer("2") //seems to work, maybe not the best strategy to run a consumer group
+
+  private def createAndRunConsumer(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
-        println(s"Offset: ${msg.record.offset()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
-        if(msg.record.key() == "fakenews") {
+        println(s"$id - Offset: ${msg.record.offset()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        if (msg.record.key() == "fakenews") {
           import akka.pattern.ask
           implicit val askTimeout = Timeout(30.seconds)
-          (total ? Increment(msg.record.value.toInt, "fakenews")).mapTo[Done]
+          (total ? Increment(msg.record.value.toInt, id)).mapTo[Done]
         }
         Future(msg)
       }
@@ -51,11 +54,8 @@ object WordCountConsumer extends App {
         msg.committableOffset.commitScaladsl()
       }
       .runWith(Sink.ignore)
+  }
 
-  done.onComplete(_ => {
-    println("Finished processing, about to shutdown...")
-    system.terminate()
-  })
   sys.addShutdownHook{
     println("Got shutdown cmd from shell, about to shutdown...")
     system.terminate()
