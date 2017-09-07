@@ -9,7 +9,6 @@ import akka.kafka.scaladsl.Producer
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.{Done, NotUsed}
-import net.manub.embeddedkafka.EmbeddedKafkaConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringSerializer
 
@@ -20,8 +19,8 @@ object WordCountProducer extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
-  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(9092, 2181, Map("offsets.topic.replication.factor" -> "1"))
-  val bootstrapServers = s"localhost:${embeddedKafkaConfig.kafkaPort}"
+  val bootstrapServers = "localhost:9092"
+
   //initial msg in topic, required to create the topic before any consumer subscribes to it
   val InitialMsg = "truth"
 
