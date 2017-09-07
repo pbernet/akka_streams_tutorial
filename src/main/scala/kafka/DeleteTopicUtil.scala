@@ -7,16 +7,14 @@ import _root_.kafka.admin.TopicCommand
   * - No clients are connected to KafkaServer
   * - KafkaServer is running
   *
-  * TODO Currently only works for one topic
+  * An alternative would probably be the reset tool:
+  * https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams+Application+Reset+Tool
   */
 object DeleteTopicUtil extends App {
   try {
-    println("About to delete...")
-    val deleteargs1 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "wordcount-input")
-    val deleteargs2 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "wordcount-output")
-
+    println("About to delete Topics...")
+    val deleteargs1 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "wordcount-input, wordcount-output")
     TopicCommand.main(deleteargs1)
-    TopicCommand.main(deleteargs2)
   } catch {
     case e @ (_ : RuntimeException ) => println("Boom" + e)
   }
