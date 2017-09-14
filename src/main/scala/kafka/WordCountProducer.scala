@@ -77,6 +77,8 @@ object WordCountProducer extends App {
     }
     case e: UnknownTopicOrPartitionException => {
       println(s"UnknownTopicOrPartitionException $e occurred - Retry...")
+      //This kind of retry only works the first time KafkaServer is restarted
+      //Maybe a Actor with SupervisionStrategy is needed here...
       produce("wordcount-input", randomMap)
     }
     case ex: RuntimeException => {
