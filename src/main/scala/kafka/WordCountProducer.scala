@@ -10,6 +10,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.{Done, NotUsed}
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
 import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.Future
@@ -21,6 +22,7 @@ import scala.concurrent.duration._
   */
 object WordCountProducer extends App {
   implicit val system = ActorSystem()
+  implicit val ec = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
   val bootstrapServers = "localhost:9092"
@@ -60,12 +62,26 @@ object WordCountProducer extends App {
     source.runWith(Sink.ignore)
   }
 
-
   sys.addShutdownHook{
     println("About to shutdown...")
   }
 
   initializeTopic("wordcount-input")
   val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
-  produce("wordcount-input", randomMap)
+  val doneFuture = produce("wordcount-input", randomMap)
+
+  doneFuture.recover{
+    case e: NetworkException => {
+      println(s"NetworkException $e occurred - Retry...")
+      produce("wordcount-input", randomMap)
+    }
+    case e: UnknownTopicOrPartitionException => {
+      println(s"UnknownTopicOrPartitionException $e occurred - Retry...")
+      produce("wordcount-input", randomMap)
+    }
+    case ex: RuntimeException => {
+      println(s"Exception $ex occurred - Do not retry. Shutdown...")
+      system.terminate()
+    }
+  }
 }
