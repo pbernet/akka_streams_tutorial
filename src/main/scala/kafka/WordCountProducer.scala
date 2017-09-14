@@ -15,6 +15,10 @@ import org.apache.kafka.common.serialization.StringSerializer
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+/**
+  * Produce unbounded messages to the topic wordcount-input
+  *
+  */
 object WordCountProducer extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
@@ -35,9 +39,6 @@ object WordCountProducer extends App {
     producer.close(60, TimeUnit.SECONDS)
   }
 
-  /**
-    * Produce unbounded messages to the topic using the messageMap
-    */
   def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
 
     val source = Source.fromIterator(() => {
@@ -59,11 +60,12 @@ object WordCountProducer extends App {
     source.runWith(Sink.ignore)
   }
 
-  initializeTopic("wordcount-input")
-  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
-  produce("wordcount-input", randomMap)
 
   sys.addShutdownHook{
     println("About to shutdown...")
   }
+
+  initializeTopic("wordcount-input")
+  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
+  produce("wordcount-input", randomMap)
 }

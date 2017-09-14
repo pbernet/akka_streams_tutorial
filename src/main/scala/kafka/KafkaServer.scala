@@ -9,11 +9,12 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig
 import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
 
 /**
-  * Default KafkaServer which embedded Zookeeper, inspired by:
+  * KafkaServer which embedded Zookeeper, inspired by:
   * https://github.com/jamesward/koober/blob/master/kafka-server/src/main/scala/KafkaServer.scala
   *
-  * An alternative would be to use "Embedded Kafka":
-  * https://github.com/manub/scalatest-embedded-kafka
+  * Alternatives:
+  * - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
+  * - Use "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
   */
 object KafkaServer extends App {
 

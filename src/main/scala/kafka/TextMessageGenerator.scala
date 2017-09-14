@@ -8,7 +8,7 @@ import scala.collection.mutable.ListBuffer
   * Inspired by:
   * https://github.com/oel/akka-streams-text-mining/blob/master/src/main/scala/ngrams/TextMessage.scala
   *
-  * see as well:
+  * Shorter implementation:
   * https://alvinalexander.com/scala/creating-random-strings-in-scala
   *
   */

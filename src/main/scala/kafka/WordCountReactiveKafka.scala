@@ -15,6 +15,8 @@ import scala.concurrent.duration._
   *
   * The word count should probably happen like described here:
   * http://doc.akka.io/docs/akka/2.5.4/scala/stream/stream-cookbook.html#implementing-reduce-by-key
+  * and here:
+  * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#connecting-producer-and-consumer
   *
   *
   */
@@ -42,7 +44,7 @@ object WordCountReactiveKafka extends App {
 
 
   Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-input"))
-    //TODO Add the word count - Where is the commit handled at the beginning?
+    //TODO Add the word count - Where is the commit handled? Should it be at the beginning?
     //split by whitespace "\\W+" : .mapConcat{msg => msg.record.value().split("\\W+").toList
 
     //filter "truth" and ""

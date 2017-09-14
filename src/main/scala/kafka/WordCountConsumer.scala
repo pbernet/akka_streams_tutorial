@@ -15,7 +15,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Start two consumers, which use the offset storage in Kafka:
+  * Start two consumers A and B within the same group, which use the offset storage in Kafka:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
   *
   */
@@ -36,9 +36,6 @@ object WordCountConsumer extends App {
       .withMaxWakeups(10)
   }
 
-  createAndRunConsumer("A")
-  createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
-
   def createAndRunConsumer(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
@@ -55,6 +52,9 @@ object WordCountConsumer extends App {
       }
       .runWith(Sink.ignore)
   }
+
+  createAndRunConsumer("A")
+  createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
 
   sys.addShutdownHook{
     println("Got shutdown cmd from shell, about to shutdown...")
