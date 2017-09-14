@@ -10,13 +10,14 @@ import org.apache.kafka.streams.kstream.KTable;
 
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Inspired by:
- * https://github.com/gwenshap/kafka-streams-wordcount
- *
- * and adapted to latest fashion using KTable - see:
  * https://kafka.apache.org/documentation/streams
+ *
+ * using KTable see:
+ * https://docs.confluent.io/current/streams/concepts.html#ktable
  *
  */
 public class WordCountKStreams {
@@ -49,9 +50,14 @@ public class WordCountKStreams {
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
-                System.out.println("Shutdown Hook is running - about to close stream!");
-                streams.close();
-                System.out.println("Shutdown Hook is running - stream closed!");
+                System.out.println("About to close stream...");
+                Boolean shutdownResult = streams.close(10L, TimeUnit.SECONDS);
+                if (shutdownResult) {
+                    System.out.println("Stream closed successfully");
+                } else {
+                    System.out.println("Unable to close stream within the 10 seconds timeout");
+                }
+
             }
         });
         System.out.println("Application running for a loooong time...");
