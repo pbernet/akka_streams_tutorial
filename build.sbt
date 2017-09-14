@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "org.apache.kafka" %% "kafka" % "0.11.0.0",
-  "org.apache.kafka" % "kafka-streams" % "0.11.0.0"
+  "org.apache.kafka" % "kafka-streams" % "0.11.0.1"
 )
 
 fork in run := true

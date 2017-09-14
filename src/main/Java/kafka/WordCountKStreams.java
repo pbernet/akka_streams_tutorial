@@ -10,6 +10,7 @@ import org.apache.kafka.streams.kstream.KTable;
 
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,7 +35,7 @@ public class WordCountKStreams {
         //earliest: automatically reset the offset to the earliest offset
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        KStreamBuilder builder = new KStreamBuilder();
+        final KStreamBuilder builder = new KStreamBuilder();
         KStream<String, String> textLines = builder.stream("wordcount-input");
         KTable<String, Long> wordCounts = textLines
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
@@ -45,10 +46,13 @@ public class WordCountKStreams {
                 .count("Counts");
         wordCounts.to(Serdes.String(), Serdes.Long(), "wordcount-output");
 
-        KafkaStreams streams = new KafkaStreams(builder, config);
-        streams.start();
+        final KafkaStreams streams = new KafkaStreams(builder, config);
+        final CountDownLatch latch = new CountDownLatch(1);
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
+
+        // attach shutdown handler to catch control-c
+        Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
+            @Override
             public void run() {
                 System.out.println("About to close stream...");
                 Boolean shutdownResult = streams.close(10L, TimeUnit.SECONDS);
@@ -57,10 +61,18 @@ public class WordCountKStreams {
                 } else {
                     System.out.println("Unable to close stream within the 10 seconds timeout");
                 }
-
+                latch.countDown();
             }
         });
-        System.out.println("Application running for a loooong time...");
-        Thread.sleep(500000000000000L);
+
+        try {
+            streams.start();
+            latch.await();
+        } catch (Throwable e) {
+            System.out.println("Exception occurred: " + e.getMessage());
+            System.exit(1);
+        }
+
+        System.exit(0);
     }
 }

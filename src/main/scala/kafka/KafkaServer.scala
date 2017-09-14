@@ -47,7 +47,6 @@ object KafkaServer extends App {
   kafkaProperties.put("log.dirs", Files.createTempDirectory("kafka-logs").toString)
   kafkaProperties.put("delete.topic.enable", "true")
   kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
-  kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
   kafkaProperties.put("transaction.state.log.min.isr", "1")
   kafkaProperties.put("transaction.state.log.replication.factor", "1")
   kafkaProperties.put("zookeeper.connection.timeout.ms", "6000")
