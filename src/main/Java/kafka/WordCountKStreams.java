@@ -15,11 +15,11 @@ import java.util.Properties;
  * Inspired by:
  * https://github.com/gwenshap/kafka-streams-wordcount
  *
- * adapted to latest fashion using KTable - see:
+ * and adapted to latest fashion using KTable - see:
  * https://kafka.apache.org/documentation/streams
  *
  */
-public class WordCountExample {
+public class WordCountKStreams {
 
     public static void main(String[] args) throws Exception{
 

@@ -1,13 +1,11 @@
 package sample.stream
 
-import java.lang.Exception
-
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.{Sink, Source, SourceQueue}
 import akka.stream.{ActorMaterializer, OverflowStrategy, QueueOfferResult, ThrottleMode}
-import akka.stream.scaladsl.{Sink, Source, SourceQueue, SourceQueueWithComplete}
 
-import scala.concurrent.{Await, Future, TimeoutException}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.Random
 
 /**
@@ -16,19 +14,18 @@ import scala.util.Random
   */
 
 object SendingMessagesToStream {
+  implicit val system = ActorSystem("Sys")
+  implicit val materializer = ActorMaterializer()
+  implicit val ec = system.dispatcher
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("Sys")
-    implicit val materializer = ActorMaterializer()
-    implicit val ec = system.dispatcher
-
 
     class SyncQueue[T](q: SourceQueue[T]) {
 
       /**
         * @throws TimeoutException if it couldn't get the value within `maxWait` time
         */
-      def offerBlocking(elem: T, maxWait: Duration = 1.seconds): Future[QueueOfferResult] =
+      def offerBlocking(elem: T, maxWait: Duration = 1.second): Future[QueueOfferResult] =
         synchronized {
           //offer returns a Future, which completes with the result of the enqueue operation
           //must only be used from a single thread
@@ -46,9 +43,7 @@ object SendingMessagesToStream {
           throw new RuntimeException("random exception")
         }
       } catch {
-        case ex: RuntimeException => Future {
-          "Exception"
-        }
+        case ex:RuntimeException => Future(s"Exception for user: $userID")     //TODO Why does not show?
       }
       Future (s"user: $userID")
     }
@@ -62,7 +57,7 @@ object SendingMessagesToStream {
     val targetSyncQueue = new SyncQueue(targetQueue)
 
     Source(1 to Int.MaxValue)
-      //.throttle(1000, 1.second, 1, ThrottleMode.shaping)
+      .throttle(10, 1.second, 1, ThrottleMode.shaping)
       .mapAsync(1)(x => targetSyncQueue.offerBlocking(asyncOp(x)))
       .runWith(Sink.ignore)
   }
