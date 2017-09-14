@@ -13,16 +13,16 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object WebSocketClient {
-  def apply(id: String, endpoint: String, supervisor: ActorRef)
+  def apply(id: String, endpoint: String, windTurbineSimulator: ActorRef)
            (implicit
             system: ActorSystem,
             materializer: ActorMaterializer,
             executionContext: ExecutionContext) = {
-    new WebSocketClient(id, endpoint, supervisor)(system, materializer, executionContext)
+    new WebSocketClient(id, endpoint, windTurbineSimulator)(system, materializer, executionContext)
   }
 }
 
-class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
+class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorRef)
                      (implicit
                       system: ActorSystem,
                       materializer: ActorMaterializer,
@@ -72,19 +72,19 @@ class WebSocketClient(id: String, endpoint: String, supervisor: ActorRef)
   val connected =
     upgradeResponse.map { upgrade =>
       upgrade.response.status match {
-        case StatusCodes.SwitchingProtocols => supervisor ! Upgraded
-        case statusCode => supervisor ! FailedUpgrade(statusCode)
+        case StatusCodes.SwitchingProtocols => windTurbineSimulator ! Upgraded
+        case statusCode => windTurbineSimulator ! FailedUpgrade(statusCode)
       }
     }
 
   connected.onComplete {
-    case Success(_) => supervisor ! Connected
-    case Failure(ex) => supervisor ! ConnectionFailure(ex)
+    case Success(_) => windTurbineSimulator ! Connected
+    case Failure(ex) => windTurbineSimulator ! ConnectionFailure(ex)
   }
-  connected.onFailure{case ex: Throwable => supervisor ! ConnectionFailure(ex)}
+  connected.onFailure{case ex: Throwable => windTurbineSimulator ! ConnectionFailure(ex)}
 
   closed.map { _ =>
-    supervisor ! Terminated
+    windTurbineSimulator ! Terminated
   }
-  closed.onFailure{case ex: Throwable => supervisor ! ConnectionFailure(ex)}
+  closed.onFailure{case ex: Throwable => windTurbineSimulator ! ConnectionFailure(ex)}
 }
