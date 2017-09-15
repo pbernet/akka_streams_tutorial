@@ -54,7 +54,7 @@ public class WordCountKStreams {
         Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
             @Override
             public void run() {
-                System.out.println("About to close stream...");
+                System.out.println("Got control-c cmd from shell, about to close stream...");
                 Boolean shutdownResult = streams.close(10L, TimeUnit.SECONDS);
                 if (shutdownResult) {
                     System.out.println("Stream closed successfully");
