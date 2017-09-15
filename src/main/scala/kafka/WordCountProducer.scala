@@ -3,15 +3,17 @@ package kafka
 import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
+import akka.kafka.ProducerMessage.Message
 import akka.kafka.ProducerSettings
-import akka.pattern.{Backoff, BackoffSupervisor}
-import akka.stream.ActorMaterializer
-import akka.util.Timeout
-import kafka.WordCountProducerActor.Produce
+import akka.kafka.scaladsl.Producer
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{ActorMaterializer, ThrottleMode}
+import akka.{Done, NotUsed}
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
 import org.apache.kafka.common.serialization.StringSerializer
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -39,60 +41,44 @@ object WordCountProducer extends App {
     producer.close(60, TimeUnit.SECONDS)
   }
 
-//  def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
-//
-//    val source = Source.fromIterator(() => {
-//      Iterator.continually{
-//        val nextInt = java.util.concurrent.ThreadLocalRandom.current().nextInt(messageMap.size)
-//        val nextString = messageMap.getOrElse(nextInt, "N/A")
-//        println("Next Message: " + nextString)
-//        nextString
-//      }
-//    })
-//      .map(each => {
-//        //Kafka automatically adds current time to Producer records
-//        val record = new ProducerRecord(topic, partition0, null: String, each)
-//        Message(record, NotUsed)
-//      })
-//      .throttle(1000, 1.second, 10, ThrottleMode.shaping)
-//      .viaMat(Producer.flow(settings))(Keep.right)
-//
-//    source.runWith(Sink.ignore)
-//  }
+  def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
+
+    val source = Source.fromIterator(() => {
+      Iterator.continually{
+        val nextInt = java.util.concurrent.ThreadLocalRandom.current().nextInt(messageMap.size)
+        val nextString = messageMap.getOrElse(nextInt, "N/A")
+        println("Next Message: " + nextString)
+        nextString
+      }
+    })
+      .map(each => {
+        //Kafka automatically adds current time to Producer records
+        val record = new ProducerRecord(topic, partition0, null: String, each)
+        Message(record, NotUsed)
+      })
+      .throttle(1, 1.second, 10, ThrottleMode.shaping)
+      .viaMat(Producer.flow(settings))(Keep.right)
+
+    source.runWith(Sink.ignore)
+  }
 
   sys.addShutdownHook{
-    println("About to shutdown...")
+    println("Got control-c cmd from shell, about to shutdown...")
   }
 
   initializeTopic("wordcount-input")
+  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
+  val doneFuture = produce("wordcount-input", randomMap)
 
-  val props =  WordCountProducerActor.props()
-  val producerActor = system.actorOf(props, name = "WordCountProducerActor")
-  val supervisor = BackoffSupervisor.props(
-    Backoff.onFailure(
-      props,
-      childName = "1",
-      minBackoff = 1.second,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.2
-    ))
-
-  system.actorOf(supervisor, name = s"backoff-supervisor")
-
-  import akka.pattern.ask
-  implicit val askTimeout = Timeout(30.seconds)
-  val doneFuture = producerActor ? Produce
-
+  //TODO Is this still desired/needed since the akka.kafka.producer config in application.conf provokes a retry
   doneFuture.recover{
     case e: NetworkException => {
       println(s"NetworkException $e occurred - Retry...")
-      //producerActor ? Produce
+      produce("wordcount-input", randomMap)
     }
     case e: UnknownTopicOrPartitionException => {
       println(s"UnknownTopicOrPartitionException $e occurred - Retry...")
-      //This kind of retry only works the first time KafkaServer is restarted
-      //Maybe a Actor with SupervisionStrategy is needed here...
-      //producerActor ? Produce
+      produce("wordcount-input", randomMap)
     }
     case ex: RuntimeException => {
       println(s"Exception $ex occurred - Do not retry. Shutdown...")

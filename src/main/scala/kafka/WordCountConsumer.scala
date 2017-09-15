@@ -57,7 +57,7 @@ object WordCountConsumer extends App {
   createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
 
   sys.addShutdownHook{
-    println("Got shutdown cmd from shell, about to shutdown...")
+    println("Got control-c cmd from shell, about to shutdown...")
     system.terminate()
   }
 }

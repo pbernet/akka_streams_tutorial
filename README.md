@@ -30,17 +30,15 @@ The ubiquitous word count example. Start the classes in the order below and watc
 | WordCountConsumer.scala   | Consume aggregated results from topic _wordcount-output_. Implemented with [reactive-kafka](https://github.com/akka/reactive-kafka "Doc")    |
 | DeleteTopicUtil.scala   | Utility to reset the offset    | 
 
-The clients communicate via a binary protocol over TCP with the server. Behaviour after a restart:
+The clients communicate via a binary protocol over TCP with the server. After a restart:
 * WordCountProducer resumes feeding words
 * WordCountKStreams resumes processing words at the stored offset and thus keeping the state
 * WordCountConsumer resumes at the stored offset
 
 Shutting down the KafkaServer results in reporting all of the clients that the Broker is not available anymore.
-However, if the KafkaServer is restarted, none of the clients is able to resume.
-Only after restarting the clients they are able to resume.  
+After the KafkaServer is restarted, the clients are able to resume. 
 
-
-TODOs:
-* Improve resilience of clients after KafkaServer restart
-* Finalize reactive kafka client WordCountReactiveKafka
-* Add Apache Flink [example word count client](https://github.com/mkuthan/example-flink-kafka/blob/master/src/main/scala/example/flink/FlinkExample.scala "Example")  
+## TODOs ##
+* Implement WordCountReactiveKafka with reactive-kafka, although akka-streams is not suited well for stateful processing 
+* Add Apache Flink [example word count client](https://github.com/mkuthan/example-flink-kafka/blob/master/src/main/scala/example/flink/FlinkExample.scala "Example") 
+* Implement the Windturbine example with Kafka 
