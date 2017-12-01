@@ -7,8 +7,11 @@ Two more complex examples are worth mentioning:
 
 
 ## Windturbine Example in pkg _sample.stream_actor_ ##
-Working sample from the [blog series 1-3](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
- from Colin Breck where Actors are used to model mutable state, life-cycle management and fault-tolerance in combination with akka streams.
+Working sample from the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
+ from Colin Breck where Actors are used to model shared mutable state, life-cycle management and fault-tolerance in combination with akka streams.
+ Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
+Islands in the Stream: Integrating Akka Streams and Akka Actors
+](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
 
 | Class                     | Description     |
 | -------------------       |-----------------|
@@ -18,7 +21,7 @@ Working sample from the [blog series 1-3](http://blog.colinbreck.com/integrating
  The clients communicate via websockets with the server. After a restart of SimulateWindTurbines the clients are able to resume. 
  Shutting down the WindTurbineServer results in reporting all of the clients that the server is not reachable.
  After the WindTurbineServer is restarted the clients are able to resume. 
- There is not persistence yet, so the processing just continuous.
+ There is not persistence yet in this example, so the processing just continuous.
 
 
 ## Apache Kafka WordCount in pkg _kafka_ ##
@@ -37,11 +40,11 @@ The clients communicate via a binary protocol over TCP with the server. Behaviou
 * WordCountKStreams resumes processing words at the stored offset and thus keeping the state
 * WordCountConsumer resumes consuming at the stored offset
 
-Shutting down the KafkaServer results in reporting all of the clients that the Broker is not available anymore.
+Shutting down the KafkaServer results in reporting all of the clients that the Kafka Broker is not available anymore.
 After the KafkaServer is restarted the clients are able to resume. 
 
 ## TODOs ##
-* Add persistence to the Windturbine Example
+* Add persistent actors to the the current version of the Windturbine example
+* Implement the Windturbine example with Kafka 
 * Implement WordCountReactiveKafka with reactive-kafka, although akka-streams is not suited well for stateful processing 
 * Add Apache Flink [example word count client](https://github.com/mkuthan/example-flink-kafka/blob/master/src/main/scala/example/flink/FlinkExample.scala "Example") 
-* Implement the Windturbine example with Kafka 
