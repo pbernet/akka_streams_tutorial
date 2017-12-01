@@ -9,13 +9,13 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
   * Inspired by:
   * http://akka.io/blog/2016/07/06/threading-and-concurrency-in-akka-streams-explained
   *
-  * Each flow stage is executed in parallel
+  * Each flow stage processes all values (in parallel)
   *
   */
 object AsyncExecution {
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("Sys")
+    implicit val system = ActorSystem("AsyncExecution")
     implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
