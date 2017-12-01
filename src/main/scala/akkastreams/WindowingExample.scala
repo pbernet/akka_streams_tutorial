@@ -7,10 +7,9 @@ package akkastreams
   * Doc:
   * https://softwaremill.com/windowing-data-in-akka-streams
   *
-  * Probably Apache Flink is more suited for that job - see:
+  * Probably Apache Flink is more suited for stateful stream processing - see:
   * https://ci.apache.org/projects/flink/flink-docs-release-1.3/concepts/programming-model.html#windows
   * https://flink.apache.org/news/2015/12/04/Introducing-windows.html
-  *
   */
 import java.time._
 
@@ -25,8 +24,7 @@ import scala.util.Random
 
 object WindowingExample {
   def main(args: Array[String]): Unit = {
-
-    implicit val as = ActorSystem()
+    implicit val as = ActorSystem("WindowingExample")
     implicit val mat = ActorMaterializer()
 
     val random = new Random()
