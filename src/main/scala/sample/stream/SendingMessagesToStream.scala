@@ -14,7 +14,7 @@ import scala.util.Random
   */
 
 object SendingMessagesToStream {
-  implicit val system = ActorSystem("Sys")
+  implicit val system = ActorSystem("SendingMessagesToStream")
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
 
@@ -43,7 +43,7 @@ object SendingMessagesToStream {
           throw new RuntimeException("random exception")
         }
       } catch {
-        case ex:RuntimeException => Future(s"Exception for user: $userID")     //TODO Why does not show?
+        case ex:RuntimeException => Future(s"Exception for user: $userID")     //TODO Why does this ex not show?
       }
       Future (s"user: $userID")
     }
