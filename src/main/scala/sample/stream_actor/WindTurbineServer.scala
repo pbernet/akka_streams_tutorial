@@ -16,6 +16,7 @@ import sample.stream_actor.Total.Increment
 import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 
 /**
@@ -96,12 +97,14 @@ object WindTurbineServer {
     val bindingFuture: Future[ServerBinding] = Http().bindAndHandle(route, httpInterface, httpPort)
 
     bindingFuture.map { serverBinding =>
-      log.info(s"Bound to ${serverBinding.localAddress} ")
-    }.onFailure {
-      case ex: Exception =>
+      log.info(s"Bound to: ${serverBinding.localAddress} ")
+    }.onComplete {
+      case Success(value) => log.info("WindTurbineServer started successfully")
+      case Failure(ex) => {
         log.error(ex, "Failed to bind to {}:{}!", httpInterface, httpPort)
         Http().shutdownAllConnectionPools()
         system.terminate()
+      }
     }
 
     scala.sys.addShutdownHook {
