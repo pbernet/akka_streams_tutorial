@@ -23,7 +23,7 @@ import scala.concurrent.duration._
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
   */
 object WebsocketChatEcho {
-  implicit val actorSystem = ActorSystem(name = "example-actor-system")
+  implicit val actorSystem = ActorSystem(name = "WebsocketChatEcho")
   implicit val streamMaterializer = ActorMaterializer()
   implicit val executionContext = actorSystem.dispatcher
   val log: LoggingAdapter = actorSystem.log
@@ -62,14 +62,14 @@ object WebsocketChatEcho {
 
     val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) =
       MergeHub.source[String]
-        .map { elem => println(s"Server recieved after MergeHub: $elem"); elem}
+        .map { elem => println(s"Server received after MergeHub: $elem"); elem}
         .via(sampleProcessing)
         .toMat(BroadcastHub.sink[String])(Keep.both).run()
 
     val echoFlow: Flow[Message, Message, NotUsed] =
     Flow[Message].mapAsync(1) {
       case TextMessage.Strict(text) =>
-        println(s"Server recieved: $text")
+        println(s"Server received: $text")
         Future.successful(text)
       case streamed: TextMessage.Streamed => streamed.textStream.runFold("") {
         (acc, next) => acc ++ next
@@ -92,8 +92,7 @@ object WebsocketChatEcho {
     val bindingFuture = Http().bindAndHandle(wsChatStreamsOnlyRoute, address, port)
     bindingFuture
       .map(_.localAddress)
-      .map(addr => s"Bound to $addr")
-      .foreach(log.info)
+      .map(addr => println(s"Server bound to: $addr"))
   }
 
   private def clientWebSocketClientFlow(address: String, port: Int) = {
@@ -117,6 +116,7 @@ object WebsocketChatEcho {
       }
     }
 
+    //TODO be more verbose and check disconnect
     connected.onComplete(println)
     closed.foreach(_ => println("closed"))
   }
