@@ -2,16 +2,22 @@ package kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.state.KeyValueStore;
 
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+
 
 /**
  * Inspired by:
@@ -23,10 +29,10 @@ import java.util.concurrent.TimeUnit;
  */
 public class WordCountKStreams {
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) {
 
         Properties config = new Properties();
-        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount");
+        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application");
         config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
@@ -35,7 +41,7 @@ public class WordCountKStreams {
         //earliest: automatically reset the offset to the earliest offset
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        final KStreamBuilder builder = new KStreamBuilder();
+        final StreamsBuilder builder = new StreamsBuilder();
         KStream<String, String> textLines = builder.stream("wordcount-input");
         KTable<String, Long> wordCounts = textLines
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
@@ -43,14 +49,12 @@ public class WordCountKStreams {
                 .filter((key, value) -> (!(value.equals(""))))
                 .peek((key, value) -> System.out.println("Processing value: " + value))
                 .groupBy((key, word) -> word)
-                .count("Counts");
-        wordCounts.to(Serdes.String(), Serdes.Long(), "wordcount-output");
+                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("counts-store"));
+        wordCounts.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
-        final KafkaStreams streams = new KafkaStreams(builder, config);
+        final KafkaStreams streams = new KafkaStreams(builder.build(), config);
         final CountDownLatch latch = new CountDownLatch(1);
 
-
-        // attach shutdown handler to catch control-c
         Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
             @Override
             public void run() {
@@ -69,7 +73,7 @@ public class WordCountKStreams {
             streams.start();
             latch.await();
         } catch (Throwable e) {
-            System.out.println("Exception occurred: " + e.getMessage());
+            System.out.println("Exception occurred during startup: " + e.getMessage());
             System.exit(1);
         }
 
