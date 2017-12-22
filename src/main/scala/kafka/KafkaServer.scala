@@ -50,7 +50,7 @@ object KafkaServer extends App {
   kafkaProperties.put("transaction.state.log.min.isr", "1")
   kafkaProperties.put("transaction.state.log.replication.factor", "1")
   kafkaProperties.put("zookeeper.connection.timeout.ms", "6000")
-  kafkaProperties.put("num.partitions", "2")
+  kafkaProperties.put("num.partitions", "10") //for both topics
 
   val kafkaConfig = KafkaConfig.fromProps(kafkaProperties)
 

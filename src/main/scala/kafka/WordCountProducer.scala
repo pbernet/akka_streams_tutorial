@@ -1,6 +1,7 @@
 package kafka
 
-import java.util.concurrent.TimeUnit
+import java.util
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import akka.actor.ActorSystem
 import akka.kafka.ProducerMessage.Message
@@ -9,15 +10,16 @@ import akka.kafka.scaladsl.Producer
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.{Done, NotUsed}
-import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.{Partitioner, ProducerRecord}
 import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.kafka.common.{Cluster, PartitionInfo}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Produce unbounded messages to the topic wordcount-input
+  * Produce unbounded text messages to the topic wordcount-input
   *
   */
 object WordCountProducer extends App {
@@ -34,6 +36,7 @@ object WordCountProducer extends App {
 
   val producerSettings = ProducerSettings(system, new StringSerializer, new StringSerializer)
     .withBootstrapServers(bootstrapServers)
+    .withProperty("partitioner.class", "kafka.CustomPartitioner")
 
   def initializeTopic(topic: String): Unit = {
     val producer = producerSettings.createKafkaProducer()
@@ -52,9 +55,9 @@ object WordCountProducer extends App {
       }
     })
       .map(each => {
-        //Kafka automatically adds current time to Producer records
-        val record = new ProducerRecord(topic, partition0, null: String, each)
-        Message(record, NotUsed)
+        //Use CustomPartitioner hook
+        val recordWithCurrentTimestamp = new ProducerRecord(topic, null: String, each)
+        Message(recordWithCurrentTimestamp, NotUsed)
       })
       .throttle(1, 1.second, 10, ThrottleMode.shaping)
       .viaMat(Producer.flow(settings))(Keep.right)
@@ -64,13 +67,13 @@ object WordCountProducer extends App {
 
   sys.addShutdownHook{
     println("Got control-c cmd from shell, about to shutdown...")
+    system.terminate()
   }
 
   initializeTopic("wordcount-input")
   val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
   val doneFuture = produce("wordcount-input", randomMap)
 
-  //TODO Is this still desired/needed since the akka.kafka.producer config in application.conf provokes a retry
   doneFuture.recover{
     case e: NetworkException => {
       println(s"NetworkException $e occurred - Retry...")
@@ -81,8 +84,43 @@ object WordCountProducer extends App {
       produce("wordcount-input", randomMap)
     }
     case ex: RuntimeException => {
-      println(s"Exception $ex occurred - Do not retry. Shutdown...")
+      println(s"RuntimeException $ex occurred - Do not retry. Shutdown...")
       system.terminate()
     }
   }
+}
+
+/**
+  * Example of a CustomPartitioner hook in the producer realm
+  * Done like this, because here we have access to cluster.availablePartitionsForTopic
+  * The partitioning here gives no added value for the downstream WordCountKStreams nor WordCountConsumer,
+  * because the whole message is put into the partition and WordCountKStreams counts words
+  *
+  */
+class CustomPartitioner extends Partitioner {
+  override def partition(topic: String, key: Any, keyBytes: Array[Byte], value: Any, valueBytes: Array[Byte], cluster: Cluster): Int = {
+    val partitionInfoList: util.List[PartitionInfo] = cluster.availablePartitionsForTopic(topic)
+    val partitionCount: Int = partitionInfoList.size
+    val fakeNewsPartition: Int = 0
+
+    //System.out.println("Partitioner received key: " + key + " and value: " + value);
+
+    if (value.toString.contains("fakeNews")) {
+      System.out.println("Send message: " + value + "   to fakeNewsPartition")
+      fakeNewsPartition
+    }
+    else ThreadLocalRandom.current.nextInt(1, partitionCount) //round robin
+  }
+
+  override def close(): Unit = {
+    System.out.println("Partitioner: " + Thread.currentThread + " received close")
+  }
+
+  override def configure(configs: util.Map[String, _]): Unit = {
+    System.out.println("Partitioner received configure with configuration: " + configs)
+  }
+}
+
+object CustomPartitioner {
+  private def deserialize[V](objectData: Array[Byte]): V = org.apache.commons.lang3.SerializationUtils.deserialize(objectData).asInstanceOf[V]
 }
