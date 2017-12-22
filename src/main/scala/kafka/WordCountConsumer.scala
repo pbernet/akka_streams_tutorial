@@ -30,7 +30,7 @@ object WordCountConsumer extends App {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
-      //behavior of the consumer when it starts reading a partition for which it doesn’t have a committed offset or if the committed offset it has is invalid
+      //Define consumer behavior upon startint to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withWakeupTimeout(10.seconds)
       .withMaxWakeups(10)
@@ -42,7 +42,7 @@ object WordCountConsumer extends App {
         println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
         if (msg.record.key() == "fakenews") {
           import akka.pattern.ask
-          implicit val askTimeout = Timeout(30.seconds)
+          implicit val askTimeout: Timeout = Timeout(30.seconds)
           (total ? Increment(msg.record.value.toInt, id)).mapTo[Done]
         }
         Future(msg)
