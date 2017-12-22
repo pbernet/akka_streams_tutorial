@@ -15,6 +15,10 @@ object DeleteTopicUtil extends App {
     println("About to delete Topics...")
     val deleteargs1 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "wordcount-input, wordcount-output")
     TopicCommand.main(deleteargs1)
+
+    val deleteargs2 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "messagecount-output")
+    TopicCommand.main(deleteargs2)
+
   } catch {
     case e @ (_ : RuntimeException ) => println("Boom" + e)
   }

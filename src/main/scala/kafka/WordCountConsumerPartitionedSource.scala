@@ -10,7 +10,7 @@ import akka.kafka.{ConsumerMessage, ConsumerSettings, Subscriptions}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
-import kafka.TotalFake.Increment
+import kafka.TotalFake.IncrementWord
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
 
@@ -51,7 +51,7 @@ object WordCountConsumerPartitionedSource extends App {
         if (msg.record.key() == "fakenews") {
           import akka.pattern.ask
           implicit val askTimeout = Timeout(30.seconds)
-        (total ? Increment(msg.record.value.toInt, id)).mapTo[Done]
+        (total ? IncrementWord(msg.record.value.toInt, id)).mapTo[Done]
       }
       batch.updated(msg.committableOffset)
       }

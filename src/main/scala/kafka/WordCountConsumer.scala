@@ -7,7 +7,7 @@ import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
-import kafka.TotalFake.Increment
+import kafka.TotalFake.{IncrementMessage, IncrementWord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
 
@@ -15,8 +15,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Start two consumers A and B within the same group, which use the offset storage in Kafka:
+  * Start consumers A and B within the same group
+  * Start consumer C as a single consumer
+  *
+  * Use the offset storage in Kafka:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
+  *
   *
   */
 object WordCountConsumer extends App {
@@ -36,14 +40,14 @@ object WordCountConsumer extends App {
       .withMaxWakeups(10)
   }
 
-  def createAndRunConsumer(id: String) = {
+  def createAndRunConsumerWords(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
-        println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
         if (msg.record.key() == "fakenews") {
           import akka.pattern.ask
           implicit val askTimeout: Timeout = Timeout(30.seconds)
-          (total ? Increment(msg.record.value.toInt, id)).mapTo[Done]
+          (total ? IncrementWord(msg.record.value.toInt, id)).mapTo[Done]
         }
         Future(msg)
       }
@@ -53,8 +57,25 @@ object WordCountConsumer extends App {
       .runWith(Sink.ignore)
   }
 
-  createAndRunConsumer("A")
-  createAndRunConsumer("B") //seems to work, maybe not the best strategy to run a consumer group
+  def createAndRunConsumerMessages(id: String) = {
+    Consumer.committableSource(createConsumerSettings("message consumer group"), Subscriptions.topics("messagecount-output"))
+      .mapAsync(1) { msg =>
+        //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        import akka.pattern.ask
+        implicit val askTimeout: Timeout = Timeout(30.seconds)
+        (total ? IncrementMessage(msg.record.value.toInt, id)).mapTo[Done]
+        Future(msg)
+      }
+      .mapAsync(1) { msg =>
+        msg.committableOffset.commitScaladsl() //commit after processing gives an “at-least once delivery”
+      }
+      .runWith(Sink.ignore)
+  }
+
+  createAndRunConsumerWords("A")
+  createAndRunConsumerWords("B")
+  createAndRunConsumerMessages("C")
+
 
   sys.addShutdownHook{
     println("Got control-c cmd from shell, about to shutdown...")

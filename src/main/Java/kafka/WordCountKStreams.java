@@ -43,14 +43,22 @@ public class WordCountKStreams {
 
         final StreamsBuilder builder = new StreamsBuilder();
         KStream<String, String> textLines = builder.stream("wordcount-input");
-        KTable<String, Long> wordCounts = textLines
+
+        KTable<String, Long> wordCount = textLines
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
                 .filter((key, value) -> (!(value.equals("truth")))) //we don't want that do we?
                 .filter((key, value) -> (!(value.equals(""))))
-                .peek((key, value) -> System.out.println("Processing value: " + value))
+                .peek((key, value) -> System.out.println("Processing WORD count with value: " + value))
                 .groupBy((key, word) -> word)
-                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("counts-store"));
-        wordCounts.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
+                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-word-store"));
+        wordCount.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
+
+        KTable<String, Long> messageCount = textLines
+                .filter((key, value) -> ((value.contains("fakeNews"))))
+                .peek((key, value) -> System.out.println("Processing MESSAGE count with value: " + value))
+                .groupBy((key, message) -> message)
+                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-message-store"));
+        messageCount.toStream().to("messagecount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), config);
         final CountDownLatch latch = new CountDownLatch(1);
