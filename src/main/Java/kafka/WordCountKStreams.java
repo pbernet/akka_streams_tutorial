@@ -6,11 +6,15 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.QueryableStoreType;
+import org.apache.kafka.streams.state.QueryableStoreTypes;
+import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 
 import java.util.Arrays;
 import java.util.Properties;
@@ -18,14 +22,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 
-
 /**
  * Inspired by:
  * https://kafka.apache.org/documentation/streams
- *
- * using KTable see:
+ * <p>
+ * Using KTable:
  * https://docs.confluent.io/current/streams/concepts.html#ktable
- *
+ * <p>
+ * Interactive query for the local state store:
+ * https://docs.confluent.io/current/streams/developer-guide/interactive-queries.html#id4
  */
 public class WordCountKStreams {
 
@@ -48,14 +53,14 @@ public class WordCountKStreams {
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
                 .filter((key, value) -> (!(value.equals("truth")))) //we don't want that do we?
                 .filter((key, value) -> (!(value.equals(""))))
-                .peek((key, value) -> System.out.println("Processing WORD count with value: " + value))
+                //.peek((key, value) -> System.out.println("Processing WORD count with value: " + value))
                 .groupBy((key, word) -> word)
                 .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-word-store"));
         wordCount.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         KTable<String, Long> messageCount = textLines
                 .filter((key, value) -> ((value.contains("fakeNews"))))
-                .peek((key, value) -> System.out.println("Processing MESSAGE count with value: " + value))
+                //.peek((key, value) -> System.out.println("Processing MESSAGE count with value: " + value))
                 .groupBy((key, message) -> message)
                 .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-message-store"));
         messageCount.toStream().to("messagecount-output", Produced.with(Serdes.String(), Serdes.Long()));
@@ -63,6 +68,44 @@ public class WordCountKStreams {
         final KafkaStreams streams = new KafkaStreams(builder.build(), config);
         final CountDownLatch latch = new CountDownLatch(1);
 
+        try {
+            addShutdownHook(streams, latch);
+            streams.start();
+            interactiveQuery(streams);
+            latch.await();
+        } catch (Throwable e) {
+            System.out.println("Exception occurred: " + e.getMessage());
+            System.exit(1);
+        }
+        System.exit(0);
+    }
+
+    private static void interactiveQuery(KafkaStreams streams) {
+        Thread thread = new Thread("fakenews-interactive-query") {
+            @Override
+            public void run() {
+                ReadOnlyKeyValueStore<String, Long> keyValueStore = null;
+
+                try {
+                    keyValueStore = WordCountKStreams.waitUntilStoreIsQueryable("count-word-store", QueryableStoreTypes.keyValueStore(), streams);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                while (true) {
+                    System.out.println("Query WORD count for fakenews: " + keyValueStore.get("fakenews"));
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+        thread.start();
+    }
+
+    private static void addShutdownHook(KafkaStreams streams, CountDownLatch latch) {
         Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
             @Override
             public void run() {
@@ -76,15 +119,18 @@ public class WordCountKStreams {
                 latch.countDown();
             }
         });
+    }
 
-        try {
-            streams.start();
-            latch.await();
-        } catch (Throwable e) {
-            System.out.println("Exception occurred during startup: " + e.getMessage());
-            System.exit(1);
+    private static <T> T waitUntilStoreIsQueryable(final String storeName,
+                                                   final QueryableStoreType<T> queryableStoreType,
+                                                   final KafkaStreams streams) throws InterruptedException {
+        while (true) {
+            try {
+                return streams.store(storeName, queryableStoreType);
+            } catch (InvalidStateStoreException ignored) {
+                // store not yet ready for querying
+                Thread.sleep(100);
+            }
         }
-
-        System.exit(0);
     }
 }
