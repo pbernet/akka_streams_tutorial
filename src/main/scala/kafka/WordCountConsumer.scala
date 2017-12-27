@@ -15,12 +15,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Start consumers A and B within the same group
-  * Start consumer C as a single consumer
+  * Consumers A and B (within the same wordcount consumer group) consume half of the partitions each
+  * Consumer C as a single consumer for all the partitions in messagecount
   *
   * Use the offset storage in Kafka:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
-  *
   *
   */
 object WordCountConsumer extends App {
@@ -34,13 +33,13 @@ object WordCountConsumer extends App {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
-      //Define consumer behavior upon startint to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
+      //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withWakeupTimeout(10.seconds)
       .withMaxWakeups(10)
   }
 
-  def createAndRunConsumerWords(id: String) = {
+  def createAndRunConsumerWordCount(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
         //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
@@ -57,8 +56,8 @@ object WordCountConsumer extends App {
       .runWith(Sink.ignore)
   }
 
-  def createAndRunConsumerMessages(id: String) = {
-    Consumer.committableSource(createConsumerSettings("message consumer group"), Subscriptions.topics("messagecount-output"))
+  def createAndRunConsumerMessageCount(id: String) = {
+    Consumer.committableSource(createConsumerSettings("messagecount consumer group"), Subscriptions.topics("messagecount-output"))
       .mapAsync(1) { msg =>
         //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
         import akka.pattern.ask
@@ -72,9 +71,9 @@ object WordCountConsumer extends App {
       .runWith(Sink.ignore)
   }
 
-  createAndRunConsumerWords("A")
-  createAndRunConsumerWords("B")
-  createAndRunConsumerMessages("C")
+  createAndRunConsumerWordCount("A")
+  createAndRunConsumerWordCount("B")
+  createAndRunConsumerMessageCount("C")
 
 
   sys.addShutdownHook{

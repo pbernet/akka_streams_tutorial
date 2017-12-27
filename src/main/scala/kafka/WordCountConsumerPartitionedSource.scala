@@ -20,7 +20,11 @@ import scala.concurrent.duration._
   * Source per partition:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#source-per-partition
   *
-  * TODO I don't fully understand what is happening here...
+  * This consumer consumes WordCounts only
+  * TODO Find out what the benefits are compared to WordCountConsumer
+  *  * Supports tracking the automatic partition assignment from Kafka.
+  *  * When topic-partition is assigned to a consumer this source will emit tuple with assigned topic-partition and a corresponding source.
+  *  * When topic-partition is revoked then corresponding source completes.
   */
 object WordCountConsumerPartitionedSource extends App {
   implicit val system = ActorSystem()
@@ -33,17 +37,15 @@ object WordCountConsumerPartitionedSource extends App {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
-      //behavior of the consumer when it starts reading a partition for which it doesn’t have a committed offset or if the committed offset it has is invalid
+      //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withWakeupTimeout(10.seconds)
       .withMaxWakeups(10)
   }
 
-  def createAndRunConsumer(id: String) = {
-    //supports tracking the automatic partition assignment from Kafka.
-    //When topic-partition is assigned to a consumer this source will emit tuple with assigned topic-partition and a corresponding source.
-    //When topic-partition is revoked then corresponding source completes.
+  def createAndRunConsumerWordCount(id: String) = {
 
+    //Backpressure per partition with batch commit
     Consumer.committablePartitionedSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .flatMapMerge(2, _._2)
       .batch(max = 20, first => CommittableOffsetBatch.empty.updated(first.committableOffset)) { (batch: CommittableOffsetBatch, msg: ConsumerMessage.CommittableMessage[String, lang.Long]) =>
@@ -59,7 +61,17 @@ object WordCountConsumerPartitionedSource extends App {
       .runWith(Sink.ignore)
   }
 
-  createAndRunConsumer("A")
+  //One consumer for each partition is needed for this to work
+  createAndRunConsumerWordCount("A")
+  createAndRunConsumerWordCount("B")
+  createAndRunConsumerWordCount("C")
+  createAndRunConsumerWordCount("D")
+  createAndRunConsumerWordCount("E")
+  createAndRunConsumerWordCount("F")
+  createAndRunConsumerWordCount("G")
+  createAndRunConsumerWordCount("H")
+  createAndRunConsumerWordCount("I")
+  createAndRunConsumerWordCount("K")
 
   sys.addShutdownHook{
     println("Got shutdown cmd from shell, about to shutdown...")
