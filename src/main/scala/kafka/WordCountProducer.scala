@@ -59,7 +59,7 @@ object WordCountProducer extends App {
         val recordWithCurrentTimestamp = new ProducerRecord(topic, null: String, each)
         Message(recordWithCurrentTimestamp, NotUsed)
       })
-      .throttle(1, 1.second, 10, ThrottleMode.shaping)
+      .throttle(100, 100.milli, 10, ThrottleMode.shaping)
       .viaMat(Producer.flow(settings))(Keep.right)
 
     source.runWith(Sink.ignore)
