@@ -1,4 +1,4 @@
-package akkahttp
+package alpakka.sse
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -6,11 +6,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream._
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import play.api.libs.json._
 
-import scala.language.postfixOps
+import scala.sys.process._
 
 /**
   * Just because we can :-)
@@ -25,10 +25,19 @@ object SSEClientWikipediaEdits {
   implicit val materializerServer = ActorMaterializer()
 
   def main(args: Array[String]) {
-    wikipediaClient()
+    browserClient()
+    sseClient()
   }
 
-  private def wikipediaClient() = {
+  private def browserClient() = {
+    //Open the default os browser with the html page
+    //Chrome is able to consume the stream directly, that is the URL can be pasted
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") "open ./src/main/scala/alpakka/sse/index.html".!
+  }
+
+
+  private def sseClient() = {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 

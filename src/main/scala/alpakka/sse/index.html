@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>SSE Client for WikipediaEdits</title>
+    </head>
+
+    <body>
+        <h1>Check the browser console log</h1>
+
+        <script>
+            var messageSource = new EventSource('https://stream.wikimedia.org/v2/stream/recentchange');
+            messageSource.addEventListener(
+                    'message',
+                    function(event) {
+                        console.log(event);
+                    },
+                    false
+            );
+        </script>
+    </body>
+</html>

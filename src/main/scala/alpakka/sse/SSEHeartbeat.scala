@@ -1,4 +1,4 @@
-package akkahttp
+package alpakka.sse
 
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -44,7 +44,7 @@ object SSEHeartbeat {
       import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
       import akka.http.scaladsl.server.Directives._ // That does the trick!
 
-     def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
+      def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
       def events =
         path("events" / Segment ){ clientName =>
@@ -101,8 +101,8 @@ object SSEHeartbeat {
       Source.fromFutureSource {
         Http()
           .singleRequest(HttpRequest(
-          uri = s"http://$address:$port/events/backoffClient"
-        ))
+            uri = s"http://$address:$port/events/backoffClient"
+          ))
           .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
       }
     }
