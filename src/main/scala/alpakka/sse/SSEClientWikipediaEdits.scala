@@ -31,8 +31,6 @@ object SSEClientWikipediaEdits {
   }
 
   private def browserClient() = {
-    //On a decent os: open the default browser with the html page
-    //Note that Chrome is able to consume the stream directly, that is the uri below can be pasted
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") "open ./src/main/scala/alpakka/sse/index.html".!
   }
