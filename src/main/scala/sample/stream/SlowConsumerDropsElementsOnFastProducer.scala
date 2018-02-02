@@ -8,6 +8,7 @@ import akka.stream.scaladsl._
 import akka.stream.{ActorMaterializer, DelayOverflowStrategy, ThrottleMode}
 
 import scala.concurrent.duration._
+import scala.util.Failure
 
 case class SourceEvent(id: Integer)
 case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
@@ -22,12 +23,17 @@ case class Metric(label: String, value: Int)
   */
 object SlowConsumerDropsElementsOnFastProducer {
   implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
+  implicit val ec = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
     fastSource
       .via(droppyStream)
       .via(enrichWithTimestamp)
+      .watchTermination(){(_, done) => done.onComplete {
+        case Failure(err) => println(s"Flow failed: $err")
+        case _ => system.terminate(); println(s"Flow terminated")
+      }}
       .runWith(slowSink)
   }
 
@@ -38,10 +44,10 @@ object SlowConsumerDropsElementsOnFastProducer {
       .to(Sink.foreach(e => println(s"Reached Sink: $e")))
 
   def fastSource: Source[SourceEvent, NotUsed] =
-    Source(1 to 1000)
+    Source(1 to 500)
       .throttle(10, 1.second, 1, ThrottleMode.shaping)
       .map { i =>
-        //println(s"Producing event $i")
+        println(s"Producing event: $i")
         SourceEvent(i)
       }
 
