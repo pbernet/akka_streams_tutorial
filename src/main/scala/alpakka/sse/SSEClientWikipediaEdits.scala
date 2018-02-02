@@ -7,9 +7,10 @@ import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import play.api.libs.json._
 
+import scala.concurrent.Future
 import scala.sys.process._
 
 /**
@@ -30,8 +31,8 @@ object SSEClientWikipediaEdits {
   }
 
   private def browserClient() = {
-    //Open the default os browser with the html page
-    //Chrome is able to consume the stream directly, that is the URL can be pasted
+    //On a decent os: open the default browser with the html page
+    //Note that Chrome is able to consume the stream directly, that is the uri below can be pasted
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") "open ./src/main/scala/alpakka/sse/index.html".!
   }
@@ -41,19 +42,30 @@ object SSEClientWikipediaEdits {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    Http()
-      .singleRequest(HttpRequest(
-        uri = "https://stream.wikimedia.org/v2/stream/recentchange"
-      ))
-      .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-      .foreach {
-        _.runForeach {
-          event: ServerSentEvent => {
-            val server_name = (Json.parse(event.data) \ "server_name").as[String]
-            val user = (Json.parse(event.data) \ "user").as[String]
-            println(s"Change on server: $server_name by: $user")
-          }
-        }
+    val sourceFuture: Future[Source[ServerSentEvent, NotUsed]] =
+      Http()
+        .singleRequest(HttpRequest(
+          uri = "https://stream.wikimedia.org/v2/stream/recentchange"
+        ))
+        .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
+
+    val printSink =
+      Sink.foreach[(String, String)] { each: (String, String) =>
+        println(s"Change on server: ${each._1} by: ${each._2}")
       }
+
+    val parserFlow: Flow[ServerSentEvent, (String, String), NotUsed] = Flow[ServerSentEvent].map {
+      event: ServerSentEvent => {
+        val server_name = (Json.parse(event.data) \ "server_name").as[String]
+        val user = (Json.parse(event.data) \ "user").as[String]
+        (server_name, user)
+      }
+    }
+
+    sourceFuture.map { source: Source[ServerSentEvent, NotUsed] =>
+      source
+        .via(parserFlow)
+        .to(printSink).run()
+    }
   }
 }
