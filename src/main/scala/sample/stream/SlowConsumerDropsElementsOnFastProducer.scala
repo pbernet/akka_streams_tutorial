@@ -12,7 +12,6 @@ import scala.util.Failure
 
 case class SourceEvent(id: Integer)
 case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
-case class Metric(label: String, value: Int)
 
 
 /**
@@ -37,13 +36,13 @@ object SlowConsumerDropsElementsOnFastProducer {
       .runWith(slowSink)
   }
 
-  def slowSink: Sink[DomainEvent, NotUsed] =
+  val slowSink: Sink[DomainEvent, NotUsed] =
     Flow[DomainEvent]
       //.buffer(100, OverflowStrategy.backpressure)
       .delay(10.seconds, DelayOverflowStrategy.backpressure)
       .to(Sink.foreach(e => println(s"Reached Sink: $e")))
 
-  def fastSource: Source[SourceEvent, NotUsed] =
+  val fastSource: Source[SourceEvent, NotUsed] =
     Source(1 to 500)
       .throttle(10, 1.second, 1, ThrottleMode.shaping)
       .map { i =>
@@ -51,7 +50,7 @@ object SlowConsumerDropsElementsOnFastProducer {
         SourceEvent(i)
       }
 
-  def enrichWithTimestamp: Flow[SourceEvent, DomainEvent, NotUsed] =
+  val enrichWithTimestamp: Flow[SourceEvent, DomainEvent, NotUsed] =
     Flow[SourceEvent]
       .map { e =>
         val instant = Instant.ofEpochMilli(System.currentTimeMillis())
@@ -59,7 +58,7 @@ object SlowConsumerDropsElementsOnFastProducer {
         DomainEvent(e.id, zonedDateTimeUTC)
       }
 
-  def droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
+  val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
   //The reducer function takes the freshest element. This in a simple dropping operation.
     Flow[SourceEvent]
       .conflate((lastEvent, newEvent) => newEvent)
