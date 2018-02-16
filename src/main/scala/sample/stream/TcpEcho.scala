@@ -4,15 +4,14 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
-import akka.{Done, NotUsed}
 
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 /**
   * Inspired by:
-  * https://doc.akka.io/docs/akka/2.5.7/scala/stream/stream-io.html
+  * https://doc.akka.io/docs/akka/2.5.9/scala/stream/stream-io.html
   *
   * Use without parameters to start server and 10 parallel clients.
   *
@@ -29,7 +28,7 @@ object TcpEcho extends App {
     if (args.isEmpty) {
       val (address, port) = ("127.0.0.1", 6000)
       serverBinding = server(system, address, port)
-      (1 to 10).par.foreach(each => client(system, address, port))
+      (1 to 10).par.foreach(each => client(each, system, address, port))
     } else {
       val (address, port) =
         if (args.length == 3) (args(1), args(2).toInt)
@@ -39,19 +38,16 @@ object TcpEcho extends App {
         serverBinding = server(system, address, port)
       } else if (args(0) == "client") {
         val system = ActorSystem("Client")
-        client(system, address, port)
+        client(1, system, address, port)
       }
     }
 
   sys.addShutdownHook{
     import scala.concurrent.ExecutionContext.Implicits.global
-    println("About to shutdown...")
-     serverBinding.map { b =>
-          b.unbind() onComplete {
-            case _ => println("Unbound server, about to terminate...")
-          }
-        }
+    serverBinding.map(b => b.unbind().onComplete(_ => println("Unbound server, about to terminate...")))
     system.terminate()
+    Await.result(system.whenTerminated, 30.seconds)
+    println("Terminated... Bye")
   }
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
@@ -65,7 +61,7 @@ object TcpEcho extends App {
       val commandParser = Flow[String].takeWhile(_ != "BYE").map(_ + "!")
 
       val welcomeMsg = s"Welcome to: ${connection.localAddress}, you are: ${connection.remoteAddress}!"
-      val welcome = Source.single(welcomeMsg)
+      val welcomeSource = Source.single(welcomeMsg)
 
       val serverEchoFlow = Flow[ByteString]
         .via(Framing.delimiter( //chunk the inputs up into actual lines of text
@@ -74,7 +70,7 @@ object TcpEcho extends App {
           allowTruncation = true))
         .map(_.utf8String)
         .via(commandParser)
-        .merge(welcome) // merge the initial banner after parser
+        .merge(welcomeSource) // merge the initial banner after parser
         .map(_ + "\n")
         .map(ByteString(_))
         .watchTermination()((_, done) => done.onComplete {
@@ -84,10 +80,9 @@ object TcpEcho extends App {
       })
       connection.handleWith(serverEchoFlow)
     }
-
-    //TODO The idleTimeout setting does not seem to have an effect...
-    val connections = Tcp().bind(interface = address, port = port, idleTimeout = 10.seconds)
-    val (binding , _) = connections.watchTermination()(Keep.both).to(handler).run()
+    
+    val connections = Tcp().bind(interface = address, port = port)
+    val binding = connections.watchTermination()(Keep.left).to(handler).run()
 
     binding.onComplete {
       case Success(b) =>
@@ -99,15 +94,15 @@ object TcpEcho extends App {
     binding
   }
 
-  def client(system: ActorSystem, address: String, port: Int): Unit = {
+  def client(id: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
     implicit val materializer = ActorMaterializer()
 
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
-    val source: Source[ByteString, NotUsed] =  Source(testInput).via(connection)
-    val closed: Future[Done] = source.runForeach(each => println(s"Client received echo: ${each.utf8String}"))
-    closed.onComplete(each => println(s"Client closed: $each"))
+    val source =  Source(testInput).via(connection)
+    val closed = source.runForeach(each => println(s"Client: $id received echo: ${each.utf8String}"))
+    closed.onComplete(each => println(s"Client: $id closed: $each"))
   }
 }
