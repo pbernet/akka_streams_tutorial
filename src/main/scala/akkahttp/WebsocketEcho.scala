@@ -12,7 +12,8 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.github.andyglow.websocket._
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
@@ -25,9 +26,9 @@ trait ClientCommon {
   val printSink: Sink[Message, Future[Done]] =
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text)             => println(s"Client received TextMessage.Strict: $text")
-      case TextMessage.Streamed(textStream)     => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${value.get}"))
-      case BinaryMessage.Strict(binary)         => //do nothing
+      case TextMessage.Strict(text) => println(s"Client received TextMessage.Strict: $text")
+      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${value.get}"))
+      case BinaryMessage.Strict(binary) => //do nothing
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
 
@@ -38,16 +39,16 @@ trait ClientCommon {
 
 /**
   * Websocket echo example with different client types
-  * Each client produces it's own echoFlow on the server
+  * Each client instance produces it's own echoFlow on the server
   *
   */
 object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
-    val (address, port) = ("127.0.0.1", 6000)
-    server(address, port)
-    (1 to 10).par.foreach(each => clientNettyBased(address, port))
-    (1 to 10).par.foreach(each => clientSingleWebSocketRequest(address, port))
-    (1 to 10).par.foreach(each => clientWebSocketClientFlow(address, port))
+  val (address, port) = ("127.0.0.1", 6000)
+  server(address, port)
+  (1 to 2).par.foreach(each => clientNettyBased(each, address, port))
+  (1 to 2).par.foreach(each => clientSingleWebSocketRequest(each, address, port))
+  (1 to 2).par.foreach(each => clientWebSocketClientFlow(each, address, port))
 
   private def server(address: String, port: Int) = {
 
@@ -67,8 +68,8 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         handleWebSocketMessages(echoFlow)
       }
 
-    val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
-    bindingFuture.onComplete {
+    val serverBinding = Http().bindAndHandle(websocketRoute, address, port)
+    serverBinding.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
@@ -76,32 +77,29 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         system.terminate()
     }
 
-    sys.addShutdownHook{
-      println("About to shutdown...")
-      bindingFuture.map { b =>
-        b.unbind() onComplete {
-          case _ => println("Unbound server, about to terminate...")
-        }
-      }
+    sys.addShutdownHook {
+      serverBinding.map(b => b.unbind().onComplete(_ => println("Unbound server, about to terminate...")))
       system.terminate()
+      Await.result(system.whenTerminated, 30.seconds)
+      println("Terminated... Bye")
     }
   }
 
-  private def clientNettyBased(address: String, port: Int) = {
+  private def clientNettyBased(id: Int, address: String, port: Int) = {
 
     // see https://github.com/andyglow/websocket-scala-client
     val cli = WebsocketClient[String](s"ws://$address:$port/echo") {
-      case str => println(s"clientNettyBased received String: $str")
+      case str => println(s"Client: $id NettyBased received String: $str")
     }
     val ws = cli.open()
     ws ! "world one"
     ws ! "world two"
     Thread.sleep(5000)
     val done = cli.shutdownAsync
-    done.onComplete(closed => println(s"clientNettyBased closed: $closed"))
+    done.onComplete(closed => println(s"Client: $id NettyBased closed: $closed"))
   }
 
-  private def clientSingleWebSocketRequest(address: String, port: Int) = {
+  private def clientSingleWebSocketRequest(id: Int, address: String, port: Int) = {
 
     // flow to use (note: not re-usable!)
     val webSocketFlow: Flow[Message, Message, Promise[Option[Message]]] =
@@ -109,10 +107,34 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         printSink,
         helloSource)(Keep.right)
 
-    val (upgradeResponse, promise) =
-    Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketFlow)
+    val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Promise[Option[Message]]) =
+      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketFlow)
 
-    val connected = upgradeResponse.map { upgrade =>
+    val connected = handleUpgrade(upgradeResponse)
+
+    connected.onComplete(done => println(s"Client: $id SingleWebSocketRequest connected: $done"))
+    //Closes on TCP idle-timeout (default is 1 minute)
+    closed.future.onComplete(closed => println(s"Client: $id SingleWebSocketRequest closed: $closed"))
+  }
+
+  private def clientWebSocketClientFlow(id: Int, address: String, port: Int) = {
+
+    val webSocketNonReusableFlow = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
+
+    val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Future[Done]) =
+      helloSource
+        .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
+        .toMat(printSink)(Keep.both) // also keep the Future[Done]
+        .run()
+
+    val connected = handleUpgrade(upgradeResponse)
+
+    connected.onComplete(done => println(s"clientWebSocketClientFlow connected: $done"))
+    closed.onComplete(closed => println(s"Client: $id SingleWebSocketRequest closed: $closed"))
+  }
+
+  private def handleUpgrade(upgradeResponse: Future[WebSocketUpgradeResponse]) = {
+    upgradeResponse.map { upgrade =>
       // status code 101 (Switching Protocols) indicates that server support WebSockets
       if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
         Done
@@ -120,33 +142,5 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
       }
     }
-
-    connected.onComplete(done => println(s"clientSingleWebSocketRequest connected: $done"))
-    //TODO Check disconnect
-    promise.success(None)
-    promise.future.onComplete(closed => println(s"clientSingleWebSocketRequest closed: $closed"))
-  }
-
-  private def clientWebSocketClientFlow(address: String, port: Int) = {
-
-    val webSocketNonReusableFlow = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
-
-    val (upgradeResponse, closed) =
-    helloSource
-      .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
-      .toMat(printSink)(Keep.both) // also keep the Future[Done]
-      .run()
-
-    val connected = upgradeResponse.flatMap { upgrade =>
-      // status code 101 (Switching Protocols) indicates that server support WebSockets
-      if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
-        Future.successful(Done)
-      } else {
-        throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
-      }
-    }
-
-    connected.onComplete(done => println(s"clientWebSocketClientFlow connected: $done"))
-    closed.onComplete(closed => println(s"clientSingleWebSocketRequest closed: $closed"))
   }
 }
