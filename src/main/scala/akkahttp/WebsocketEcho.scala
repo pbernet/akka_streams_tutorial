@@ -50,7 +50,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   (1 to 2).par.foreach(each => clientSingleWebSocketRequest(each, address, port))
   (1 to 2).par.foreach(each => clientWebSocketClientFlow(each, address, port))
 
-  private def server(address: String, port: Int) = {
+  def server(address: String, port: Int) = {
 
     def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
@@ -85,7 +85,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     }
   }
 
-  private def clientNettyBased(id: Int, address: String, port: Int) = {
+  def clientNettyBased(id: Int, address: String, port: Int) = {
 
     // see https://github.com/andyglow/websocket-scala-client
     val cli = WebsocketClient[String](s"ws://$address:$port/echo") {
@@ -99,16 +99,15 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     done.onComplete(closed => println(s"Client: $id NettyBased closed: $closed"))
   }
 
-  private def clientSingleWebSocketRequest(id: Int, address: String, port: Int) = {
+  def clientSingleWebSocketRequest(id: Int, address: String, port: Int) = {
 
-    // flow to use (note: not re-usable!)
-    val webSocketFlow: Flow[Message, Message, Promise[Option[Message]]] =
+    val webSocketNonReusableFlow: Flow[Message, Message, Promise[Option[Message]]] =
       Flow.fromSinkAndSourceMat(
         printSink,
         helloSource)(Keep.right)
 
     val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Promise[Option[Message]]) =
-      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketFlow)
+      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketNonReusableFlow)
 
     val connected = handleUpgrade(upgradeResponse)
 
@@ -117,9 +116,9 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     closed.future.onComplete(closed => println(s"Client: $id SingleWebSocketRequest closed: $closed"))
   }
 
-  private def clientWebSocketClientFlow(id: Int, address: String, port: Int) = {
+  def clientWebSocketClientFlow(id: Int, address: String, port: Int) = {
 
-    val webSocketNonReusableFlow = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
+    val webSocketNonReusableFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
 
     val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Future[Done]) =
       helloSource
