@@ -32,7 +32,7 @@ object SSEClientWikipediaEdits {
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") "open ./src/main/scala/alpakka/sse/index.html".!
+    if (os == "mac os x") Process("open ./src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
 
