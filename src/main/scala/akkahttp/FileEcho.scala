@@ -20,7 +20,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 
-trait MyJsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
+trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long)
 
@@ -28,19 +28,23 @@ trait MyJsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 }
 
 /**
-  * This file upload/download roundtrip example is inspired by:
+  * This file upload/download round trip example is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
+  * It's possible to upload large files up to 60MB, see settings in application.conf
+  * Just replace testfile.txt with a large file
+  *
+  * TODO Investigate strange behaviour with large files: The downloaded files are NOT the same size
   */
-object FileEcho extends App with MyJsonProtocol {
+object FileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("FileEcho")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
 
+  val resourceFileName =  "testfile.txt"
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
-  val fileHandle = uploadClient(address, port)
-  fileHandle.flatMap(fileHandle => downloadClient(fileHandle, address, port))
+  (1 to 10).par.foreach(each => roundtripClient(each, address, port))
 
   def server(address: String, port: Int): Unit = {
 
@@ -75,7 +79,15 @@ object FileEcho extends App with MyJsonProtocol {
     }
   }
 
-  def uploadClient(address: String, port: Int): Future[FileEcho.FileHandle] = {
+  def roundtripClient(id: Int, address: String, port: Int) = {
+    val fileHandle = uploadClient(id, address, port)
+    fileHandle.onComplete {
+      case Success(each) =>  downloadClient(id, each, address, port)
+      case Failure(exception) => println(s"Exception during upload: $exception")
+    }
+  }
+
+  def uploadClient(id: Int, address: String, port: Int): Future[FileEcho.FileHandle] = {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
@@ -99,14 +111,14 @@ object FileEcho extends App with MyJsonProtocol {
           responseBodyAsString <- Unmarshal(response).to[FileHandle]
         } yield responseBodyAsString
 
-      result.onComplete(res => println(s"Upload client received result: $res"))
+      result.onComplete(res => println(s"Upload client with id: $id received result: $res"))
       result
     }
 
-    upload(new File(getClass.getResource("/testfile.txt").toURI))
+    upload(new File(getClass.getResource(s"/$resourceFileName").toURI))
   }
 
-  def downloadClient(remoteFile: FileHandle, address: String, port: Int): Future[File] = {
+  def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
 
     val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
     val httpClient = Http(system).outgoingConnection(address, port)
@@ -120,13 +132,13 @@ object FileEcho extends App with MyJsonProtocol {
       } yield downloaded
 
       result.map{
-        ioresult => println(s"Download client finished downloading: ${ioresult.count} bytes!")
+        ioresult => println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes!")
         system.terminate()
       }
     }
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
-    println(s"Download client will store file to: ${localFile.getAbsolutePath}")
+    println(s"Download client with id: $id will store file to: ${localFile.getAbsolutePath}")
     Future(localFile)
   }
 }
