@@ -28,20 +28,19 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 }
 
 /**
-  * This file upload/download round trip example is inspired by:
+  * This file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
-  * It's possible to upload large files up to 60MB, see settings in application.conf
+  * It's possible to upload/download files up to 60MB, see settings in application.conf
   * Just replace testfile.txt with a large file
   *
-  * TODO Investigate strange behaviour with large files: The downloaded files are NOT the same size
   */
 object FileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("FileEcho")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
 
-  val resourceFileName =  "testfile.txt"
+  val resourceFileName = "testfile.txt"
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
@@ -82,7 +81,7 @@ object FileEcho extends App with JsonProtocol {
   def roundtripClient(id: Int, address: String, port: Int) = {
     val fileHandle = uploadClient(id, address, port)
     fileHandle.onComplete {
-      case Success(each) =>  downloadClient(id, each, address, port)
+      case Success(each) => downloadClient(id, each, address, port)
       case Failure(exception) => println(s"Exception during upload: $exception")
     }
   }
@@ -101,6 +100,15 @@ object FileEcho extends App with JsonProtocol {
     }
 
     def upload(file: File): Future[FileHandle] = {
+
+      def delayRequestSoTheServerIsNotHammered = {
+        val (start, end) = (5000, 10000)
+        val rnd = new scala.util.Random
+        val sleepTime = start + rnd.nextInt((end - start) + 1)
+        Thread.sleep(sleepTime.toLong)
+      }
+
+      delayRequestSoTheServerIsNotHammered
 
       val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
 
@@ -131,11 +139,12 @@ object FileEcho extends App with JsonProtocol {
         downloaded <- response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
       } yield downloaded
 
-      result.map{
-        ioresult => println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes!")
-        system.terminate()
+      result.map {
+        ioresult =>
+          println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes!")
       }
     }
+
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
     println(s"Download client with id: $id will store file to: ${localFile.getAbsolutePath}")
