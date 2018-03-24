@@ -32,15 +32,16 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * https://github.com/clockfly/akka-http-file-server
   *
   * It's possible to upload/download files up to 60MB, see settings in application.conf
-  * Just replace testfile.txt with a large file
-  *
+  * - Replace testfile.jpg with a large file
+  * - Run FileEcho with limited Heap eg -Xms256m -Xmx256m
+  * - Monitor the heap with visualvm.github.io
   */
 object FileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("FileEcho")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
 
-  val resourceFileName = "testfile.txt"
+  val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
@@ -90,7 +91,7 @@ object FileEcho extends App with JsonProtocol {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
-      val fileSource = FileIO.fromPath(file.toPath, chunkSize = 100000)
+      val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
       val formData = Multipart.FormData(Multipart.FormData.BodyPart(
         "binary",
         HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
@@ -102,7 +103,7 @@ object FileEcho extends App with JsonProtocol {
     def upload(file: File): Future[FileHandle] = {
 
       def delayRequestSoTheServerIsNotHammered = {
-        val (start, end) = (5000, 10000)
+        val (start, end) = (1000, 5000)
         val rnd = new scala.util.Random
         val sleepTime = start + rnd.nextInt((end - start) + 1)
         Thread.sleep(sleepTime.toLong)
