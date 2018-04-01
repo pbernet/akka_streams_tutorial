@@ -1,4 +1,4 @@
-package tutorial
+package sample.stream
 
 import java.nio.file.Paths
 
@@ -8,9 +8,8 @@ import akka.stream.scaladsl._
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 
-import scala.concurrent.duration._
-
 import scala.concurrent._
+import scala.concurrent.duration._
 
 object WaitForThreeFlowsToComplete {
 

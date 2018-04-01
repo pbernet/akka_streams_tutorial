@@ -1,4 +1,4 @@
-package tutorial
+package sample.stream
 
 import akka.NotUsed
 import akka.actor.{ActorSystem, Cancellable}
