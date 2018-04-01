@@ -2,8 +2,13 @@ package sample.stream
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Flow, Sink, Source}
 
+/**
+  * Inspired by:
+  * https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams
+  *
+  */
 object BasicTransformation {
   implicit val system = ActorSystem("BasicTransformation")
   import system.dispatcher
@@ -16,14 +21,10 @@ object BasicTransformation {
          |when an unknown printer took a galley of type and scrambled it to make a type
          |specimen book.""".stripMargin
 
-    Source.fromIterator(() => text.split("\\s").iterator).
-      map(_.toUpperCase).
-      runForeach(println).
-      onComplete(_ => system.terminate())
-
-    // could also use .runWith(Sink.foreach(println)) instead of .runForeach(println) above
-    // as it is a shorthand for the same thing. Sinks may be constructed elsewhere and plugged
-    // in like this. Note also that foreach returns a future (in either form) which may be
-    // used to attach lifecycle events to, like here with the onComplete.
+    val source = Source.fromIterator(() => text.split("\\s").iterator)
+    val sink = Sink.foreach[String](println)
+    val flow = Flow[String].map(x => x.toUpperCase)
+    val result = source.via(flow).runWith(sink)
+    result.onComplete(_ => system.terminate())
   }
 }
