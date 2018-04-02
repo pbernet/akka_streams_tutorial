@@ -35,7 +35,7 @@ object MergeHubWithDynamicSources {
     val toConsumer: Sink[String, NotUsed] = runnableGraph.run()
 
     def fastSource(index: Int, toConsumer: Sink[String, NotUsed]) = {
-      val tickSource = Source.tick(100.millis, 100.millis, index).map(_.toString)
+      val tickSource = Source.tick(100.millis, 100.millis, index).map{each => println(s"Produced tick for source: $each"); each}.map(_.toString)
       tickSource.runWith(toConsumer)
     }
 
@@ -43,6 +43,6 @@ object MergeHubWithDynamicSources {
     Source.single("Hello MergeHub!").runWith(toConsumer)
 
     // Add more dynamic producer sources. If the consumer cannot keep up, then ALL of the producers are backpressured
-    (1 to 100).par.foreach(each => fastSource(each, toConsumer))
+    (1 to 10).par.foreach(each => fastSource(each, toConsumer))
   }
 }
