@@ -18,8 +18,6 @@ import scala.language.postfixOps
 import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
-
-
 trait ClientCommon {
   implicit val system = ActorSystem("WebsocketEcho")
   implicit val materializer = ActorMaterializer()
@@ -34,7 +32,7 @@ trait ClientCommon {
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
 
-  //see http://doc.akka.io/docs/akka-http/10.0.10/scala/http/client-side/websocket-support.html#half-closed-client-websockets
+  //see https://doc.akka.io/docs/akka-http/10.1.1/client-side/websocket-support.html?language=scala#half-closed-websockets
   val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
     .concatMat(Source.maybe[Message])(Keep.right)
 }
@@ -42,6 +40,9 @@ trait ClientCommon {
 /**
   * Websocket echo example with different client types
   * Each client instance produces it's own echoFlow on the server
+  *
+  * Please note that this basic example has no life cycle management nor fault-tolerance
+  * The "Windturbine Example" does show this
   *
   */
 object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
