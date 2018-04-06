@@ -121,7 +121,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     val connected = handleUpgrade(upgradeResponse)
 
     connected.onComplete(done => println(s"Client: $id singleWebSocketRequestClient connected: $done"))
-    //Closes on TCP idle-timeout (default is 1 minute)
+    //Does not close anymore due to new configurable "automatic keep-alive Ping support" - see application.conf
     closed.future.onComplete(closed => println(s"Client: $id singleWebSocketRequestClient closed: $closed"))
   }
 
@@ -138,6 +138,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     val connected = handleUpgrade(upgradeResponse)
 
     connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
+    //Does not close anymore due to new configurable "automatic keep-alive Ping support" - see application.conf
     closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
   }
 
