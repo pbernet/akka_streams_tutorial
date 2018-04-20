@@ -26,12 +26,12 @@ object FlightDelayStreaming {
   implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
-    val source =  FileIO.fromPath(Paths.get("src/main/resources/2008.csv"))
-    val sink = Sink.foreach(averageSink)
-
-    val done: Future[Done] = source
+    val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008.csv"))
       .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
+    val sink = Sink.foreach(averageSink)
+
+    val done: Future[Done] = sourceOfLines
       .via(csvToFlightEvent)
       .via(filterAndConvert)
       .via(averageCarrierDelay)
