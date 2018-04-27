@@ -9,7 +9,7 @@ import akka.util.ByteString
 import akka.{Done, NotUsed}
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   Inspired by:
@@ -31,13 +31,13 @@ object FlightDelayStreaming {
       .map(_.utf8String))
     val sink = Sink.foreach(averageSink)
 
-    val done: Future[Done] = sourceOfLines
+    val done = sourceOfLines
       .via(csvToFlightEvent)
       .via(filterAndConvert)
       .via(averageCarrierDelay)
       .runWith(sink)
 
-    done.onComplete { each => system.terminate()}
+    terminate(done)
   }
 
   // Split csv into a string array and transform each array into a FlightEvent
@@ -58,17 +58,30 @@ object FlightDelayStreaming {
   val averageCarrierDelay: Flow[FlightDelayRecord, (String, Int, Int), NotUsed] =
     Flow[FlightDelayRecord]
       .groupBy(30, _.uniqueCarrier) //maxSubstreams must be larger than the number of carriers in the file
+      .map { each => println(s"Processing FlightDelayRecord: $each"); each }
       .fold(("", 0, 0)) {
         (x: (String, Int, Int), y: FlightDelayRecord) =>
           val count = x._2 + 1
           val totalMins = x._3 + Try(y.arrDelayMins.toInt).getOrElse(0)
           (y.uniqueCarrier, count, totalMins)
-      }.mergeSubstreams
+      }
+      .mergeSubstreams
 
   def averageSink[A](avg: A): Unit = {
     avg match {
       case (a: String, b: Int, c: Int) => println(s"Delays for carrier $a: ${Try(c / b).getOrElse(0)} average mins, $b delayed flights")
       case x => println("no idea what " + x + "is!")
+    }
+  }
+
+  def terminate(done: Future[Done]) = {
+    done.onComplete {
+      case Success(b) =>
+        println("Flow Success. About to terminate...")
+        system.terminate()
+      case Failure(e) =>
+        println(s"Flow Failure: ${e.getMessage}. About to terminate...")
+        system.terminate()
     }
   }
 }
