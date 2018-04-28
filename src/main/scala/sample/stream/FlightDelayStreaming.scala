@@ -14,11 +14,11 @@ import scala.util.{Failure, Success, Try}
 /**
   Inspired by:
   https://blog.redelastic.com/diving-into-akka-streams-2770b3aeabb0
-  but with regular processing stages (= no graph)
+  using regular processing stages (= no graph)
 
   Download flight data:
   http://stat-computing.org/dataexpo/2009/the-data.html
-  and store locally, eg src/main/resources/2008.csv
+  and store locally, eg to src/main/resources/2008.csv
   */
 object FlightDelayStreaming {
   implicit val system = ActorSystem("FlightDelayStreaming")
@@ -37,13 +37,13 @@ object FlightDelayStreaming {
       .via(averageCarrierDelay)
       .runWith(sink)
 
-    terminate(done)
+    terminateWhen(done)
   }
 
   // Split csv into a string array and transform each array into a FlightEvent
   val csvToFlightEvent: Flow[String, FlightEvent, NotUsed] = Flow[String]
-    .map(_.split(",").map(_.trim)) // we now have our columns split by ","
-    .map(stringArrayToFlightEvent) // we convert an array of columns to a FlightEvent
+    .map(_.split(",").map(_.trim))
+    .map(stringArrayToFlightEvent)
 
   def stringArrayToFlightEvent(cols: Array[String]) = FlightEvent(cols(0), cols(1), cols(2), cols(3), cols(4), cols(5), cols(6), cols(7), cols(8), cols(9), cols(10), cols(11), cols(12), cols(13), cols(14), cols(15), cols(16), cols(17), cols(18), cols(19), cols(20), cols(21), cols(22), cols(23), cols(24), cols(25), cols(26), cols(27), cols(28))
 
@@ -74,7 +74,7 @@ object FlightDelayStreaming {
     }
   }
 
-  def terminate(done: Future[Done]) = {
+  def terminateWhen(done: Future[Done]) = {
     done.onComplete {
       case Success(b) =>
         println("Flow Success. About to terminate...")
