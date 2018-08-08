@@ -5,8 +5,8 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
-case class Valid(value: Int)
-case class Invalid(value: Int)
+case class Valid(payload: Any)
+case class Invalid(payload: Any, cause: Option[Throwable])
 
 /**
   * Inspired by:
@@ -15,7 +15,6 @@ case class Invalid(value: Int)
   * Concepts:
   *  * divert invalid elements instead of filtering/dropping them
   *  * keep order of elements downstream
-  *
   */
 object DivertToExample {
   implicit val system = ActorSystem("DivertToExample")
@@ -27,15 +26,15 @@ object DivertToExample {
     val sink = Sink.foreach[Either[Valid, Invalid]](each => println(s"${each.left.get} is valid"))
 
     val errorSink =  Flow[Invalid]
-      .map(each => println(s"$each is invalid"))
+      .map(each => println(s"$each is invalid, because of: ${each.cause.getOrElse(new Throwable("N/A"))}"))
       .to(Sink.ignore)
 
     val flow: Flow[Int, Either[Valid, Invalid], NotUsed] = Flow[Int]
       .map{  x =>
       if (x % 2 == 0) Left(Valid(x))
-      else Right(Invalid(x))
+      else Right(Invalid(x, Some(new Throwable("Is odd"))))
       }
-      //contramap: apply _.isRight to each incoming upstream element before it is passed to the sink
+      //contramap: apply "isRight" to each incoming upstream element before it is passed to the sink
       .divertTo(errorSink.contramap(_.right.get), _.isRight)
 
     val result = source.via(flow).runWith(sink)
