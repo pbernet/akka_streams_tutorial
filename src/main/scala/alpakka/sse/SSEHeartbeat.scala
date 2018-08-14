@@ -24,7 +24,6 @@ import scala.util.{Failure, Success}
   * An even more resilient sse server->client implementation is here:
   * http://developer.lightbend.com/docs/alpakka/current/sse.html
   * see EventSourceSpec in this repo for a working example
-  *
   */
 object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
