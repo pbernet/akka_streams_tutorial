@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-all" % "5.15.4",
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % "0.20",
   "com.typesafe.akka" %% "akka-stream-kafka" % "0.20",
-  "ch.qos.logback" % "logback-classic" % "1.1.7",
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.14"  % "test",
   "com.typesafe.play" %% "play" % "2.6.10",
