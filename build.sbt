@@ -23,7 +23,9 @@ libraryDependencies ++= Seq(
   "org.apache.kafka" % "kafka-streams" % "1.1.1",
 
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.10",
- "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.20",
+  "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.20",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.6",
+  "commons-io" % "commons-io" % "2.5"
 )
 
 resolvers ++= Seq(
