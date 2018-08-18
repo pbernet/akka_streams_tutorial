@@ -36,14 +36,16 @@ trait JsonProtocol2 extends DefaultJsonProtocol with SprayJsonSupport {
   * Differences to FileEcho:
   *  * Uses a Stream for upload instead of a Single requests as in FileEcho
   *  * Uses the host-level API with a queue for download
-  *  * Retries via config param max-retries set to: 1
+  *  * Retries via config param max-retries
   *
   * Doc:
   * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
   *
   *
   * TODOs
-  * Cleanup on pool shutdown
+  *  * When ex is thrown during download: The download retry does not seem to work as expected
+  *  * When ex is thrown during download: The responseFuture is always a Success
+  *  * Cleanup on pool shutdown
   *
   */
 object FileEchoStream extends App with JsonProtocol2 {
@@ -72,6 +74,7 @@ object FileEchoStream extends App with JsonProtocol2 {
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
+              throw new RuntimeException("Boom server error")
               println(s"Server received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
@@ -90,7 +93,6 @@ object FileEchoStream extends App with JsonProtocol2 {
   }
 
   def filesToUpload(): Source[FileHandle, NotUsed] =
-  // This could be a lazy/infinite stream. For this example we have a finite one:
     Source(List(
       FileHandle("1.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
       FileHandle("2.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
@@ -132,6 +134,41 @@ object FileEchoStream extends App with JsonProtocol2 {
     }
 
 
+    def download(fileHandle: FileEchoStream.FileHandle) = {
+      val queueSize = 1
+      val poolClientFlowDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
+      val queue =
+        Source.queue[(HttpRequest, Promise[HttpResponse])](queueSize, OverflowStrategy.backpressure)
+          .via(poolClientFlowDownload)
+          .toMat(Sink.foreach({
+            case (Success(resp), p) => p.success(resp)
+            case (Failure(e), p) => p.failure(e)
+          }))(Keep.left)
+          .run()
+
+      def queueRequest(request: HttpRequest): Future[HttpResponse] = {
+        val responsePromise = Promise[HttpResponse]()
+        queue.offer(request -> responsePromise).flatMap {
+          case QueueOfferResult.Enqueued => responsePromise.future
+          case QueueOfferResult.Dropped => Future.failed(new RuntimeException("Queue overflowed. Try again later."))
+          case QueueOfferResult.Failure(ex) => Future.failed(ex)
+          case QueueOfferResult.QueueClosed => Future.failed(new RuntimeException("Queue was closed (pool shut down) while running the request. Try again later."))
+        }
+      }
+
+      val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestNoFuture(fileHandle))
+      responseFuture.onComplete {
+        case Success(resp) => {
+          val localFile = File.createTempFile("downloadLocal", ".tmp.client")
+          val result = resp.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+          result.map {
+            ioresult =>
+              println(s"Download client for file: $resp finished downloading: ${ioresult.count} bytes!")
+          }
+        }
+        case Failure(exception) => println(s"Boom $exception while downloading")
+      }
+    }
 
     filesToUpload()
       // The stream will "pull out" these requests when capacity is available.
@@ -151,42 +188,8 @@ object FileEchoStream extends App with JsonProtocol2 {
         val fileHandle = Await.result(fileHandleFuture, 1.second)  //TODO Do it without blocking
         response.discardEntityBytes()
 
-
-        //TODO sep download method?
-
-        val QueueSize = 1
-        val poolClientFlowDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
-        val queue =
-          Source.queue[(HttpRequest, Promise[HttpResponse])](QueueSize, OverflowStrategy.backpressure)
-            .via(poolClientFlowDownload)
-            .toMat(Sink.foreach({
-              case (Success(resp), p) => p.success(resp)
-              case (Failure(e), p)    => p.failure(e)
-            }))(Keep.left)
-            .run()
-
-        def queueRequest(request: HttpRequest): Future[HttpResponse] = {
-          val responsePromise = Promise[HttpResponse]()
-          queue.offer(request -> responsePromise).flatMap {
-            case QueueOfferResult.Enqueued    => responsePromise.future
-            case QueueOfferResult.Dropped     => Future.failed(new RuntimeException("Queue overflowed. Try again later."))
-            case QueueOfferResult.Failure(ex) => Future.failed(ex)
-            case QueueOfferResult.QueueClosed => Future.failed(new RuntimeException("Queue was closed (pool shut down) while running the request. Try again later."))
-          }
-        }
-
-        val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestNoFuture(fileHandle))
-        responseFuture.onComplete {
-          case Success(resp) => {
-            val localFile = File.createTempFile("downloadLocal", ".tmp.client")
-            val result = resp.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
-            result.map {
-              ioresult =>
-                println(s"Download client for file: $resp finished downloading: ${ioresult.count} bytes!")
-            }
-          }
-          case Failure(exception) => println(s"Boom $exception")
-        }
+        //Finish the roundtrip
+        download(fileHandle)
 
       case (Failure(ex), fileToUpload) =>
         println(s"Uploading file $fileToUpload failed with $ex")
