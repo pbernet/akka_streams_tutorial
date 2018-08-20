@@ -19,6 +19,7 @@ object ProcessingApp {
   implicit val system = ActorSystem("ProcessingApp")
   implicit val ec = system.dispatcher
 
+  //This does not have the desired effect
   val decider: Supervision.Decider = {
     case _: TimeoutException => Supervision.Restart
     case NonFatal(e) =>
@@ -30,28 +31,6 @@ object ProcessingApp {
     .withDebugLogging(true)
     .withSupervisionStrategy(decider)
     .withAutoFusing(true), system)
-
-  //For tests on local container use brokerURL: tcp://localhost:11616 AND jmsEndpointName: test-topic
-  //val connectionFactory: javax.jms.ConnectionFactory = new ActiveMQConnectionFactory("activemq", "v******", "tcp://localhost:11616")
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "tcp://127.0.0.1:8888")
-  //TODO This does not have the desired effect
-  //Currently: JMSServer must be running and can not go down
-  val jmsConsumerSourceRestartable: Source[Message, NotUsed] = RestartSource.withBackoff(
-    minBackoff = 3.seconds,
-    maxBackoff = 30.seconds,
-    randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-  ) { () => jmsConsumerSource
-  }
-
-  val jmsConsumerSource: Source[Message, KillSwitch] = JmsConsumer(
-    JmsConsumerSettings(connectionFactory)
-      .withTopic("test-topic")
-      .withBufferSize(10)
-      //Persistence relies on ActiveMQ: A consumed message shall be acknowledged only after it has been sent by the connectors
-      //TODO Consider this: "transactionally receiving javax.jms.Messages from a JMS provider"
-      //https://developer.lightbend.com/docs/alpakka/current/jms.html#transactionally-receiving-s-from-a-jms-provider
-      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)
-  )
 
   def main(args: Array[String]) {
 
@@ -75,6 +54,23 @@ object ProcessingApp {
     }
       .runWith(Sink.ignore)
   }
+
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "tcp://127.0.0.1:8888")
+
+  //This does not have the desired effect
+  val jmsConsumerSourceRestartable: Source[Message, NotUsed] = RestartSource.withBackoff(
+    minBackoff = 3.seconds,
+    maxBackoff = 30.seconds,
+    randomFactor = 0.2
+  ) { () => jmsConsumerSource
+  }
+
+  val jmsConsumerSource: Source[Message, KillSwitch] = JmsConsumer(
+    JmsConsumerSettings(connectionFactory)
+      .withTopic("test-topic")
+      .withBufferSize(10)
+      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)
+  )
 
   private def jmsTextMessageProducerClient(connectionFactory: ConnectionFactory) = {
     val jmsProducerSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer(
