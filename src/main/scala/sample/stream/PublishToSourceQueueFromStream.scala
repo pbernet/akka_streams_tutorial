@@ -14,7 +14,9 @@ import scala.concurrent.duration._
   * Observation:
   *  * The buffer size must be large enough (eg 1000) to allow for massive parallelism in mapAsync (eg 100)
   *  * If buffer size is 1 then the mapAsync can only be run with 1
-  *  * With buffer size 1 and mapAsyc 100 the queue stops accepting after element 173
+  *  * With buffer size 1 and mapAsync 100 the queue stops accepting after element 173
+  *
+  *  Similar example: MergeHubWithDynamicSources
   */
 
 object PublishToSourceQueueFromStream {
@@ -24,7 +26,7 @@ object PublishToSourceQueueFromStream {
 
   def main(args: Array[String]): Unit = {
 
-    val bufferSize = 1
+    val bufferSize = 1000
 
     val slowSink: Sink[Seq[Int], NotUsed] =
       Flow[Seq[Int]]
