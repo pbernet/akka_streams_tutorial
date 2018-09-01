@@ -19,8 +19,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.6.10",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
-  "org.apache.kafka" %% "kafka" % "1.1.1",
-  "org.apache.kafka" % "kafka-streams" % "1.1.1",
+  "org.apache.kafka" %% "kafka" % "2.0.0",
+  "org.apache.kafka" % "kafka-streams" % "2.0.0",
 
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.10",
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.20",
@@ -32,5 +32,11 @@ resolvers ++= Seq(
   "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public",
   "Mvnrepository" at "https://mvnrepository.com/artifact"
 )
+
+//see: https://github.com/sbt/sbt/issues/3618
+val workaround = {
+  sys.props += "packaging.type" -> "jar"
+  ()
+}
 
 fork in run := true
