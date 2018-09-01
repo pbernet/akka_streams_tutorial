@@ -44,7 +44,7 @@ object KafkaServer extends App {
   kafkaProperties.put("zookeeper.connect", "localhost:2181")
   kafkaProperties.put("broker.id", "0")
   kafkaProperties.put("offsets.topic.replication.factor", "1")
-  kafkaProperties.put("log.dirs", Files.createTempDirectory("kafka-logs").toString)
+  kafkaProperties.put("log.dirs", "/tmp/kafka-logs")
   kafkaProperties.put("delete.topic.enable", "true")
   kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
   kafkaProperties.put("transaction.state.log.min.isr", "1")
@@ -64,6 +64,9 @@ object KafkaServer extends App {
     kafka.shutdown()
     kafka.awaitShutdown()
     zooKeeperServer.stop()
+
+//    val rmlogs = "rm -rf /tmp/kafka-logs".!!
+//    println("Remove logdir: /tmp/kafka-logs " + rmlogs)
   }
 
   zooKeeperThread.join()
