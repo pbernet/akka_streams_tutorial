@@ -15,8 +15,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Consumers A and B (within the same wordcount consumer group) consume half of the partitions each
-  * Consumer C as a single consumer for all the partitions in messagecount
+  * Consumers A.1 and A.2 (within the same word count consumer group) consume half of the partitions each
+  * Consumer B as a single consumer for all the partitions in message count
   *
   * Use the offset storage in Kafka:
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
@@ -71,9 +71,9 @@ object WordCountConsumer extends App {
       .runWith(Sink.ignore)
   }
 
-  createAndRunConsumerWordCount("A")
-  createAndRunConsumerWordCount("B")
-  createAndRunConsumerMessageCount("C")
+  createAndRunConsumerWordCount("A.1")
+  createAndRunConsumerWordCount("A.2")
+  createAndRunConsumerMessageCount("B")
 
 
   sys.addShutdownHook{
