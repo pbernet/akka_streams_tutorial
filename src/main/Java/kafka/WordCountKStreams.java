@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
@@ -41,6 +42,7 @@ public class WordCountKStreams {
         config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        config.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-state-dir");
 
         //What to do when there is no initial offset in Kafka or if the current offset does not exist any more on the server (e.g. because that data has been deleted)
         //earliest: automatically reset the offset to the earliest offset
@@ -53,25 +55,26 @@ public class WordCountKStreams {
                 .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
                 .filter((key, value) -> (!(value.equals("truth")))) //we don't want that do we?
                 .filter((key, value) -> (!(value.equals(""))))
-                //.peek((key, value) -> System.out.println("Processing WORD count with value: " + value))
+                //.peek((key, value) -> System.out.println("Processing WORD count key: " + key + " with value: " + value))
                 .groupBy((key, word) -> word)
                 .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-word-store"));
         wordCount.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         KTable<String, Long> messageCount = textLines
                 .filter((key, value) -> ((value.contains("fakeNews"))))
-                //.peek((key, value) -> System.out.println("Processing MESSAGE count with value: " + value))
-                .groupBy((key, message) -> message)
+                //.peek((key, value) -> System.out.println("Processing MESSAGE count key: " + key + " with value: " + value))
+                .map((key, value) -> new KeyValue<String, String>("total", value))
+                .groupByKey()
                 .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-message-store"));
         messageCount.toStream().to("messagecount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
-        final KafkaStreams streams = new KafkaStreams(builder.build(), config);
+        final KafkaStreams app = new KafkaStreams(builder.build(), config);
         final CountDownLatch latch = new CountDownLatch(1);
 
         try {
-            addShutdownHook(streams, latch);
-            streams.start();
-            interactiveQuery(streams);
+            addShutdownHook(app, latch);
+            app.start();
+            interactiveQuery(app);
             latch.await();
         } catch (Throwable e) {
             System.out.println("Exception occurred: " + e.getMessage());
@@ -80,20 +83,23 @@ public class WordCountKStreams {
         System.exit(0);
     }
 
-    private static void interactiveQuery(KafkaStreams streams) {
-        Thread thread = new Thread("fakenews-interactive-query") {
+    private static void interactiveQuery(KafkaStreams app) {
+        Thread thread = new Thread("fakenews-interactive-queries") {
             @Override
             public void run() {
-                ReadOnlyKeyValueStore<String, Long> keyValueStore = null;
+                ReadOnlyKeyValueStore<String, Long> keyValueStoreWords = null;
+                ReadOnlyKeyValueStore<String, Long> keyValueStoreMessages = null;
 
                 try {
-                    keyValueStore = WordCountKStreams.waitUntilStoreIsQueryable("count-word-store", QueryableStoreTypes.keyValueStore(), streams);
+                    keyValueStoreWords = WordCountKStreams.waitUntilStoreIsQueryable("count-word-store", QueryableStoreTypes.keyValueStore(), app);
+                    keyValueStoreMessages = WordCountKStreams.waitUntilStoreIsQueryable("count-message-store", QueryableStoreTypes.keyValueStore(), app);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
                 while (true) {
-                    System.out.println("Query WORD count for fakenews: " + keyValueStore.get("fakenews"));
+                    System.out.println("Query WORD count fakenews total: " + keyValueStoreWords.get("fakenews"));
+                    System.out.println("Query MESSAGES count total: " + keyValueStoreMessages.get("total"));
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException e) {
@@ -105,12 +111,19 @@ public class WordCountKStreams {
         thread.start();
     }
 
-    private static void addShutdownHook(KafkaStreams streams, CountDownLatch latch) {
+    private static void addShutdownHook(KafkaStreams app, CountDownLatch latch) {
         Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
             @Override
             public void run() {
                 System.out.println("Got control-c cmd from shell, about to close stream...");
-                Boolean shutdownResult = streams.close(10L, TimeUnit.SECONDS);
+
+                Boolean shutdownResult = app.close(10L, TimeUnit.SECONDS);
+                // Delete the application's *local* state dir (= STATE_DIR_CONFIG)
+                // On startup of KafkaServer it tries to restore this folder
+                // To prevent this: Remove the kafka log.dirs manually eg:
+                // rm -rf /tmp/kafka-logs
+                app.cleanUp();
+
                 if (shutdownResult) {
                     System.out.println("Stream closed successfully");
                 } else {
@@ -128,8 +141,8 @@ public class WordCountKStreams {
             try {
                 return streams.store(storeName, queryableStoreType);
             } catch (InvalidStateStoreException ignored) {
-                // store not yet ready for querying
-                Thread.sleep(100);
+                System.out.println("Local store: " + storeName + " not yet ready for querying - sleep");
+                Thread.sleep(1000);
             }
         }
     }
