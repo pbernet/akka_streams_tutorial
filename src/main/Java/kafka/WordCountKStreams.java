@@ -118,10 +118,14 @@ public class WordCountKStreams {
                 System.out.println("Got control-c cmd from shell, about to close stream...");
 
                 Boolean shutdownResult = app.close(10L, TimeUnit.SECONDS);
-                // Delete the application's *local* state dir (= STATE_DIR_CONFIG)
-                // On startup of KafkaServer it tries to restore this folder
-                // To prevent this: Remove the kafka log.dirs manually eg:
+                // cleanUp() deletes the application's *local* state dir (= STATE_DIR_CONFIG)
+                // On startup of KafkaServer this local state dir folder will be restored
+                // To prevent this: Remove the kafka log.dirs manually, after KafkaServer is shutdown eg:
                 // rm -rf /tmp/kafka-logs
+
+                //When you have a Kafka installation: Use the app-reset-tool
+                //https://www.confluent.io/blog/data-reprocessing-with-kafka-streams-resetting-a-streams-application/
+                //https://docs.confluent.io/current/streams/developer-guide/app-reset-tool.html
                 app.cleanUp();
 
                 if (shutdownResult) {
