@@ -1,0 +1,9 @@
+{
+    "fields": [
+        { "name": "str1", "type": ["string", "null"]},
+        { "name": "str2", "type": ["string", "null"]},
+        { "name": "int1", "type": ["int", "null"]}
+    ],
+    "name": "myrecord",
+    "type": "record"
+}

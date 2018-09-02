@@ -25,7 +25,9 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.10",
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.20",
   "org.apache.httpcomponents" % "httpclient" % "4.5.6",
-  "commons-io" % "commons-io" % "2.5"
+  "commons-io" % "commons-io" % "2.5",
+  "org.apache.avro" % "avro" % "1.8.2",
+  "com.twitter" %% "bijection-avro" % "0.9.6"
 )
 
 resolvers ++= Seq(
