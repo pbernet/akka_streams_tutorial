@@ -109,7 +109,7 @@ class CustomPartitioner extends Partitioner {
     //println("CustomPartitioner received key: " + key + " and value: " + value)
 
     if (value.toString.contains("fakeNews")) {
-      println("CustomPartitioner send message: " + value + " to fakeNewsPartition")
+      //println("CustomPartitioner send message: " + value + " to fakeNewsPartition")
       fakeNewsPartition
     }
     else ThreadLocalRandom.current.nextInt(1, partitionCount) //round robin
