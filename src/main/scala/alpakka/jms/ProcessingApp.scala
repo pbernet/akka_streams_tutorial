@@ -55,7 +55,10 @@ object ProcessingApp {
       .runWith(Sink.ignore)
   }
 
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "tcp://127.0.0.1:8888")
+  //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
+  //This is a workaround - see discussion:
+  //https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883/3
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "failover:tcp://127.0.0.1:8888")
 
   //This does not have the desired effect
   val jmsConsumerSourceRestartable: Source[Message, NotUsed] = RestartSource.withBackoff(
