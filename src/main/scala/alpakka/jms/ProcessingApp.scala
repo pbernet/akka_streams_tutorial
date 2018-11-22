@@ -1,5 +1,7 @@
 package alpakka.jms
 
+import java.util.concurrent.ThreadLocalRandom
+
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.alpakka.jms.scaladsl.{JmsConsumer, JmsProducer}
@@ -14,6 +16,19 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.control.NonFatal
 
+/**
+  * Produce/Consume messages against JMSServer (must be re-started manually)
+  *
+  * Shows two issues with the current JMS connector 1.0-M1
+  * 1) Alpakka JMS connector restart behaviour
+  * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
+  * A workaround has been applied
+  *
+  * 2) Setting sessionCount parameter seems to not have an effect
+  * See thread names in log output
+  * TODO analyse map vs mapAsync
+  *
+  */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("ProcessingApp")
@@ -23,7 +38,7 @@ object ProcessingApp {
   val decider: Supervision.Decider = {
     case _: TimeoutException => Supervision.Restart
     case NonFatal(e) =>
-      println(s"Stream failed with: ${e.getMessage}, going to resume")
+      logger.info(s"Stream failed with: ${e.getMessage}, going to resume")
       Supervision.Resume
   }
 
@@ -37,27 +52,26 @@ object ProcessingApp {
     jmsTextMessageProducerClient(connectionFactory)
 
     val done = jmsConsumerSourceRestartable
-      .map {
+      .mapAsync(10) {
         case textMessage: TextMessage =>
           val traceID = textMessage.getIntProperty("TRACE_ID")
-          val text = textMessage.getText
-          print(s"RECEIVED Msg from JMS with TRACE_ID: $traceID\n")
-          textMessage
+
+          val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 1000
+          logger.info(s"RECEIVED Msg from JMS with TRACE_ID: $traceID - Sleeping for: $randomTime ms")
+          Thread.sleep(randomTime)
+          Future(textMessage)
       }
 
       .map {
       textMessage =>
-        print(s"Finished processing Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")} - ack\n")
-        print("----\n")
+        logger.info(s"Finished processing Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")} - ack")
         textMessage.acknowledge()
         textMessage
     }
       .runWith(Sink.ignore)
   }
 
-  //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
-  //This is a workaround - see discussion:
-  //https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883/3
+  //Workaround: The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "failover:tcp://127.0.0.1:8888")
 
   //This does not have the desired effect
@@ -70,18 +84,19 @@ object ProcessingApp {
 
   val jmsConsumerSource: Source[Message, KillSwitch] = JmsConsumer(
     JmsConsumerSettings(connectionFactory)
-      .withTopic("test-topic")
+      .withQueue("test-queue")
+      .withSessionCount(10)
       .withBufferSize(10)
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)
   )
 
   private def jmsTextMessageProducerClient(connectionFactory: ConnectionFactory) = {
     val jmsProducerSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer(
-      JmsProducerSettings(connectionFactory).withTopic("test-topic")
+      JmsProducerSettings(connectionFactory).withQueue("test-queue")
     )
 
     Source(1 to 10000)
-      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+      .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .map { number =>
         JmsTextMessage(s"Payload: ${number.toString}")
           .withProperty("TRACE_ID", number)
