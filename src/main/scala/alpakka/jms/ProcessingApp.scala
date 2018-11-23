@@ -17,16 +17,14 @@ import scala.concurrent.{Future, TimeoutException}
 import scala.util.control.NonFatal
 
 /**
-  * Produce/Consume messages against JMSServer (must be re-started manually)
+  * Produce/Consume messages against local alpakka.env.JMSServer (must be re-started manually)
   *
-  * Shows two issues with the current JMS connector 1.0-M1
-  * 1) Alpakka JMS connector restart behaviour
+  * Reproduces this issues:
+  * Alpakka JMS connector restart behaviour
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
-  * A workaround has been applied
+  * with the current JMS connector 1.0-M1
   *
-  * 2) Setting sessionCount parameter seems to not have an effect
-  * See thread names in log output
-  * TODO analyse map vs mapAsync
+  * A workaround has been applied, which works around the problem on the JMS client level
   *
   */
 object ProcessingApp {
@@ -52,22 +50,22 @@ object ProcessingApp {
     jmsTextMessageProducerClient(connectionFactory)
 
     val done = jmsConsumerSourceRestartable
-      .mapAsync(10) {
+      .mapAsyncUnordered(10) {
         case textMessage: TextMessage =>
           val traceID = textMessage.getIntProperty("TRACE_ID")
 
-          val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 1000
-          logger.info(s"RECEIVED Msg from JMS with TRACE_ID: $traceID - Sleeping for: $randomTime ms")
-          Thread.sleep(randomTime)
+          val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 100
+          logger.info(s"RECEIVED Msg from JMS with TRACE_ID: $traceID - Working for: $randomTime ms")
+          val start = System.currentTimeMillis()
+          while ((System.currentTimeMillis() - start) < randomTime) {}
           Future(textMessage)
       }
-
       .map {
       textMessage =>
-        logger.info(s"Finished processing Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")} - ack")
         textMessage.acknowledge()
         textMessage
-    }
+      }
+      .wireTap(textMessage => logger.info(s"Finished processing Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")} - ack"))
       .runWith(Sink.ignore)
   }
 
@@ -95,7 +93,7 @@ object ProcessingApp {
       JmsProducerSettings(connectionFactory).withQueue("test-queue")
     )
 
-    Source(1 to 10000)
+    Source(1 to 100)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .map { number =>
         JmsTextMessage(s"Payload: ${number.toString}")
