@@ -12,10 +12,13 @@ import akka.util.ByteString
 
 import scala.collection.immutable
 import scala.concurrent.Future
+import scala.util.Try
 
 /**
-  * Parse XML and extract embedded base64 docs
+  * Parse XML and extract embedded base64 application/pdf docs
   *
+  * TODO Extraction of the file name is missing,
+  * all the files are saved under the same dummy name
   */
 
 object XmlProcessing {
@@ -37,12 +40,13 @@ object XmlProcessing {
         parseEvent: ParseEvent =>
           parseEvent match {
             case s: StartElement if s.attributes.contains("mediaType") =>
-              println("Found application/pdf: " + s.attributes.head)
               textBuffer.clear()
-              immutable.Seq.empty
+              val mediaType = s.attributes.head._2
+              println("Add mediaType: " + mediaType)
+              immutable.Seq(mediaType)
             case s: EndElement if s.localName == "observationMedia" =>
               val text = textBuffer.toString
-              println("Found text: " + text)
+              println("Add payload: " + text)
               immutable.Seq(text)
             case t: TextEvent =>
               textBuffer.append(t.text)
@@ -54,20 +58,18 @@ object XmlProcessing {
       .runWith(Sink.seq)
 
     result.onComplete {
-      results =>
-        results.get.foreach {
-          each: String => {
+      results: Try[immutable.Seq[String]] =>
+        results.get.sliding(2, 2).toList.filter(each => each.head == "application/pdf").foreach {
+          each: immutable.Seq[String] => {
             val dec1 = Base64.getMimeDecoder
-            println("Each base64: " + each)
-            println("----")
-            val decoded: Array[Byte] = dec1.decode(each)
-            val bos = new BufferedOutputStream(new FileOutputStream("test.jpeg"))
+            val decoded: Array[Byte] = dec1.decode(each.reverse.head)
+            val bos = new BufferedOutputStream(new FileOutputStream("test.pdf"))
             bos.write(decoded)
             bos.close()
           }
         }
 
-        println("Flow completed with results: " + results + " - about to terminate")
+        println("Flow completed, about to terminate")
         system.terminate()
     }
   }
