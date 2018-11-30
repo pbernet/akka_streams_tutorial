@@ -23,6 +23,7 @@ libraryDependencies ++= Seq(
 
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % "1.0-M1",
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % "1.0-M1",
+  "com.lightbend.akka" %% "akka-stream-alpakka-xml" % "1.0-M1",
   
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.18"  % "test",
