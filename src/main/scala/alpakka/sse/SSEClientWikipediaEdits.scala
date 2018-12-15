@@ -6,12 +6,15 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
+import alpakka.jms.ProcessingApp.logger
 import play.api.libs.json._
 
-import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.sys.process._
+import scala.util.Try
+import scala.util.control.NonFatal
 
 /**
   * Just because we can :-)
@@ -21,9 +24,16 @@ import scala.sys.process._
   *
   */
 object SSEClientWikipediaEdits {
+  val decider: Supervision.Decider = {
+    case NonFatal(e) =>
+      logger.warn(s"Stream failed with: ${e.getMessage}, going to restart")
+      Supervision.Restart
+  }
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer.create(ActorMaterializerSettings.create(system)
+    .withDebugLogging(true)
+    .withSupervisionStrategy(decider), system)
 
   def main(args: Array[String]) {
     browserClient()
@@ -40,17 +50,21 @@ object SSEClientWikipediaEdits {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    val sourceFuture: Future[Source[ServerSentEvent, NotUsed]] =
-      Http()
-        .singleRequest(HttpRequest(
-          uri = "https://stream.wikimedia.org/v2/stream/recentchange"
-        ))
-        .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-
-    val printSink =
-      Sink.foreach[(String, String)] { each: (String, String) =>
-        println(s"Change on server: ${each._1} by: ${each._2}")
+    val restartSource = RestartSource.withBackoff(
+      minBackoff = 3.seconds,
+      maxBackoff = 30.seconds,
+      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
+    ) { () =>
+      Source.fromFutureSource {
+        Http()
+          .singleRequest(HttpRequest(
+            uri = "https://stream.wikimedia.org/v2/stream/recentchange"
+          ))
+          .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
       }
+    }
+
+    val printSink = Sink.foreach[Change] { each: Change => println(each.toString())}
 
     val parserFlow: Flow[ServerSentEvent, (String, String), NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
@@ -60,10 +74,8 @@ object SSEClientWikipediaEdits {
       }
     }
 
-    sourceFuture.map { source: Source[ServerSentEvent, NotUsed] =>
-      source
-        .via(parserFlow)
-        .to(printSink).run()
-    }
+    restartSource
+      .via(parserFlow)
+      .runWith(printSink)
   }
 }
