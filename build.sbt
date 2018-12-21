@@ -2,31 +2,35 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.8"
+
+val akkaVersion = "2.5.19"
+val akkaHTTPVersion = "10.1.6"
+val alpakkaVersion = "1.0-M1"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-stream" % "2.5.18",
-  "com.typesafe.akka" %% "akka-actor" % "2.5.18",
-  "com.typesafe.akka" %% "akka-actor-typed" % "2.5.18",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.5.18",
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+  "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   
-  "com.typesafe.akka" %% "akka-http" % "10.1.5",
+  "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
 
   "javax.jms" % "jms" % "1.1",
   "org.apache.activemq" % "activemq-client" % "5.15.7",
   "org.apache.activemq" % "activemq-broker" % "5.15.7",
-  "com.lightbend.akka" %% "akka-stream-alpakka-jms" % "1.0-M1",
+  "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
 
-  "com.typesafe.akka" %% "akka-stream-kafka" % "1.0-M1",
+  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaVersion,
   "org.apache.kafka" %% "kafka" % "2.0.0",
   "org.apache.kafka" % "kafka-streams" % "2.0.0",
 
-  "com.lightbend.akka" %% "akka-stream-alpakka-sse" % "1.0-M1",
-  "com.lightbend.akka" %% "akka-stream-alpakka-file" % "1.0-M1",
-  "com.lightbend.akka" %% "akka-stream-alpakka-xml" % "1.0-M1",
+  "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.18"  % "test",
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "com.typesafe.play" %% "play" % "2.6.10",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
