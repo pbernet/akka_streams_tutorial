@@ -16,6 +16,10 @@ import scala.sys.process._
 import scala.util.Try
 import scala.util.control.NonFatal
 
+case class Change(serverName: String, user: String, cmdType: String, lengthNew: Int = 0, lengthOld: Int = 0) {
+  override def toString() = s"$cmdType on server: $serverName by: $user new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
+}
+
 /**
   * Just because we can :-)
   * Consume the WikipediaEdits stream which is implemented with SSE - see:
@@ -66,11 +70,22 @@ object SSEClientWikipediaEdits {
 
     val printSink = Sink.foreach[Change] { each: Change => println(each.toString())}
 
-    val parserFlow: Flow[ServerSentEvent, (String, String), NotUsed] = Flow[ServerSentEvent].map {
+    val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
-        val server_name = (Json.parse(event.data) \ "server_name").as[String]
+
+        def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
+
+        val serverName = (Json.parse(event.data) \ "server_name").as[String]
         val user = (Json.parse(event.data) \ "user").as[String]
-        (server_name, user)
+
+        val cmdType = (Json.parse(event.data) \ "type").as[String]
+        if (cmdType == "new" || cmdType == "edit") {
+          val lengthNew = (Json.parse(event.data) \ "length" \ "new").get.toString()
+          val lengthOld = (Json.parse(event.data) \ "length" \ "old").get.toString()
+          Change(serverName, user, cmdType, tryToInt(lengthNew), tryToInt(lengthOld))
+        } else {
+          Change(serverName, user, cmdType)
+        }
       }
     }
 
