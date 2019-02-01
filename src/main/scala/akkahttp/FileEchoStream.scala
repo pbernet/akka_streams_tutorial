@@ -35,16 +35,16 @@ trait JsonProtocol2 extends DefaultJsonProtocol with SprayJsonSupport {
 /**
   * Differences to FileEcho:
   *  * Uses a Stream for upload instead of a Single requests as in FileEcho
-  *  * Uses the host-level API with a queue for download
-  *  * Retries via config param max-retries
+  *  * Uses the host-level API with a SourceQueue for download
+  *  * Retries via config param max-retries set in application.conf
   *
   * Doc:
   * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
   *
   *
   * TODOs
-  *  * When ex is thrown during download: The download retry does not seem to work as expected
-  *  * When ex is thrown during download: The responseFuture is always a Success
+  *  * When ex is thrown on server during download: The download retry does not seem to work as expected
+  *  * When ex is thrown on server during download: The responseFuture is always a Success
   *  * Cleanup on pool shutdown
   *
   */
@@ -74,7 +74,8 @@ object FileEchoStream extends App with JsonProtocol2 {
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
-              throw new RuntimeException("Boom server error")
+              //TODO see class comment
+              //throw new RuntimeException("Boom server error")
               println(s"Server received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
@@ -94,11 +95,11 @@ object FileEchoStream extends App with JsonProtocol2 {
 
   def filesToUpload(): Source[FileHandle, NotUsed] =
     Source(List(
-      FileHandle("1.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
-      FileHandle("2.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
-      FileHandle("3.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
-      FileHandle("4.jpg", Paths.get("./src/main/resources/testfile.jpg").toString),
-      FileHandle("5.jpg", Paths.get("./src/main/resources/testfile.jpg").toString)
+      FileHandle("1.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
+      FileHandle("2.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
+      FileHandle("3.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
+      FileHandle("4.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
+      FileHandle("5.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString)
     ))
 
 
