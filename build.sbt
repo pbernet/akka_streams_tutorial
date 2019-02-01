@@ -17,6 +17,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
+  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
   "javax.jms" % "jms" % "1.1",
   "org.apache.activemq" % "activemq-client" % activemqVersion,
