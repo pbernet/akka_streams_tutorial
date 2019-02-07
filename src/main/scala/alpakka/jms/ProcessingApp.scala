@@ -9,7 +9,7 @@ import akka.stream.alpakka.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsPro
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.config.Config
-import javax.jms.{ConnectionFactory, Message}
+import javax.jms.{ConnectionFactory, Message, TextMessage}
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,7 +20,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * Produce/Consume messages against local alpakka.env.JMSServer
+  * ProcessingApp consumes messages against local alpakka.env.JMSServer
   * JMSServer must be re-started manually to see the restart behaviour
   * JMSTextMessageProducerClient is a separate class
   *
@@ -29,10 +29,26 @@ import scala.util.{Failure, Success}
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
   * Fixed with 1.0-M2
   *
-  * Remaining issue for 1.0-M2:
-  * *Sometimes* for yet unknown reasons messages remain pending in the queue
-  * *Sometimes* after manually restarting this consumer, they get consumed
-  * *Some* of the remaining messages have the JMS property JMSXDeliveryCount set, which value equals the no of runs of the Consumer
+  * Remaining Issue for 1.0-M2:
+  *
+  * Case 1: Ack only on message
+  * * The ProcessingApp consumes messages ONLY up to the product of SessionCount * BufferSize, then it stops
+  * * The "watcher" (= additional JMS session) shows that the messages remain in the queue
+  * * After restarting the ProcessingApp consumer another batch of SessionCount * BufferSize is consumed
+  *
+  * Case 2: Ack only on envelope (Seems to work as expected)
+  *
+  * Case 3: Ack on BOTH envelope and message: Works as expected
+  *
+  * How to reproduce Case 1:
+  * 1) Start JMSServer
+  * 2) Start JMSTextMessageProducerClient and let it produce > 20 messages
+  * 3) Start ProcessingApp consumer and see the number of Pending Msg: in log
+  * 4) Re-Start ProcessingApp consumer and see decreased number of messages
+  *
+  * Possibly related to:
+  * https://github.com/akka/alpakka/issues/908
+  *
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -44,7 +60,7 @@ object ProcessingApp {
     case NonFatal(e) =>
       logger.info(s"Stream failed with: ${e.getMessage}, going to restart")
       Supervision.Restart
-    case _           => Supervision.Stop
+    case _ => Supervision.Stop
   }
 
   implicit val materializer = ActorMaterializer.create(ActorMaterializerSettings.create(system)
@@ -57,23 +73,24 @@ object ProcessingApp {
         ackEnvelope: AckEnvelope =>
 
           try {
-          val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
-          val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 100
-          logger.info(s"RECEIVED Msg with TRACE_ID: $traceID - Working for: $randomTime ms")
-          val start = System.currentTimeMillis()
-          while ((System.currentTimeMillis() - start) < randomTime) {
-            if(randomTime >= 400) throw new RuntimeException("BOOM")
-          }
-          Future(ackEnvelope)
+            val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
+            val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 100
+            logger.info(s"RECEIVED Msg with TRACE_ID: $traceID - Working for: $randomTime ms")
+            val start = System.currentTimeMillis()
+            while ((System.currentTimeMillis() - start) < randomTime) {
+              if (randomTime >= 400) throw new RuntimeException("BOOM") //comment out for "happy path"
+            }
+            Future(ackEnvelope)
           } catch {
-            case e @ (_ : Exception ) =>
-              handleError(ackEnvelope, e, "Handle error message")
-              throw e  //Rethrow to allow next element to be processed
+            case e@(_: Exception) =>
+              handleError(ackEnvelope, e, "Error, send this message to error queue")
+              throw e //Rethrow to allow next element to be processed
           }
       }
       .map {
         ackEnvelope =>
-          ackEnvelope.acknowledge()
+          //ackEnvelope.acknowledge() //TODO Ack only on envelope
+          ackEnvelope.message.acknowledge() //TODO Ack only on message
           ackEnvelope.message
       }
       .wireTap(textMessage => logger.info(s"ACK Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))
@@ -92,7 +109,7 @@ object ProcessingApp {
   val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
     JmsConsumerSettings(consumerConfig, connectionFactory)
       .withQueue("test-queue")
-      .withSessionCount(10)
+      .withSessionCount(1)
       .withBufferSize(10)
   )
 
@@ -119,14 +136,14 @@ object ProcessingApp {
   private def handleError(ackEnvelope: AckEnvelope, e: Exception, msg: String): Unit = {
     logger.error(msg, e)
     sendOriginalMessageToErrorQueue(ackEnvelope, e)
-    ackEnvelope.acknowledge // Mark as complete to skip this message, see comment above
+    //ackEnvelope.acknowledge() //TODO Ack only on envelope
+    ackEnvelope.message.acknowledge() //TODO Ack only on message
   }
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {
     val done: Future[Done] = Source.single(ackEnvelope.message).map((message: Message) => {
-      //TODO Find a way to convert javax.jms.Message to JmsTextMessage
-        JmsTextMessage("should be body of original msg")
-          .withProperty("errorType", e.getClass.getName)
+      JmsTextMessage(message.asInstanceOf[TextMessage].getText)
+        .withProperty("errorType", e.getClass.getName)
         .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
     }).runWith(errorQueueSink)
     logWhen(done)
@@ -134,7 +151,7 @@ object ProcessingApp {
 
   def logWhen(done: Future[Done]) = {
     done.onComplete {
-      case Success(b) =>
+      case Success(_) =>
         logger.info("Message successfully written to error queue")
       case Failure(e) =>
         logger.error(s"Failure while writing to error queue: ${e.getMessage}")
