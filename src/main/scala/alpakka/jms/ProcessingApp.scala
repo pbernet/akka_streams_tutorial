@@ -111,6 +111,8 @@ object ProcessingApp {
       .withQueue("test-queue")
       .withSessionCount(1)
       .withBufferSize(10)
+      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
+      .withAckTimeout(10 seconds) //TODO Check if this has an influence on ack behaviour
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
