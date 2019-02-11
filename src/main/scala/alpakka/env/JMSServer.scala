@@ -16,6 +16,7 @@ object JMSServer extends App {
   broker.setPersistent(false)
   broker.setBrokerName(host)
   broker.setAdvisorySupport(false)
+  broker.setUseJmx(true)
   broker.start()
 
   if (broker.isStarted) {
