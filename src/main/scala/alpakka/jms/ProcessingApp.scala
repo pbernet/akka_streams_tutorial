@@ -27,24 +27,19 @@ import scala.util.{Failure, Success}
   * Up to 1.0-M1 there was an issue discussed here:
   * Alpakka JMS connector restart behaviour
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
-  * Fixed with 1.0-M2
+  * This is fixed with 1.0-M2
   *
-  * Remaining Issue for 1.0-M2:
+  * This example has been upcycled to demonstrate a realistic consumer scenario,
+  * where faulty messages are written to an error queue.
   *
-  * Case 1: Ack only on message
-  * * The ProcessingApp consumes messages ONLY up to the product of SessionCount * BufferSize, then it stops
-  * * The "watcher" (= additional JMS session) shows that the messages remain in the queue
-  * * After restarting the ProcessingApp consumer another batch of SessionCount * BufferSize is consumed
+  * What is interesting:
+  * Acknowledge should be done on the envelope as suggested in:
+  * https://doc.akka.io/docs/alpakka/1.0-M2/jms/consumer.html#using-jms-client-acknowledgement
+  * However, when run against JMS Broker Artemis, we notice that the processing stops and there
+  * are remaining messages on the queue.
+  * This can "fixed" by by setting the bufferSize to 0 (= Message-by-message acknowledgement)
   *
-  * Case 2: Ack only on envelope (Seems to work as expected)
-  *
-  * Case 3: Ack on BOTH envelope and message: Works as expected
-  *
-  * How to reproduce Case 1:
-  * 1) Start JMSServer
-  * 2) Start JMSTextMessageProducerClient and let it produce > 20 messages
-  * 3) Start ProcessingApp consumer and see the number of Pending Msg: in log
-  * 4) Re-Start ProcessingApp consumer and see decreased number of messages
+  * Start the Artemis Broker from /docker/docker-compose.yml
   *
   * Possibly related to:
   * https://github.com/akka/alpakka/issues/908
@@ -89,8 +84,7 @@ object ProcessingApp {
       }
       .map {
         ackEnvelope =>
-          //ackEnvelope.acknowledge() //TODO Ack only on envelope
-          ackEnvelope.message.acknowledge() //TODO Ack only on message
+          ackEnvelope.acknowledge()
           ackEnvelope.message
       }
       .wireTap(textMessage => logger.info(s"ACK Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))
@@ -103,16 +97,19 @@ object ProcessingApp {
 
   //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
   //This does not interfere with the new 1.0-M2 implementation
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("", "", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
   val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
     JmsConsumerSettings(consumerConfig, connectionFactory)
       .withQueue("test-queue")
       .withSessionCount(1)
-      .withBufferSize(10)
+
+      // Maximum number of messages to prefetch before applying backpressure. Default value is: 100
+      // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
+      // disabling buffering. The outstanding messages before backpressure will be the sessionCount.
+      .withBufferSize(0)
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
-      .withAckTimeout(10 seconds) //TODO Check if this has an influence on ack behaviour
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
@@ -138,8 +135,7 @@ object ProcessingApp {
   private def handleError(ackEnvelope: AckEnvelope, e: Exception, msg: String): Unit = {
     logger.error(msg, e)
     sendOriginalMessageToErrorQueue(ackEnvelope, e)
-    //ackEnvelope.acknowledge() //TODO Ack only on envelope
-    ackEnvelope.message.acknowledge() //TODO Ack only on message
+    ackEnvelope.acknowledge()
   }
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {

@@ -23,7 +23,7 @@ object JMSTextMessageProducerClient {
 
   //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
   //This does not interfere with the new 1.0-M2 implementation
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("activemq", "vivates", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
 
   def main(args: Array[String]): Unit = {

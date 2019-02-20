@@ -1,0 +1,24 @@
+version: "3"
+# Start from cmd line: docker-compose up -d
+# Or directly from IntelliJ IDEA
+services:
+  # https://github.com/vromero/activemq-artemis-docker
+  artemis:
+    restart: always
+    image: vromero/activemq-artemis:2.6.4-alpine
+    hostname: artemis
+    networks:
+      - runtime-net
+    ports:
+      - "8161:8161"
+      - "21616:61616"
+      - "21613:61613"
+      - "1199:1199"
+      - "1198:1198"
+    environment:
+      - ENABLE_JMX=true
+      - JMX_PORT=1199
+      - JMX_RMI_PORT=1198
+
+networks:
+  runtime-net:
