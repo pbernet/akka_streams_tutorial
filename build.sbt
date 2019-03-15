@@ -40,7 +40,7 @@ libraryDependencies ++= Seq(
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.10",
   "org.apache.httpcomponents" % "httpclient" % "4.5.6",
-  "commons-io" % "commons-io" % "2.5",
+  "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6"
 )
