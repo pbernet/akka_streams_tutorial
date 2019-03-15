@@ -7,7 +7,8 @@ scalaVersion := "2.12.8"
 val akkaVersion = "2.5.20"
 val akkaHTTPVersion = "10.1.7"
 val alpakkaVersion = "1.0-M2"
-val akkaStreamKafkaVersion =  "1.0-M2"
+val akkaStreamKafkaVersion =  "1.0.1"
+val kafkaVersion = "2.1.1"
 val activemqVersion =  "5.15.8"
 
 libraryDependencies ++= Seq(
@@ -25,8 +26,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
 
   "com.typesafe.akka" %% "akka-stream-kafka" % akkaStreamKafkaVersion,
-  "org.apache.kafka" %% "kafka" % "2.1.0",
-  "org.apache.kafka" % "kafka-streams" % "2.1.0",
+  "org.apache.kafka" %% "kafka" % kafkaVersion,
+  "org.apache.kafka" % "kafka-streams" % kafkaVersion,
 
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
