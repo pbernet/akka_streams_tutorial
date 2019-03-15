@@ -36,7 +36,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.1" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "com.typesafe.play" %% "play" % "2.6.10",
-  "com.geteventstore" %% "eventstore-client" % "4.1.1",
+  "com.geteventstore" %% "eventstore-client" % "6.0.0",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.10",
   "org.apache.httpcomponents" % "httpclient" % "4.5.6",
