@@ -11,6 +11,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -30,7 +31,7 @@ public class SimpleAvroConsumer {
 
         boolean running = true;
         while (running) {
-            ConsumerRecords<String, byte[]> records = consumer.poll(100);
+            ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(100));
             for (ConsumerRecord<String, byte[]> avroRecord : records) {
 
                 Schema.Parser parser = new Schema.Parser();
