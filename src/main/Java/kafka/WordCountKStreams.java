@@ -17,10 +17,10 @@ import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -117,7 +117,7 @@ public class WordCountKStreams {
             public void run() {
                 System.out.println("Got control-c cmd from shell, about to close stream...");
 
-                Boolean shutdownResult = app.close(10L, TimeUnit.SECONDS);
+                Boolean shutdownResult = app.close(Duration.ofMillis(10000));
                 // cleanUp() deletes the application's *local* state dir (= STATE_DIR_CONFIG)
                 // On startup of KafkaServer this local state dir folder will be restored
                 // To prevent this: Remove the kafka log.dirs manually, after KafkaServer is shutdown eg:
