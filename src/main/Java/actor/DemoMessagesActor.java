@@ -19,6 +19,8 @@ import static akka.pattern.PatternsCS.ask;
  * Doc Completable Future:
  * https://www.baeldung.com/java-completablefuture
  *
+ * TODO Switch to https://doc.akka.io/api/akka/current/akka/pattern/index.html
+ *
  */
 public class DemoMessagesActor extends AbstractLoggingActor {
 

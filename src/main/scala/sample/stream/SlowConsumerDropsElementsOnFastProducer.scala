@@ -59,7 +59,8 @@ object SlowConsumerDropsElementsOnFastProducer {
       }
 
   val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
-  //The reducer function takes the freshest element. This in a simple dropping operation.
+    //Conflate is "rate aware", it combines elements from upstream while downstream backpressures
+    //The reducer function takes the freshest element. This in a simple dropping operation.
     Flow[SourceEvent]
       .conflate((lastEvent, newEvent) => newEvent)
 }
