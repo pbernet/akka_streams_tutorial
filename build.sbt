@@ -6,7 +6,7 @@ scalaVersion := "2.12.8"
 
 val akkaVersion = "2.5.21"
 val akkaHTTPVersion = "10.1.7"
-val alpakkaVersion = "1.0-M2"
+val alpakkaVersion = "1.0-M3"
 val akkaStreamKafkaVersion =  "1.0.1"
 val kafkaVersion = "2.1.1"
 val activemqVersion =  "5.15.8"
@@ -33,14 +33,14 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   
-  "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+  "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
-  "com.typesafe.play" %% "play" % "2.6.10",
+  "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.11.3",
-  "org.apache.httpcomponents" % "httpclient" % "4.5.6",
-  "commons-io" % "commons-io" % "2.5",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.7",
+  "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6"
 )
