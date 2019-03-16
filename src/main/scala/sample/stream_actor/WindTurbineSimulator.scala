@@ -1,10 +1,9 @@
-package sample
+package sample.stream_actor
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.http.scaladsl.model.StatusCode
 import akka.stream.ActorMaterializer
-import sample.WindTurbineSimulator._
-import sample.stream_actor.WebSocketClient
+import sample.stream_actor.WindTurbineSimulator._
 
 case class WindTurbineSimulatorException(id: String) extends RuntimeException
 

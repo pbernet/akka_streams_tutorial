@@ -17,7 +17,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 case class Change(serverName: String, user: String, cmdType: String, lengthNew: Int = 0, lengthOld: Int = 0) {
-  override def toString() = s"$cmdType on server: $serverName by: $user new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
+  override def toString = s"$cmdType on server: $serverName by: $user new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
 }
 
 /**

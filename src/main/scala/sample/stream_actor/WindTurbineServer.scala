@@ -100,11 +100,10 @@ object WindTurbineServer {
       log.info(s"Bound to: ${serverBinding.localAddress} ")
     }.onComplete {
       case Success(value) => log.info("WindTurbineServer started successfully")
-      case Failure(ex) => {
+      case Failure(ex) =>
         log.error(ex, "Failed to bind to {}:{}!", httpInterface, httpPort)
         Http().shutdownAllConnectionPools()
         system.terminate()
-      }
     }
 
     scala.sys.addShutdownHook {

@@ -1,13 +1,13 @@
 package sample.graphDSL
 
 import java.nio.file.Paths
+import java.util.concurrent.ThreadLocalRandom
 
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
 
-import scala.concurrent.forkjoin.ThreadLocalRandom
 import scala.util.{Failure, Success}
 
 /**
@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
 object WritePrimes {
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("Sys")
+    implicit val system = ActorSystem("WritePrimes")
     import system.dispatcher
     implicit val materializer = ActorMaterializer()
 
@@ -34,17 +34,15 @@ object WritePrimes {
     // write to file sink
     val fileSink = FileIO.toPath(Paths.get("target/primes.txt"))
     val slowSink = Flow[Int]
-      // act as if processing is really slow
       .map(i => { Thread.sleep(1000); ByteString(i.toString) })
       .toMat(fileSink)((_, bytesWritten) => bytesWritten)
 
-    // console output sink
     val consoleSink = Sink.foreach[Int](println)
 
     // Optional sample processing flow, to show the nature of the composition
     val sharedDoubler = Flow[Int].map(_ * 2)
 
-    // send primes to both slow file sink and console sink using graph API
+    // send primes to both sinks using graph API
     val graph = GraphDSL.create(slowSink, consoleSink)((slow, _) => slow) { implicit builder =>
       (slow, console) =>
         import GraphDSL.Implicits._
@@ -55,7 +53,6 @@ object WritePrimes {
     }
     val materialized = RunnableGraph.fromGraph(graph).run()
 
-    // ensure the output file is closed and the system shutdown upon completion
     materialized.onComplete {
       case Success(_) =>
         system.terminate()

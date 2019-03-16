@@ -102,14 +102,14 @@ object FileEcho extends App with JsonProtocol {
 
     def upload(file: File): Future[FileHandle] = {
 
-      def delayRequestSoTheServerIsNotHammered = {
+      def delayRequestSoTheServerIsNotHammered() = {
         val (start, end) = (1000, 5000)
         val rnd = new scala.util.Random
         val sleepTime = start + rnd.nextInt((end - start) + 1)
         Thread.sleep(sleepTime.toLong)
       }
 
-      delayRequestSoTheServerIsNotHammered
+      delayRequestSoTheServerIsNotHammered()
 
       val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
 

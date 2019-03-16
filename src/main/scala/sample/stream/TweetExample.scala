@@ -51,7 +51,7 @@ object TweetExample {
 
     val sumSink: Sink[Int, Future[Int]] = Sink.fold[Int, Int](0)(_ + _)
     val sum: Future[Int] = limitedTweets.map(t => 1).runWith(sumSink)
-    sum.onComplete { (result: Try[Int]) =>
+    sum.onComplete { result: Try[Int] =>
       println("Resulting Future from run completed with result: " + result)
       system.terminate()
     }

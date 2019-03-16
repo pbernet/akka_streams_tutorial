@@ -17,6 +17,7 @@ import scala.concurrent.duration._
   * To calculate the "all time median of medians grouped by 5" we would need to store the values (eg in an actor)
   *
   */
+//noinspection LanguageFeature
 object CalculateMedian {
   implicit val system = ActorSystem("CalculateMedian")
   implicit val ec = system.dispatcher

@@ -150,7 +150,7 @@ final class EventSourceSpec extends AsyncWordSpec with Matchers with BeforeAndAf
         eventSource.throttle(1, 500.milliseconds, 1, ThrottleMode.Shaping).take(nrOfSamples).runWith(Sink.seq)
       //#consume-events
 
-      val expected = Seq.tabulate(nrOfSamples)(_ + 3).map(toServerSentEvent(true))
+      val expected = Seq.tabulate(nrOfSamples)(_ + 3).map(toServerSentEvent(setEventId = true))
       events.map(_ shouldBe expected).andThen { case _ => system.stop(server) }
     }
 

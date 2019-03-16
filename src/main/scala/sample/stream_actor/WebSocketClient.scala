@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, FlowShape, SourceShape}
-import sample.WindTurbineSimulator._
+import sample.stream_actor.WindTurbineSimulator._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -81,10 +81,11 @@ class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorR
     case Success(_) => windTurbineSimulator ! Connected
     case Failure(ex) => windTurbineSimulator ! ConnectionFailure(ex)
   }
-  connected.onFailure{case ex: Throwable => windTurbineSimulator ! ConnectionFailure(ex)}
 
   closed.map { _ =>
     windTurbineSimulator ! Terminated
   }
-  closed.onFailure{case ex: Throwable => windTurbineSimulator ! ConnectionFailure(ex)}
+  closed.onComplete {
+    case Failure(ex) => windTurbineSimulator ! ConnectionFailure(ex)
+  }
 }

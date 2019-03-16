@@ -2,9 +2,8 @@ package sample.stream_actor
 
 import akka.actor.ActorSystem
 import akka.pattern.{Backoff, BackoffSupervisor}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.stream.scaladsl.{Sink, Source}
-import sample.WindTurbineSimulator
+import akka.stream.{ActorMaterializer, ThrottleMode}
 
 import scala.concurrent.duration._
 

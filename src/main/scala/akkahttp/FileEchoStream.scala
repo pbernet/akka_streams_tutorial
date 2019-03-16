@@ -159,14 +159,13 @@ object FileEchoStream extends App with JsonProtocol2 {
 
       val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestNoFuture(fileHandle))
       responseFuture.onComplete {
-        case Success(resp) => {
+        case Success(resp) =>
           val localFile = File.createTempFile("downloadLocal", ".tmp.client")
           val result = resp.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
           result.map {
             ioresult =>
               println(s"Download client for file: $resp finished downloading: ${ioresult.count} bytes!")
           }
-        }
         case Failure(exception) => println(s"Boom $exception while downloading")
       }
     }

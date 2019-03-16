@@ -46,7 +46,7 @@ object TextMessageGenerator {
     val wordLen: Int = random.nextInt(minLen, maxLen + 1)
 
     for (i <- 1 to wordLen) {
-      val char = if (i == 1) maybeUpperChar else (if (i % 2 == 0) mostlyVowelChar else randomChar)
+      val char = if (i == 1) maybeUpperChar else if (i % 2 == 0) mostlyVowelChar else randomChar
       word += char
     }
 
