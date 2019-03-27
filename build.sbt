@@ -9,7 +9,7 @@ val akkaHTTPVersion = "10.1.7"
 val alpakkaVersion = "1.0-M3"
 val akkaStreamKafkaVersion =  "1.0.1"
 val kafkaVersion = "2.1.1"
-val activemqVersion =  "5.15.8"
+val activemqVersion =  "5.15.9"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
