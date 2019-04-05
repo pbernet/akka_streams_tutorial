@@ -21,7 +21,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
  The clients communicate via websockets with the server. After a restart of SimulateWindTurbines the clients are able to resume. 
  Shutting down the WindTurbineServer results in reporting all of the clients that the server is not reachable.
  After the WindTurbineServer is restarted the clients are able to resume. 
- There is not persistence yet in this example, so the processing just continuous.
+ There is no persistence, so the processing just continuous.
 
 
 ## Apache Kafka WordCount in pkg _kafka_ ##
@@ -31,13 +31,15 @@ The ubiquitous word count. Start the classes in the order below and watch the co
 | ------------------- |-----------------|
 | KafkaServer.scala| Standalone Kafka/Zookeeper. Alternative: [Setup Kafka server manually](https://kafka.apache.org/quickstart "Instruction")  
 | WordCountProducer.scala   | Client which feeds words to topic _wordcount-input_. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
-| WordCountKStreams.java   | Client to process stateful word and news count. Implemented with the magic [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
-| WordCountConsumer.scala   | Client which consumes aggregated results from topic _wordcount-output_. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
+| WordCountKStreams.java   | Client to process stateful word and news count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
+| WordCountConsumer.scala   | Client which consumes aggregated results from topic _wordcount-output_ and _messagecount-output_. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
 | DeleteTopicUtil.scala   | Utility to reset the offset    | 
+
+_WordCountKStreams.java_ and _WordCountConsumer.scala_ should yield the same results.
 
 The clients communicate via a binary protocol over TCP with the server. Behaviour after restart:
 * WordCountProducer resumes feeding words
-* WordCountKStreams resumes processing words at the stored offset and thus keeping the state
+* WordCountKStreams resumes at the stored offset
 * WordCountConsumer resumes consuming at the stored offset
 
 Shutting down the KafkaServer results in reporting all of the clients that the Kafka Broker is not available anymore.

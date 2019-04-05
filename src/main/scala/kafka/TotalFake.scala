@@ -6,7 +6,7 @@ import kafka.TotalFake.{IncrementMessage, IncrementWord}
 
 /**
   * Keep the state of:
-  *  - WORD count for "fakeNews" keywords
+  *  - WORD count for keyword "fakeNews"
   *  - MESSAGE count for messages which contain the keyword "fakeNews"
   *
   * Note that a message can contain several "fakeNews" keywords
