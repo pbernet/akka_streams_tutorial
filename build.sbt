@@ -4,12 +4,12 @@ version := "1.0"
 
 scalaVersion := "2.12.8"
 
-val akkaVersion = "2.5.21"
-val akkaHTTPVersion = "10.1.7"
-val alpakkaVersion = "1.0-M3"
+val akkaVersion = "2.5.22"
+val akkaHTTPVersion = "10.1.8"
+val alpakkaVersion = "1.0.0"
 val akkaStreamKafkaVersion =  "1.0.1"
-val kafkaVersion = "2.1.1"
-val activemqVersion =  "5.15.8"
+val kafkaVersion = "2.2.0"
+val activemqVersion =  "5.15.9"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -39,7 +39,7 @@ libraryDependencies ++= Seq(
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8",
-  "org.apache.httpcomponents" % "httpclient" % "4.5.7",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.8",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6"
