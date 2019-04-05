@@ -1,7 +1,7 @@
 package kafka
 
 import java.util
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+import java.util.concurrent.ThreadLocalRandom
 
 import akka.actor.ActorSystem
 import akka.kafka.ProducerMessage.Message
@@ -43,7 +43,6 @@ object WordCountProducer extends App {
   def initializeTopic(topic: String): Unit = {
     val producer = producerSettings.createKafkaProducer()
     producer.send(new ProducerRecord(topic, partition0, null: String, InitialMsg))
-    producer.close(60, TimeUnit.SECONDS)
   }
 
   def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
@@ -62,7 +61,7 @@ object WordCountProducer extends App {
         Message(recordWithCurrentTimestamp, NotUsed)
       })
       .throttle(100, 100.milli, 10, ThrottleMode.shaping)
-      .viaMat(Producer.flow(settings))(Keep.right)
+      .viaMat(Producer.flexiFlow(settings))(Keep.right)
 
     source.runWith(Sink.ignore)
   }

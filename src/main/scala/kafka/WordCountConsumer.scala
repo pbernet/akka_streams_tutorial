@@ -15,11 +15,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Consumers A.1 and A.2 (within the same word count consumer group) consume half of the partitions each
-  * Consumer B as a single consumer for all the partitions in message count
+  * Consumers W.1 and W.2 consume half of the partitions each within the wordcount consumer group
+  * Consumer M is a single consumer for all the partitions in the messagecount consumer group
   *
   * Use the offset storage in Kafka:
-  * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka
+  * https://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka-committing
   *
   */
 object WordCountConsumer extends App {
@@ -35,8 +35,6 @@ object WordCountConsumer extends App {
       .withGroupId(group)
       //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      .withWakeupTimeout(10.seconds)
-      .withMaxWakeups(10)
   }
 
   def createAndRunConsumerWordCount(id: String) = {
@@ -66,14 +64,14 @@ object WordCountConsumer extends App {
         Future(msg)
       }
       .mapAsync(1) { msg =>
-        msg.committableOffset.commitScaladsl() //commit after processing gives an “at-least once delivery”
+        msg.committableOffset.commitScaladsl() //commit after processing for “at-least once delivery”
       }
       .runWith(Sink.ignore)
   }
 
-  createAndRunConsumerWordCount("A.1")
-  createAndRunConsumerWordCount("A.2")
-  createAndRunConsumerMessageCount("B")
+  createAndRunConsumerWordCount("W.1")
+  createAndRunConsumerWordCount("W.2")
+  createAndRunConsumerMessageCount("M")
 
 
   sys.addShutdownHook{

@@ -21,10 +21,11 @@ import scala.concurrent.duration._
   * http://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#source-per-partition
   *
   * This consumer consumes WordCounts only
-  * TODO Find out what the benefits are compared to WordCountConsumer
+  * TODO Try to understand the documented benefits:
   *  * Supports tracking the automatic partition assignment from Kafka.
   *  * When topic-partition is assigned to a consumer this source will emit tuple with assigned topic-partition and a corresponding source.
   *  * When topic-partition is revoked then corresponding source completes.
+  * compared to WordCountConsumer
   */
 object WordCountConsumerPartitionedSource extends App {
   implicit val system = ActorSystem()
@@ -39,8 +40,6 @@ object WordCountConsumerPartitionedSource extends App {
       .withGroupId(group)
       //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      .withWakeupTimeout(10.seconds)
-      .withMaxWakeups(10)
   }
 
   def createAndRunConsumerWordCount(id: String) = {
@@ -61,17 +60,16 @@ object WordCountConsumerPartitionedSource extends App {
       .runWith(Sink.ignore)
   }
 
-  //One consumer for each partition is needed for this to work
-  createAndRunConsumerWordCount("A")
-  createAndRunConsumerWordCount("B")
-  createAndRunConsumerWordCount("C")
-  createAndRunConsumerWordCount("D")
-  createAndRunConsumerWordCount("E")
-  createAndRunConsumerWordCount("F")
-  createAndRunConsumerWordCount("G")
-  createAndRunConsumerWordCount("H")
-  createAndRunConsumerWordCount("I")
-  createAndRunConsumerWordCount("K")
+  createAndRunConsumerWordCount("W.1")
+  createAndRunConsumerWordCount("W.2")
+  createAndRunConsumerWordCount("W.3")
+  createAndRunConsumerWordCount("W.4")
+  createAndRunConsumerWordCount("W.5")
+  createAndRunConsumerWordCount("W.6")
+  createAndRunConsumerWordCount("W.7")
+  createAndRunConsumerWordCount("W.8")
+  createAndRunConsumerWordCount("W.9")
+  createAndRunConsumerWordCount("W.10")
 
   sys.addShutdownHook{
     println("Got shutdown cmd from shell, about to shutdown...")
