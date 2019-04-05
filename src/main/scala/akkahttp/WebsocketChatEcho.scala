@@ -31,9 +31,10 @@ object WebsocketChatEcho {
 
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
-    val maxClients = 10
     server(address, port)
-    for ( a <- 1 to maxClients) clientWebSocketClientFlow(address, port)  //Without compression messages in stdout: numberOfMsg * maxClients^2
+
+    val maxClients = 2
+    (1 to maxClients).par.foreach(_ => clientWebSocketClientFlow(address, port))
   }
 
   private def server(address: String, port: Int) = {
@@ -76,7 +77,7 @@ object WebsocketChatEcho {
       }
     }
       .via(Flow.fromSinkAndSource(chatSink, chatSource))
-      //Add compression
+      //Add compression, without compression messages in stdout: numberOfMsg * maxClients^2
       .groupedWithin(10, 2.second)
       .map { eachSeq =>
         println(s"Compressed ${eachSeq.size} messages within 2 seconds")
@@ -116,8 +117,7 @@ object WebsocketChatEcho {
       }
     }
 
-    //TODO be more verbose and check disconnect
-    connected.onComplete(println)
-    closed.foreach(_ => println("closed"))
+    connected.onComplete(_ => println("client connected"))
+    closed.foreach(_ => println("client closed"))
   }
 }

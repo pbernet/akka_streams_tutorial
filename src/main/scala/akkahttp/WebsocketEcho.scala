@@ -32,7 +32,7 @@ trait ClientCommon {
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
 
-  //see https://doc.akka.io/docs/akka-http/10.1.1/client-side/websocket-support.html?language=scala#half-closed-websockets
+  //see https://doc.akka.io/docs/akka-http/10.1.8/client-side/websocket-support.html?language=scala#half-closed-websockets
   val helloSource = Source(List(TextMessage("world one"), TextMessage("world two")))
     .concatMat(Source.maybe[Message])(Keep.right)
 }
