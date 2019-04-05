@@ -39,7 +39,7 @@ libraryDependencies ++= Seq(
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.11.3",
-  "org.apache.httpcomponents" % "httpclient" % "4.5.7",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.8",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6"
