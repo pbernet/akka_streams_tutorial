@@ -30,7 +30,7 @@ case class Change(serverName: String, user: String, cmdType: String, lengthNew: 
 object SSEClientWikipediaEdits {
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
-      logger.warn(s"Stream failed with: ${e.getMessage}, going to restart")
+      logger.warn(s"Stream failed with: ${e}, going to restart")
       Supervision.Restart
   }
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
@@ -80,8 +80,8 @@ object SSEClientWikipediaEdits {
 
         val cmdType = (Json.parse(event.data) \ "type").as[String]
         if (cmdType == "new" || cmdType == "edit") {
-          val lengthNew = (Json.parse(event.data) \ "length" \ "new").get.toString()
-          val lengthOld = (Json.parse(event.data) \ "length" \ "old").get.toString()
+          val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
+          val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
           Change(serverName, user, cmdType, tryToInt(lengthNew), tryToInt(lengthOld))
         } else {
           Change(serverName, user, cmdType)
