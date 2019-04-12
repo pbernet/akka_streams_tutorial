@@ -1,4 +1,15 @@
-package akkastreams
+package sample.stream_shared_state
+
+import java.time.{Instant, OffsetDateTime, ZoneId}
+
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
+
+import scala.collection.mutable
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.Random
 
 /**
   * Windowing sample taken from:
@@ -11,17 +22,6 @@ package akkastreams
   * https://ci.apache.org/projects/flink/flink-docs-release-1.3/concepts/programming-model.html#windows
   * https://flink.apache.org/news/2015/12/04/Introducing-windows.html
   */
-import java.time._
-
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
-
-import scala.collection.mutable
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.Random
-
 object WindowingExample {
   def main(args: Array[String]): Unit = {
     implicit val as = ActorSystem("WindowingExample")
