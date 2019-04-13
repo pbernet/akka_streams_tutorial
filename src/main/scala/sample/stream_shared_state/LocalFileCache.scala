@@ -40,9 +40,7 @@ import scala.util.control.NonFatal
   * Use File.setLastModified to extend the keeping period
   *
   * After system restart the files are now read in random order, which affects the eviction process.
-  * So files remain at-least for the evictionTime in the cache but maybe longer
-  *
-  * The eviction may be done async
+  * So files remain at-least for the evictionTime in the local file cache
   *
   */
 object LocalFileCache {
@@ -55,7 +53,7 @@ object LocalFileCache {
     case _ => Supervision.Stop
   }
 
-  val scaleFactor = 10 //Raise to stress
+  val scaleFactor = 1 //Raise to stress
   val evictionTime: Long = 10 * 1000 //10 seconds
   val localFileCache = Paths.get("/tmp/localFileCache")
 
@@ -71,7 +69,7 @@ object LocalFileCache {
     case class Message(id: Int, file: File)
 
     //Generate random messages with IDs between 0/10
-    val messages = List.fill(100000)(Message(ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
+    val messages = List.fill(100000)(Message(ThreadLocalRandom.current.nextInt(0, 10 * scaleFactor), null))
 
 
     val stateFlow = Flow[Message].statefulMapConcat { () =>
@@ -80,7 +78,7 @@ object LocalFileCache {
       var stateMap = ListMap.empty[Int, File]
 
       println(s"About to load file references from $localFileCache ...")
-      //TODO Ordered by last modified TS in Java:
+      //TODO Read ordered by last modified TS in Java:
       //https://stackoverflow.com/questions/203030/best-way-to-list-files-in-java-sorted-by-date-modified
       val filesSource: Source[Path, NotUsed] = Directory.ls(localFileCache)
 
@@ -118,7 +116,7 @@ object LocalFileCache {
         } else {
           println("Cache miss - download for ID: " + message.id)
 
-          //Simulate download problem
+          //Simulate download problem, the spec says the the 2nd concurrent request for the same ID gets a HTTP 404
           if (message.id < 2 * scaleFactor) throw new RuntimeException("BOOM")
 
           //Result of a successful download file
