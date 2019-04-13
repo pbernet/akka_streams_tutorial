@@ -4,9 +4,7 @@ import java.io.File
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.ThreadLocalRandom
 
-import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.alpakka.file.scaladsl.Directory
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorAttributes, ActorMaterializer, Supervision, ThrottleMode}
 import org.apache.commons.io.FileUtils
@@ -16,7 +14,6 @@ import scala.collection.immutable
 import scala.collection.immutable.ListMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
 
 
@@ -31,7 +28,7 @@ import scala.util.control.NonFatal
   *   On filesystem in /tmp/localFileCache
   * For each subsequent IDs try to load from local file cache
   *
-  * On system restart: read all files from filesystem
+  * On system restart: read all files from filesystem ordered by lastModified
   * After configurable evictionTime has expired: remove oldest file
   * Simulate download exceptions and resume stream: Supervision.Resume keeps the state
   *
@@ -39,8 +36,7 @@ import scala.util.control.NonFatal
   * If used in a ProcessingApp, where faulty elements are put in error queue and thus need to remain in file cache
   * Use File.setLastModified to extend the keeping period
   *
-  * After system restart the files are now read in random order, which affects the eviction process.
-  * So files remain at-least for the evictionTime in the local file cache
+  * Multiple logback.xml are on the classpath, read from THIS on in project
   *
   */
 object LocalFileCache {
@@ -53,12 +49,12 @@ object LocalFileCache {
     case _ => Supervision.Stop
   }
 
-  val scaleFactor = 1 //Raise to stress
+  val scaleFactor = 1 //Raise to stress more
   val evictionTime: Long = 10 * 1000 //10 seconds
   val localFileCache = Paths.get("/tmp/localFileCache")
 
   FileUtils.forceMkdir(localFileCache.toFile)
-  //Comment out to start with empty cache
+  //Comment out to start with empty local file cache
   //FileUtils.cleanDirectory(localFileCache.toFile)
 
 
@@ -77,49 +73,40 @@ object LocalFileCache {
       //State with already processed IDs
       var stateMap = ListMap.empty[Int, File]
 
-      println(s"About to load file references from $localFileCache ...")
-      //TODO Read ordered by last modified TS in Java:
-      //https://stackoverflow.com/questions/203030/best-way-to-list-files-in-java-sorted-by-date-modified
-      val filesSource: Source[Path, NotUsed] = Directory.ls(localFileCache)
-
-      val result: Future[immutable.Seq[Path]] = filesSource
-        //.wireTap(each => println(each))
-        .runWith(Sink.seq)
-
-      //Sync loading is needed here
-      val loadedResults = Await.result(result, 600.seconds)
-      loadedResults.foreach { each: Path =>
-        stateMap = stateMap + (each.getFileName.toString.dropRight(4).toInt -> each.toFile)
+      logger.info(s"About to load file refs from: $localFileCache...")
+      val loadedResults =  new FileLister().run(localFileCache.toFile)
+      loadedResults.forEach { each: File =>
+        logger.debug(s"Add file: ${each.getName} with lastModified: ${each.lastModified()}")
+        stateMap = stateMap + (each.getName.dropRight(4).toInt -> each)
       }
-      println(s"Finished loading: ${loadedResults.size} file references")
 
-      println(s"Start processing loop...")
-
+      logger.info(s"Finished loading: ${loadedResults.size} file refs. Start processing loop...")
 
       def evictOldestFile() = {
         if (stateMap.nonEmpty) {
           val timeStampOfOldestFile = stateMap.values.head.lastModified()
           val oldestFileID = stateMap.keys.head
-          //println(s"About to evict oldest cached file with ID: $oldestFileID")
+          logger.debug(s"About to evict oldest cached file with ID: $oldestFileID")
           if (timeStampOfOldestFile + evictionTime < System.currentTimeMillis()) {
-            FileUtils.forceDelete(localFileCache.resolve(Paths.get(oldestFileID.toString + ".zip")).toFile)
+            //TODO make more robust, filesystem and memory should not get out of sync
             stateMap = stateMap - oldestFileID
-            println(s"REMOVED oldest file: $oldestFileID after: $evictionTime ms. Remaining files: ${stateMap.keys.size}")
+            FileUtils.deleteQuietly(localFileCache.resolve(Paths.get(oldestFileID.toString + ".zip")).toFile)
+            logger.info(s"REMOVED oldest file: $oldestFileID after: $evictionTime ms. Remaining files: ${stateMap.keys.size}")
           }
         }
       }
 
       def processNext(message: Message) = {
         if (stateMap.contains(message.id)) {
-          println("Cache hit for ID: " + message.id)
+          logger.info("Cache hit for ID: " + message.id)
           List(message)
         } else {
-          println("Cache miss - download for ID: " + message.id)
+          logger.info("Cache miss - download for ID: " + message.id)
 
           //Simulate download problem, the spec says the the 2nd concurrent request for the same ID gets a HTTP 404
           if (message.id < 2 * scaleFactor) throw new RuntimeException("BOOM")
 
-          //Result of a successful download file
+          //For now: simulate a successfully download file
           val downloadedFile: Path = Files.createFile(Paths.get("/tmp/localFileCache").resolve(Paths.get(message.id.toString + ".zip")))
 
           stateMap = stateMap + (message.id -> downloadedFile.toFile)
@@ -140,11 +127,11 @@ object LocalFileCache {
       .runWith(Sink.seq)
       .onComplete {
         identValues =>
-          println(s"Processed: ${identValues.get.size} elements")
+          logger.info(s"Processed: ${identValues.get.size} elements")
           val result: Map[Int, immutable.Seq[Message]] = identValues.get.groupBy(each => each.id)
           result.foreach {
             each: (Int, immutable.Seq[Message]) =>
-              println(s"ID: ${each._1} elements: ${each._2.size}")
+              logger.info(s"ID: ${each._1} elements: ${each._2.size}")
           }
           system.terminate()
       }
