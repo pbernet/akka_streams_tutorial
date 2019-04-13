@@ -2,6 +2,7 @@ package sample.stream_shared_state
 
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
+import java.util.concurrent.ThreadLocalRandom
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -14,11 +15,8 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.collection.immutable
 import scala.collection.immutable.ListMap
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.math.abs
-import scala.util.Random._
-import scala.util.Try
+import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
 
 
@@ -27,7 +25,7 @@ import scala.util.control.NonFatal
   * There was a need to avoid duplicate file downloads and thus keep them locally
   *
   * Use case in detail:
-  * Process a stream of reoccurring IDs
+  * Process a stream of messages with reoccurring IDs
   * For the first ID download a .zip file and add it to the local file cache, which has two parts:
   *   In memory in a ListMap, which preserves the insert order
   *   On filesystem in /tmp/localFileCache
@@ -41,8 +39,10 @@ import scala.util.control.NonFatal
   * If used in a ProcessingApp, where faulty elements are put in error queue and thus need to remain in file cache
   * Use File.setLastModified to extend the keeping period
   *
-  * Originally inspired by:
-  * https://stackoverflow.com/questions/37902354/akka-streams-state-in-a-flow
+  * After system restart the files are now read in random order, which affects the eviction process.
+  * So files remain at-least for the evictionTime in the cache but maybe longer
+  *
+  * The eviction may be done async
   *
   */
 object LocalFileCache {
@@ -55,6 +55,7 @@ object LocalFileCache {
     case _ => Supervision.Stop
   }
 
+  val scaleFactor = 10 //Raise to stress
   val evictionTime: Long = 10 * 1000 //10 seconds
   val localFileCache = Paths.get("/tmp/localFileCache")
 
@@ -67,35 +68,34 @@ object LocalFileCache {
     implicit val system = ActorSystem("LocalFileCache")
     implicit val materializer = ActorMaterializer()
 
-    case class IdentValue(id: Int, file: File)
+    case class Message(id: Int, file: File)
 
-    //Generate random IDs between 0/10
-    val identValues = List.fill(100)(IdentValue(abs(nextInt()) % 10, null))
+    //Generate random messages with IDs between 0/10
+    val messages = List.fill(100000)(Message(ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
 
 
-    val stateFlow = Flow[IdentValue].statefulMapConcat { () =>
+    val stateFlow = Flow[Message].statefulMapConcat { () =>
 
       //State with already processed IDs
       var stateMap = ListMap.empty[Int, File]
 
-      println("About to load file references...")
+      println(s"About to load file references from $localFileCache ...")
+      //TODO Ordered by last modified TS in Java:
+      //https://stackoverflow.com/questions/203030/best-way-to-list-files-in-java-sorted-by-date-modified
       val filesSource: Source[Path, NotUsed] = Directory.ls(localFileCache)
 
       val result: Future[immutable.Seq[Path]] = filesSource
         //.wireTap(each => println(each))
         .runWith(Sink.seq)
 
-      //If sync loading would be needed: Use Await.result(result, xx.seconds)
-      result.onComplete {
-        results: Try[immutable.Seq[Path]] =>
-            results.get.foreach { each: Path =>
-              stateMap = stateMap + (each.getFileName.toString.dropRight(4).toInt -> each.toFile)
-            }
-          println(s"Finished loading file references")
+      //Sync loading is needed here
+      val loadedResults = Await.result(result, 600.seconds)
+      loadedResults.foreach { each: Path =>
+        stateMap = stateMap + (each.getFileName.toString.dropRight(4).toInt -> each.toFile)
       }
+      println(s"Finished loading: ${loadedResults.size} file references")
 
-
-      println(s"Start processing...")
+      println(s"Start processing loop...")
 
 
       def evictOldestFile() = {
@@ -106,44 +106,46 @@ object LocalFileCache {
           if (timeStampOfOldestFile + evictionTime < System.currentTimeMillis()) {
             FileUtils.forceDelete(localFileCache.resolve(Paths.get(oldestFileID.toString + ".zip")).toFile)
             stateMap = stateMap - oldestFileID
-            println(s"REMOVED oldest file: $oldestFileID after: $evictionTime ms. Remaining files: ${stateMap.keys}")
+            println(s"REMOVED oldest file: $oldestFileID after: $evictionTime ms. Remaining files: ${stateMap.keys.size}")
           }
         }
       }
 
-      identValue =>
-
-        evictOldestFile()
-
-        if (stateMap.contains(identValue.id)) {
-          println("Cache hit for ID: " + identValue.id)
-          List(identValue)
+      def processNext(message: Message) = {
+        if (stateMap.contains(message.id)) {
+          println("Cache hit for ID: " + message.id)
+          List(message)
         } else {
-          println("Cache miss - download for ID: " + identValue.id)
+          println("Cache miss - download for ID: " + message.id)
 
           //Simulate download problem
-          if (identValue.id == 0) throw new RuntimeException("BOOM")
+          if (message.id < 2 * scaleFactor) throw new RuntimeException("BOOM")
 
           //Result of a successful download file
-          val downloadedFile: Path = Files.createFile(Paths.get("/tmp/localFileCache").resolve(Paths.get(identValue.id.toString + ".zip")))
+          val downloadedFile: Path = Files.createFile(Paths.get("/tmp/localFileCache").resolve(Paths.get(message.id.toString + ".zip")))
 
-          stateMap = stateMap + (identValue.id -> downloadedFile.toFile)
-          List(identValue)
+          stateMap = stateMap + (message.id -> downloadedFile.toFile)
+          List(message)
         }
+      }
+
+      message =>
+        evictOldestFile()
+        processNext(message)
 
     }
 
-    Source(identValues)
-      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+    Source(messages)
+      .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
       .via(stateFlow)
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.seq)
       .onComplete {
         identValues =>
           println(s"Processed: ${identValues.get.size} elements")
-          val result: Map[Int, immutable.Seq[IdentValue]] = identValues.get.groupBy(each => each.id)
+          val result: Map[Int, immutable.Seq[Message]] = identValues.get.groupBy(each => each.id)
           result.foreach {
-            each: (Int, immutable.Seq[IdentValue]) =>
+            each: (Int, immutable.Seq[Message]) =>
               println(s"ID: ${each._1} elements: ${each._2.size}")
           }
           system.terminate()
