@@ -1,7 +1,8 @@
 package sample.stream_shared_state
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
+import java.net.URI
+import java.nio.file.Paths
 import java.util.concurrent.ThreadLocalRandom
 
 import akka.actor.ActorSystem
@@ -51,7 +52,7 @@ object LocalFileCache {
 
   val scaleFactor = 1 //Raise to stress more
   val evictionTime: Long = 10 * 1000 //10 seconds
-  val localFileCache = Paths.get("/tmp/localFileCache")
+  val localFileCache = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   FileUtils.forceMkdir(localFileCache.toFile)
   //Comment out to start with empty local file cache
@@ -65,7 +66,7 @@ object LocalFileCache {
     case class Message(id: Int, file: File)
 
     //Generate random messages with IDs between 0/10
-    val messages = List.fill(100000)(Message(ThreadLocalRandom.current.nextInt(0, 10 * scaleFactor), null))
+    val messages = List.fill(100)(Message(ThreadLocalRandom.current.nextInt(0, 10 * scaleFactor), null))
 
 
     val stateFlow = Flow[Message].statefulMapConcat { () =>
@@ -103,11 +104,9 @@ object LocalFileCache {
         } else {
           logger.info("Cache miss - download for ID: " + message.id)
 
-          //Simulate download problem, the spec says the the 2nd concurrent request for the same ID gets a HTTP 404
-          if (message.id < 2 * scaleFactor) throw new RuntimeException("BOOM")
-
-          //For now: simulate a successfully download file
-          val downloadedFile: Path = Files.createFile(Paths.get("/tmp/localFileCache").resolve(Paths.get(message.id.toString + ".zip")))
+          val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
+          val url = new URI("http://127.0.0.1:6001/download/" + message.id.toString)
+          val downloadedFile = new DownloaderRetry().download(url, destinationFile)
 
           stateMap = stateMap + (message.id -> downloadedFile.toFile)
           List(message)
