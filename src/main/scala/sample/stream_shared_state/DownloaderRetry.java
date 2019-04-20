@@ -92,10 +92,10 @@ public class DownloaderRetry {
 		public boolean retryRequest(IOException exception, int executionCount, HttpContext context) {
 
 			Throwable rootCause = ExceptionUtils.getRootCause(exception);
-			logger.warn("XDM downloading attempt failed, root cause: {}", rootCause.toString());
+			logger.warn("File downloading attempt failed, root cause: {}", rootCause.toString());
 
 			if (executionCount >= maxRetriesCount) {
-				logger.warn("XDM downloading failed after {} retries in {} minute(s)",
+				logger.warn("File downloading failed after {} retries in {} minute(s)",
 						executionCount, maxDurationMinutes);
 				return false;
 
@@ -135,12 +135,12 @@ public class DownloaderRetry {
 				return false; // retry only on HTTP 503
 
 			if (executionCount >= maxRetriesCount) {
-				logger.warn("XDM downloading failed after {} retries in {} minute(s)",
+				logger.warn("File downloading failed after {} retries in {} minute(s)",
 						executionCount, maxDurationMinutes);
 				return false;
 
 			} else {
-				logger.warn("XDM downloading attempt failed, HTTP status code: {}", httpStatusCode);
+				logger.warn("File downloading attempt failed, HTTP status code: {}", httpStatusCode);
 				return true;
 			}
 		}
