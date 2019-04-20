@@ -35,10 +35,6 @@ import scala.util.control.NonFatal
   * TODO
   * Since the http download is executed from the statefulMapConcat stage, the http download can not occur in parallel
   *
-  * If used in a ProcessingApp, where faulty elements could occur at a later stage and put in an error queue
-  * and thus the original downloaded file needs to remain in file cache for later reference
-  * Simulate File.setLastModified to extend the keeping period
-  *
   * Multiple logback.xml are on the classpath, read from THIS on in project
   *
   */
@@ -54,6 +50,7 @@ object LocalFileCache {
 
   val scaleFactor = 1 //Raise to stress more
   val evictionTime: Long = 10 * 1000 //10 seconds
+  val evictionTimeOnError: Long = 100 * 1000 //100 seconds
   val localFileCache = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   FileUtils.forceMkdir(localFileCache.toFile)
@@ -65,10 +62,10 @@ object LocalFileCache {
     implicit val system = ActorSystem("LocalFileCache")
     implicit val materializer = ActorMaterializer()
 
-    case class Message(id: Int, file: File)
+    case class Message(group: Int, id: Int, file: File)
 
-    //Generate random messages with IDs between 0/10
-    val messages = List.fill(1000)(Message(ThreadLocalRandom.current.nextInt(0, 10 * scaleFactor), null))
+    //Within three groups: Generate random messages with IDs between 0/100
+    val messages = List.fill(1000)(Message(ThreadLocalRandom.current.nextInt(0, 2), ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
 
 
     val stateFlow = Flow[Message].statefulMapConcat { () =>
@@ -147,9 +144,21 @@ object LocalFileCache {
     }
 
     Source(messages)
-      .throttle(10 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
+      .throttle(1 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
       .via(stateFlow)
-      //TODO Simulate error in a later processing stage
+      .groupBy(3, _.group) //parallel processing per group
+      .map {  each =>
+        try {
+          if (each.group == 0) throw new RuntimeException("Simulate error for element in group 0")
+        }   catch {
+          case e @ (_ : RuntimeException )  => {
+            logger.info(s"Extend eviction time for id: ${each.id} for group: ${each.group}")
+            each.file.setLastModified(System.currentTimeMillis() + evictionTimeOnError)
+          }
+        }
+        each
+      }
+      .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.seq)
       .onComplete {
