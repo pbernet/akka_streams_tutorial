@@ -45,6 +45,7 @@ object LocalFileCacheCaffeine {
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
       logger.info(s"Stream failed with: $e, going to resume")
+      logger.debug(s"Stream failed with: $e, going to resume", e)
       Supervision.Restart
     case _ => Supervision.Stop
   }
@@ -101,28 +102,21 @@ object LocalFileCacheCaffeine {
 
         def processNext(message: Message): Message = {
           if (cache.getIfPresent(message.id).isDefined) {
-            logger.info("Cache hit for ID: " + message.id)
-            message
+            val value = cache.getIfPresent(message.id).get
+            logger.info(s"Cache hit for ID: ${message.id}")
+            Message(message.group, message.id, value.toFile)
           } else {
-            logger.info("Cache miss - download for ID: " + message.id)
+            logger.info(s"Cache miss for ID: ${message.id} - download...")
             var downloadedFile: Path = null
-            try {
+
               val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
               val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
               downloadedFile = new DownloaderRetry().download(url, destinationFile)
               cache.put(message.id, downloadedFile)
-            } catch {
-              case e@(_: Throwable) => {
-                logger.error("Ex during download. " + e)
-                throw e
-              }
-            }
-            Message(message.group, message.id, downloadedFile.toFile)
+              Message(message.group, message.id, downloadedFile.toFile)
           }
         }
-
         Future(processNext(message))
-
       }
 
     val faultyDownstreamFlow: Flow[Message, Message, NotUsed] = Flow[Message]
@@ -132,8 +126,8 @@ object LocalFileCacheCaffeine {
         } catch {
           case e@(_: RuntimeException) => {
             //Force an update (= replacement of value) to extend cache time
+            logger.info(s"Extend eviction time for ID: ${message.id} from group: ${message.group}")
             cache.put(message.id, message.file.toPath)
-            logger.info(s"Extend eviction time for id: ${message.id} for group: ${message.group}")
           }
         }
         message
@@ -141,8 +135,10 @@ object LocalFileCacheCaffeine {
 
     Source(messages)
       .throttle(1 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
+//      .groupBy(10, _.id % 2)
       .via(downloadFlow)
       .via(faultyDownstreamFlow)
+//      .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)
   }
