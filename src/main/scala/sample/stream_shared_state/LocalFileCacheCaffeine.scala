@@ -36,6 +36,9 @@ import scala.util.control.NonFatal
   * On system restart: read all files from filesystem (ordered by lastModified)
   *
   * TODO
+  * Implement download barrier to meet non-idempotent behaviour of the real download server,
+  * which does not allow two parallel requests with the same ID but different group
+  * 
   * Multiple logback.xml are on the classpath, read from THIS one in project resources
   *
   */
@@ -44,8 +47,8 @@ object LocalFileCacheCaffeine {
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
-      logger.info(s"Stream failed with: $e, going to resume")
-      logger.debug(s"Stream failed with: $e, going to resume", e)
+      logger.info(s"Stream failed with: $e, going to restart")
+      logger.debug(s"Stream failed with: $e, going to restart", e)
       Supervision.Restart
     case _ => Supervision.Stop
   }
@@ -76,7 +79,7 @@ object LocalFileCacheCaffeine {
     Scaffeine()
       .recordStats()
       .expireAfter[Int, Path]((_, _) => evictionTime, (_, _, _) => evictionTimeOnError, (_, _, _) => evictionTime)
-      .maximumSize(500)
+      .maximumSize(1000)
       .writer(writer)
       .build[Int, Path]()
 
@@ -93,12 +96,12 @@ object LocalFileCacheCaffeine {
 
     case class Message(group: Int, id: Int, file: Path)
 
-    //Within three groups: Generate random messages with IDs between 0/100
-    val messages = List.fill(1000)(Message(ThreadLocalRandom.current.nextInt(0, 2), ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
+    //Within three groups: Generate random messages with IDs between 0/100, set to 5 to show "download barrier" issue
+    val messages = List.fill(10000)(Message(ThreadLocalRandom.current.nextInt(0, 2), ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
 
 
     val downloadFlow: Flow[Message, Message, NotUsed] = Flow[Message]
-      .mapAsync(5) { message =>
+      .mapAsyncUnordered(5) { message =>
 
         def processNext(message: Message): Message = {
           if (cache.getIfPresent(message.id).isDefined) {
@@ -135,12 +138,11 @@ object LocalFileCacheCaffeine {
 
     Source(messages)
       .throttle(1 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
-      //Go parallel on the ID to fix non-idempotent behaviour of the real download server,
-      //which does not allow two subsequent requests with the same ID but different group
-      .groupBy(2, _.id % 2)
+      //Try to go parallel on the ID
+//      .groupBy(2, _.id % 2)
       .via(downloadFlow)
       .via(faultyDownstreamFlow)
-      .mergeSubstreams
+//      .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)
   }
