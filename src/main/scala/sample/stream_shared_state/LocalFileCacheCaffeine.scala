@@ -23,9 +23,9 @@ import scala.util.control.NonFatal
 
 /**
   * Implement a local file cache with caffeine
-  * Use scaffeine wrapper for convenience:
-  * https://github.com/blemale/scaffeine
+  * Use scaffeine wrapper for convenience: https://github.com/blemale/scaffeine
   * Use FileServer as faulty HTTP download mock
+  * Monitor localFileCache with:  watch ls -ltr
   *
   * Use case:
   * Avoid duplicate file downloads, thus keep them locally
@@ -62,11 +62,11 @@ object LocalFileCacheCaffeine {
 
   val writer = new caffeine.cache.CacheWriter[Int, Path] {
     override def write(key: Int, value: Path): Unit = {
-      logger.debug(s"Writing to cache id: $key")
+      logger.debug(s"Writing to cache ID: $key")
     }
 
     override def delete(key: Int, value: Path, cause: caffeine.cache.RemovalCause): Unit = {
-      logger.info(s"Deleting from storage: $key because of: $cause")
+      logger.info(s"Deleting from storage for ID: $key because of: $cause")
       val destinationFile = localFileCache.resolve(value)
       FileUtils.deleteQuietly(destinationFile.toFile)
     }
@@ -91,7 +91,7 @@ object LocalFileCacheCaffeine {
     implicit val system = ActorSystem("LocalFileCache")
     implicit val materializer = ActorMaterializer()
 
-    case class Message(group: Int, id: Int, file: File)
+    case class Message(group: Int, id: Int, file: Path)
 
     //Within three groups: Generate random messages with IDs between 0/100
     val messages = List.fill(1000)(Message(ThreadLocalRandom.current.nextInt(0, 2), ThreadLocalRandom.current.nextInt(0, 100 * scaleFactor), null))
@@ -104,7 +104,7 @@ object LocalFileCacheCaffeine {
           if (cache.getIfPresent(message.id).isDefined) {
             val value = cache.getIfPresent(message.id).get
             logger.info(s"Cache hit for ID: ${message.id}")
-            Message(message.group, message.id, value.toFile)
+            Message(message.group, message.id, value)
           } else {
             logger.info(s"Cache miss for ID: ${message.id} - download...")
             var downloadedFile: Path = null
@@ -113,7 +113,7 @@ object LocalFileCacheCaffeine {
               val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
               downloadedFile = new DownloaderRetry().download(url, destinationFile)
               cache.put(message.id, downloadedFile)
-              Message(message.group, message.id, downloadedFile.toFile)
+              Message(message.group, message.id, downloadedFile)
           }
         }
         Future(processNext(message))
@@ -127,7 +127,7 @@ object LocalFileCacheCaffeine {
           case e@(_: RuntimeException) => {
             //Force an update (= replacement of value) to extend cache time
             logger.info(s"Extend eviction time for ID: ${message.id} from group: ${message.group}")
-            cache.put(message.id, message.file.toPath)
+            cache.put(message.id, message.file)
           }
         }
         message
@@ -135,10 +135,12 @@ object LocalFileCacheCaffeine {
 
     Source(messages)
       .throttle(1 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
-//      .groupBy(10, _.id % 2)
+      //Go parallel on the ID to fix non-idempotent behaviour of the real download server,
+      //which does not allow two subsequent requests with the same ID but different group
+      .groupBy(2, _.id % 2)
       .via(downloadFlow)
       .via(faultyDownstreamFlow)
-//      .mergeSubstreams
+      .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)
   }
