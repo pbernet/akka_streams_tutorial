@@ -152,6 +152,7 @@ object LocalFileCache {
           if (each.group == 0) throw new RuntimeException("Simulate error for element in group 0")
         }   catch {
           case e @ (_ : RuntimeException )  => {
+            //TODO This element will not be the last one in the Map...
             logger.info(s"Extend eviction time for id: ${each.id} for group: ${each.group}")
             each.file.setLastModified(System.currentTimeMillis() + evictionTimeOnError)
           }
