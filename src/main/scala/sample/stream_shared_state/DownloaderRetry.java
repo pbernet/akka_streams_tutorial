@@ -40,7 +40,7 @@ public class DownloaderRetry {
 		URI url = new URI("http://127.0.0.1:6001/download/30");
 		//URI url = new URI("http://127.0.0.1:6001/downloadflaky/30");
 
-		Path resFile = new DownloaderRetry().download(url, LocalFileCache.localFileCache().resolve(Paths.get("test.zip")));
+		Path resFile = new DownloaderRetry().download(url, LocalFileCacheCaffeine.localFileCache().resolve(Paths.get("test.zip")));
 		System.out.print("Downloaded file: " + resFile.toFile().getName() + " with size: " + resFile.toFile().length() + " bytes");
 	}
 
