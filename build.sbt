@@ -42,7 +42,8 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % "4.5.8",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
-  "com.twitter" %% "bijection-avro" % "0.9.6"
+  "com.twitter" %% "bijection-avro" % "0.9.6",
+  "com.github.blemale" %% "scaffeine" % "2.6.0" % "compile"
 )
 
 resolvers ++= Seq(
