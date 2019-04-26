@@ -18,8 +18,8 @@ import org.apache.http.client.HttpResponseException
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 
 
@@ -117,27 +117,26 @@ object LocalFileCacheCaffeine {
               Message(message.group, message.id, downloadedFile)
           }
         }
-        //TODO Find a way to wait for the downloaded element non-blocking
         //For now: Instead of blocking concurrent requests before the cache lookup
         //lets use this "optimistic" approach
         Future(processNext(message)).recoverWith {
           case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] =>  {
             val rootCause = ExceptionUtils.getRootCause(e)
             val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
-            var returnFuture = Future(Message(0, 0, null))
+            val resultPromise = Promise[Message]()
             if (status == 404) {
                 logger.info(s"TRACE_ID: ${message.id} failed with 404, wait for the item to appear in the local cache (from a concurrent download)")
-                Thread.sleep(10000) //... but we block here on the current thread :-(
+                Thread.sleep(10000) //TODO Do polling in while loop
                 if (cache.getIfPresent(message.id).isDefined) {
                   val value = cache.getIfPresent(message.id).get
                   logger.info(s"CACHE hit for TRACE_ID: ${message.id}")
-                  returnFuture = Future(Message(message.group, message.id, value))
+                  resultPromise.success(Message(message.group, message.id, value))
                 } else {
                   logger.info(s"NO CACHE hit for TRACE_ID: ${message.id}")
-                  returnFuture = Future.failed(e)
+                  resultPromise.failure(e)
                 }
               }
-            returnFuture
+            resultPromise.future
           }
           case e: Throwable =>  Future.failed(e)
         }
