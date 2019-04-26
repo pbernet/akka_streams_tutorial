@@ -26,7 +26,7 @@ import scala.util.control.NonFatal
 /**
   * Implement a local file cache with caffeine
   * Use scaffeine wrapper for convenience: https://github.com/blemale/scaffeine
-  * Use FileServer as faulty HTTP download mock
+  * Use class FileServer as faulty HTTP download mock
   * Monitor localFileCache with:  watch ls -ltr
   *
   * Use case:
@@ -35,12 +35,9 @@ import scala.util.control.NonFatal
   * For the first ID download a .zip file and add it to the local file cache
   * For each subsequent IDs try to load from local file cache
   * On downstream error messages need to be kept longer
-  * On system restart: read all files from filesystem (ordered by lastModified)
+  * On system restart: read all files from filesystem (for now: ordered by lastModified)
   *
   * TODO
-  * Implement download barrier to meet non-idempotent behaviour of the real download server,
-  * which does not allow two parallel requests with the same ID but different group
-  * 
   * Multiple logback.xml are on the classpath, read from THIS one in project resources
   *
   */
@@ -63,7 +60,7 @@ object LocalFileCacheCaffeine {
 
   FileUtils.forceMkdir(localFileCache.toFile)
   //Comment out to start with empty local file cache
-  FileUtils.cleanDirectory(localFileCache.toFile)
+  //FileUtils.cleanDirectory(localFileCache.toFile)
 
 
   val writer = new caffeine.cache.CacheWriter[Int, Path] {
@@ -94,7 +91,7 @@ object LocalFileCacheCaffeine {
   }
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("LocalFileCache")
+    implicit val system = ActorSystem("LocalFileCacheCaffeine")
     implicit val materializer = ActorMaterializer()
 
     case class Message(group: Int, id: Int, file: Path)
@@ -160,7 +157,7 @@ object LocalFileCacheCaffeine {
         message
       }
 
-    //Within three groups: Generate random messages with IDs between 0/100, set to 5 to show "download barrier" issue
+    //Generate random messages with IDs between 0/50 note that after a while we will have only cache hits
     val messagesGroupOne = List.fill(10000)(Message(1, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupTwo = List.fill(10000)(Message(2, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupThree = List.fill(10000)(Message(3, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
@@ -168,7 +165,7 @@ object LocalFileCacheCaffeine {
     val combinedMessages = Source.combine(Source(messagesGroupOne), Source(messagesGroupTwo), Source(messagesGroupThree))(numInputs => MergePrioritized(List(1,1,1)))
     combinedMessages
       .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
-      //Try to go parallel on the TRACE_ID and thus have two substreams
+      //Try to go parallel on the TRACE_ID and thus have 2 substreams
       .groupBy(2, _.id % 2)
       .via(downloadFlow)
 //      .via(faultyDownstreamFlow)

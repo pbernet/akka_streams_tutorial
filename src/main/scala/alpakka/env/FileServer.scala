@@ -17,6 +17,7 @@ import scala.util.{Failure, Success}
 
 /**
   * Dummy HTTP FileServer for local download simulation
+  *
   * Normal response: /download/[id]
   * Flaky response:  /downloadflaky/[id]
   * Non-idempotent response: /downloadni/[id]
@@ -112,7 +113,7 @@ object FileServer extends App {
   }
 
   def randomErrorHttpStatusCode = {
-    val statusCodes = Seq(StatusCodes.NotFound, StatusCodes.InternalServerError, StatusCodes.BadRequest, StatusCodes.ServiceUnavailable)
+    val statusCodes = Seq(StatusCodes.InternalServerError, StatusCodes.BadRequest, StatusCodes.ServiceUnavailable)
     val start = 0
     val end = statusCodes.size - 1
     val rnd = new scala.util.Random
