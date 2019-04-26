@@ -120,29 +120,29 @@ object LocalFileCacheCaffeine {
               Message(message.group, message.id, downloadedFile)
           }
         }
-        //Optimistic approach, instead of blocking concurrent requests
+        //TODO Find a way to wait for the downloaded element non-blocking
+        //For now: Instead of blocking concurrent requests before the cache lookup
+        //lets use this "optimistic" approach
         Future(processNext(message)).recoverWith {
-          case e: RuntimeException =>  {
+          case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] =>  {
             val rootCause = ExceptionUtils.getRootCause(e)
-            if (rootCause.isInstanceOf[HttpResponseException]) {
-                val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
-              if (status == 404) {
+            val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
+            var returnFuture = Future(Message(0, 0, null))
+            if (status == 404) {
                 logger.info(s"TRACE_ID: ${message.id} failed with 404, wait for the item to appear in the local cache (from a concurrent download)")
-                Thread.sleep(10000) //longer than sleep on server
+                Thread.sleep(10000) //... but we block here on the current thread :-(
                 if (cache.getIfPresent(message.id).isDefined) {
                   val value = cache.getIfPresent(message.id).get
                   logger.info(s"CACHE hit for TRACE_ID: ${message.id}")
-                  Future(Message(message.group, message.id, value))
+                  returnFuture = Future(Message(message.group, message.id, value))
                 } else {
                   logger.info(s"NO CACHE hit for TRACE_ID: ${message.id}")
-                  Future.failed(e)
+                  returnFuture = Future.failed(e)
                 }
               }
-            }
+            returnFuture
           }
-            //TODO Fix this
-            logger.error(s"XXX: ${message.id} with error: ", e)
-            Future.failed(e)
+          case e: Throwable =>  Future.failed(e)
         }
       }
 
