@@ -4,18 +4,23 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{MediaTypes, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes, Uri}
 import akka.http.scaladsl.server.Directives.{logRequestResult, path, _}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
   * Dummy HTTP FileServer for local download simulation
   * Normal response: /download/[id]
   * Flaky response:  /downloadflaky/[id]
+  * Non-idempotent response: /downloadni/[id]
+  *  Allow each id only once, answer with 404 on consecutive requests
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -29,24 +34,60 @@ object FileServer extends App {
   def server(address: String, port: Int): Unit = {
     val resourceFileName = "payload.zip"
 
-    def routes: Route = logRequestResult("FileServer") {
-      path("download" / Segment) { id =>
-        logger.info(s"TRACE_ID: $id Server received download request.")
-        get {
-          //return always the same file independent from the ID
-          getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+    val cache: Cache[String, String] =
+      Scaffeine()
+        .recordStats()
+        .expireAfterWrite(1.hour)
+        .maximumSize(500)
+        .build[String, String]()
+
+
+    val exceptionHandler = ExceptionHandler {
+      case ex: RuntimeException =>
+        extractUri { uri: Uri =>
+          println(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
+          //TODO read the id from the URI?
+          //cache.invalidate(id)
+          complete(HttpResponse(InternalServerError, entity = "Runtime ex occurred"))
         }
-      } ~ path("downloadflaky" / Segment) { id =>
-        logger.info(s"TRACE_ID: $id Server received flaky download request")
-        get {
-          if (id.toInt % 10 == 0) { // 10, 20, 30
-            complete(randomErrorHttpStatusCode)
-          } else if (id.toInt % 5 == 0) { // 5, 15, 25
-            //Causes TimeoutException on client if sleep time > 5 sec
-            randomSleeper
+    }
+
+    def routes: Route = handleExceptions(exceptionHandler) {
+      logRequestResult("FileServer") {
+        path("download" / Segment) { id =>
+          logger.info(s"TRACE_ID: $id Server received download request")
+          get {
+            //return always the same file independent from the ID
             getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+          }
+        } ~ path("downloadflaky" / Segment) { id =>
+          logger.info(s"TRACE_ID: $id Server received flaky download request")
+          get {
+            if (id.toInt % 10 == 0) { // 10, 20, 30
+              complete(randomErrorHttpStatusCode)
+            } else if (id.toInt % 5 == 0) { // 5, 15, 25
+              //Causes TimeoutException on client if sleep time > 5 sec
+              randomSleeper
+              getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+            } else {
+              getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+            }
+          }
+        } ~ path("downloadni" / Segment) { id =>
+          logger.debug(s"TRACE_ID: $id Server received non-idempotent request")
+
+          if(cache.getIfPresent(id).isDefined) {
+            logger.info(s"TRACE_ID: $id Only one download per TRACE_ID allowed. Reply with 404")
+            complete(StatusCodes.NotFound)
+
           } else {
-            getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+            cache.put(id, "downloading")  //to simulate blocking on concurrent requests
+            get {
+              randomSleeper
+              val response = getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+              cache.put(id, "downloaded")
+              response
+            }
           }
         }
       }
@@ -55,7 +96,7 @@ object FileServer extends App {
     val bindingFuture = Http().bindAndHandle(routes, address, port)
     bindingFuture.onComplete {
       case Success(b) =>
-        logger.info("Server started, listening on: http:/" + b.localAddress + "/download/id")
+        logger.info(s"Server started, listening on: ${b.localAddress}")
       case Failure(e) =>
         logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
