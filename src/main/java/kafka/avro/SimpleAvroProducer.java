@@ -27,7 +27,7 @@ public class SimpleAvroProducer {
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
         props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
 
-        String schemaFile = new String(Files.readAllBytes(Paths.get("./src/main/Java/kafka/avro/record.avsc")));
+        String schemaFile = new String(Files.readAllBytes(Paths.get("./src/main/java/kafka/avro/record.avsc")));
 
         Schema.Parser parser = new Schema.Parser();
         Schema schema = parser.parse(schemaFile);

@@ -24,7 +24,7 @@ public class SimpleAvroConsumer {
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
 
-        String schemaFile = new String(Files.readAllBytes(Paths.get("./src/main/Java/kafka/avro/record.avsc")));
+        String schemaFile = new String(Files.readAllBytes(Paths.get("./src/main/java/kafka/avro/record.avsc")));
 
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Arrays.asList("avro-topic"));
