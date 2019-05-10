@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Dummy HTTP FileServer for local download simulation
+  * Dummy HTTP FileServer for local file download simulation
   *
   * Normal response: /download/[id]
   * Flaky response:  /downloadflaky/[id]

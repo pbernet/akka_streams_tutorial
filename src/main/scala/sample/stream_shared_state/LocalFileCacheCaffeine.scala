@@ -25,20 +25,19 @@ import scala.util.control.NonFatal
 
 /**
   * Implement a local file cache with caffeine
-  * Use scaffeine wrapper for convenience: https://github.com/blemale/scaffeine
-  * Use class FileServer as faulty HTTP download mock
+  * Use scala wrapper scaffeine for convenience: https://github.com/blemale/scaffeine
+  *
+  * Start class alpakka.env.FileServer as faulty HTTP download mock
   * Monitor localFileCache with:  watch ls -ltr
   *
   * Use case:
-  * Avoid duplicate file downloads, thus keep them locally
-  * Process a stream of messages with reoccurring IDs
-  * For the first ID download a .zip file and add it to the local file cache
-  * For each subsequent IDs try to load from local file cache
-  * On downstream error messages need to be kept longer
-  * On system restart: read all files from filesystem (for now: ordered by lastModified)
+  * Process a stream of messages with reoccurring TRACE_ID
+  * Avoid duplicate file downloads per TRACE_ID, thus keep them locally in the file cache
   *
-  * TODO
-  * Multiple logback.xml are on the classpath, read from THIS one in project resources
+  * For the first TRACE_ID download a .zip file and add it to the local file cache
+  * For each subsequent TRACE_IDs try to load from local file cache
+  * On downstream error, files need to be kept longer in the local cache
+  * On system restart: read all files from filesystem (for now: ordered by lastModified)
   *
   */
 object LocalFileCacheCaffeine {
@@ -58,6 +57,7 @@ object LocalFileCacheCaffeine {
   val evictionTimeOnError = 10.minutes
   val localFileCache = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
+  logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
   //Comment out to start with empty local file cache
   //FileUtils.cleanDirectory(localFileCache.toFile)

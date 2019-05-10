@@ -10,7 +10,6 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import com.github.andyglow.websocket._
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
@@ -50,7 +49,6 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   val (address, port) = ("127.0.0.1", 6002)
   server(address, port)
   browserClient()
-  (1 to 2).par.foreach(each => nettyClient(each, address, port))
   (1 to 2).par.foreach(each => singleWebSocketRequestClient(each, address, port))
   (1 to 2).par.foreach(each => webSocketClientFlowClient(each, address, port))
 
@@ -94,20 +92,6 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     if (os == "mac os x") Process("open ./src/main/resources/WebsocketEcho.html").!
   }
 
-
-  def nettyClient(id: Int, address: String, port: Int) = {
-
-    // see https://github.com/andyglow/websocket-scala-client
-    val cli = WebsocketClient[String](s"ws://$address:$port/echo") {
-      case str => println(s"Client: $id nettyClient received String: $str")
-    }
-    val ws = cli.open()
-    ws ! "world one"
-    ws ! "world two"
-    Thread.sleep(5000)
-    val done = cli.shutdownAsync
-    done.onComplete(closed => println(s"Client: $id nettyClient closed: $closed"))
-  }
 
   def singleWebSocketRequestClient(id: Int, address: String, port: Int) = {
 

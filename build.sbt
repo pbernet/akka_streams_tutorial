@@ -33,17 +33,20 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   
-  "org.scalatest" %% "scalatest" % "3.0.6" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.github.andyglow" %% "websocket-scala-client" % "0.2.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8",
   "org.apache.httpcomponents" % "httpclient" % "4.5.8",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6",
-  "com.github.blemale" %% "scaffeine" % "2.6.0" % "compile"
+  "com.github.blemale" %% "scaffeine" % "2.6.0" % "compile",
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
+
+  "org.scalatest" %% "scalatest" % "3.0.6" % "test",
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
+  "org.testcontainers" % "testcontainers" % "1.11.2" % "test",
+  "junit" % "junit" % "4.13-beta-1"
 )
 
 resolvers ++= Seq(
