@@ -46,7 +46,7 @@ object LocalFileCacheCaffeine {
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
       val rootCause = ExceptionUtils.getRootCause(e)
-      logger.info(s"Stream failed with: $rootCause, going to restart")
+      logger.error(s"Stream failed with: $rootCause, going to restart")
       logger.debug(s"Stream failed with: $rootCause, going to restart", e)
       Supervision.Restart
     case _ => Supervision.Stop
@@ -167,7 +167,7 @@ object LocalFileCacheCaffeine {
       //Try to go parallel on the TRACE_ID and thus have 2 substreams
       .groupBy(2, _.id % 2)
       .via(downloadFlow)
-//      .via(faultyDownstreamFlow)
+      .via(faultyDownstreamFlow)
       .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)
