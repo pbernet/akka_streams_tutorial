@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   
-  "com.typesafe.play" %% "play" % "2.6.21",
+  "com.typesafe.play" %% "play" % "2.6.23",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8",
   "org.apache.httpcomponents" % "httpclient" % "4.5.8",
