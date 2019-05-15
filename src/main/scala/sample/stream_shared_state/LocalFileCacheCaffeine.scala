@@ -24,21 +24,18 @@ import scala.util.control.NonFatal
 
 
 /**
-  * Implement a local file cache with caffeine
-  * Use scala wrapper scaffeine for convenience: https://github.com/blemale/scaffeine
+  * Implement a local file cache with caffeine https://github.com/ben-manes/caffeine
+  * Use scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
   *
-  * Start class alpakka.env.FileServer as faulty HTTP download mock
-  * Monitor localFileCache with:  watch ls -ltr
+  * Before running this class, start alpakka.env.FileServer as faulty HTTP download mock
+  * Monitor localFileCache dir with:  watch ls -ltr
   *
   * Use case:
   * Process a stream of messages with reoccurring TRACE_ID
-  * Avoid duplicate file downloads per TRACE_ID, thus keep them locally in the file cache
-  *
-  * For the first TRACE_ID download a .zip file and add it to the local file cache
-  * For each subsequent TRACE_IDs try to load from local file cache
-  * On downstream error, files need to be kept longer in the local cache
+  * For the first TRACE_ID download a .zip file from the FileServer and add it to the local file cache 
+  * For each subsequent TRACE_IDs try to load from local file cache first in order to avoid duplicate downloads per TRACE_ID
+  * On downstream error, the file needs to be kept longer in the local file cache
   * On system restart: read all files from filesystem (for now: ordered by lastModified)
-  *
   */
 object LocalFileCacheCaffeine {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
