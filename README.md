@@ -1,6 +1,6 @@
 # Akka streams tutorial #
 
-This is a collection of simple runnable self contained examples from various akka streams docs, tutorials and blogs. 
+A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs. 
 Two more complex examples are worth mentioning:
 * Windturbine Example
 * Apache Kafka WordCount
@@ -15,13 +15,12 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 | Class                     | Description     |
 | -------------------       |-----------------|
-| SimulateWindTurbines.scala| Starts n clients|
+| SimulateWindTurbines.scala| Starts n clients which feed measurements to the server|
 | WindTurbineServer.scala   | Start server    |
 
- The clients communicate via websockets with the server. After a restart of SimulateWindTurbines the clients are able to resume. 
- Shutting down the WindTurbineServer results in reporting all of the clients that the server is not reachable.
- After the WindTurbineServer is restarted the clients are able to resume. 
- There is no persistence, so the processing just continuous.
+ The clients communicate via websockets with the _WindTurbineServer_. After a restart of _SimulateWindTurbines_ the clients are able to resume. 
+ Shutting down the _WindTurbineServer_ results in reporting all of the clients that the server is not reachable.
+ After restarting _WindTurbineServer_ the clients are able to resume. Since there is no persistence, the processing just continuous.
 
 
 ## Apache Kafka WordCount in pkg _kafka_ ##
@@ -37,10 +36,7 @@ The ubiquitous word count. Start the classes in the order below and watch the co
 
 _WordCountKStreams.java_ and _WordCountConsumer.scala_ should yield the same results.
 
-The clients communicate via a binary protocol over TCP with the server. Behaviour after restart:
-* WordCountProducer resumes feeding words
-* WordCountKStreams resumes at the stored offset
-* WordCountConsumer resumes consuming at the stored offset
-
-Shutting down the KafkaServer results in reporting all of the clients that the Kafka Broker is not available anymore.
-After the KafkaServer is restarted the clients are able to resume.
+The clients communicate via a binary protocol over TCP with the _KafkaServer_. After restarting _KafkaServer_:
+* _WordCountProducer_ resumes feeding words
+* _WordCountKStreams_ resumes at the stored offset
+* _WordCountConsumer_ resumes consuming at the stored offset
