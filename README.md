@@ -19,7 +19,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 | WindTurbineServer.scala   | Start server    |
 
  The clients communicate via websockets with the _WindTurbineServer_. After a restart of _SimulateWindTurbines_ the clients are able to resume. 
- Shutting down the _WindTurbineServer_ results in reporting all of the clients that the server is not reachable.
+ Shutting down the _WindTurbineServer_ results in reporting the clients that the server is not reachable.
  After restarting _WindTurbineServer_ the clients are able to resume. Since there is no persistence, the processing just continuous.
 
 
