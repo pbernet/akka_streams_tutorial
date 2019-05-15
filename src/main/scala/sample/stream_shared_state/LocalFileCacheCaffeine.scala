@@ -114,22 +114,21 @@ object LocalFileCacheCaffeine {
               Message(message.group, message.id, downloadedFile)
           }
         }
-        //For now: Instead of blocking concurrent requests before the cache lookup
-        //lets use this "optimistic" approach
+        //"Optimistic approach": Wait for the file to appear in the local file cache
         Future(processNext(message)).recoverWith {
           case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] =>  {
             val rootCause = ExceptionUtils.getRootCause(e)
             val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
             val resultPromise = Promise[Message]()
             if (status == 404) {
-                logger.info(s"TRACE_ID: ${message.id} failed with 404, wait for the item to appear in the local cache (from a concurrent download)")
+                logger.info(s"TRACE_ID: Request with ${message.id} failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
                 Thread.sleep(10000) //TODO Do polling in while loop
                 if (cache.getIfPresent(message.id).isDefined) {
                   val value = cache.getIfPresent(message.id).get
                   logger.info(s"CACHE hit for TRACE_ID: ${message.id}")
                   resultPromise.success(Message(message.group, message.id, value))
                 } else {
-                  logger.info(s"NO CACHE hit for TRACE_ID: ${message.id}")
+                  logger.info(s"CACHE miss for TRACE_ID: ${message.id}")
                   resultPromise.failure(e)
                 }
               }
