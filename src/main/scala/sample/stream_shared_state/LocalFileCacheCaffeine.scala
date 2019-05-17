@@ -102,14 +102,13 @@ object LocalFileCacheCaffeine {
             logger.info(s"Cache hit for TRACE_ID: ${message.id}")
             Message(message.group, message.id, value)
           } else {
-            logger.info(s"Cache miss for TRACE_ID: ${message.id} - download...")
-            var downloadedFile: Path = null
+            logger.info(s"TRACE_ID: ${message.id} Cache miss - download...")
 
               val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
               //val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
               val url = new URI("http://127.0.0.1:6001/downloadni/" + message.id.toString)
-              downloadedFile = new DownloaderRetry().download(url, destinationFile)
-              logger.info(s"Successfully downloaded for TRACE_ID: ${message.id} - put into cache...")
+              val downloadedFile = new DownloaderRetry().download(url, destinationFile)
+              logger.info(s"TRACE_ID: ${message.id} Successfully downloaded - put into cache...")
               cache.put(message.id, downloadedFile)
               Message(message.group, message.id, downloadedFile)
           }
@@ -121,14 +120,14 @@ object LocalFileCacheCaffeine {
             val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
             val resultPromise = Promise[Message]()
             if (status == 404) {
-                logger.info(s"TRACE_ID: Request with ${message.id} failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
+                logger.info(s"TRACE_ID: ${message.id} Request failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
                 Thread.sleep(10000) //TODO Do polling in while loop
                 if (cache.getIfPresent(message.id).isDefined) {
                   val value = cache.getIfPresent(message.id).get
-                  logger.info(s"CACHE hit for TRACE_ID: ${message.id}")
+                  logger.info(s"TRACE_ID: ${message.id} CACHE hit")
                   resultPromise.success(Message(message.group, message.id, value))
                 } else {
-                  logger.info(s"CACHE miss for TRACE_ID: ${message.id}")
+                  logger.info(s"TRACE_ID: ${message.id} CACHE miss")
                   resultPromise.failure(e)
                 }
               }
@@ -163,7 +162,7 @@ object LocalFileCacheCaffeine {
       //Try to go parallel on the TRACE_ID and thus have 2 substreams
       .groupBy(2, _.id % 2)
       .via(downloadFlow)
-      .via(faultyDownstreamFlow)
+      //.via(faultyDownstreamFlow)
       .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)

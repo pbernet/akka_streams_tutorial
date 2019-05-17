@@ -46,7 +46,7 @@ object FileServer extends App {
     val exceptionHandler = ExceptionHandler {
       case ex: RuntimeException =>
         extractUri { uri: Uri =>
-          println(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
+          logger.error(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
           //TODO read the id from the URI?
           //cache.invalidate(id)
           complete(HttpResponse(InternalServerError, entity = "Runtime ex occurred"))
@@ -75,10 +75,10 @@ object FileServer extends App {
             }
           }
         } ~ path("downloadni" / Segment) { id =>
-          logger.debug(s"TRACE_ID: $id Server received non-idempotent request")
+          logger.info(s"TRACE_ID: $id Server received non-idempotent request")
 
           if(cache.getIfPresent(id).isDefined) {
-            logger.info(s"TRACE_ID: $id Only one download per TRACE_ID allowed. Reply with 404")
+            logger.warn(s"TRACE_ID: $id Only one download per TRACE_ID allowed. Reply with 404")
             complete(StatusCodes.NotFound)
 
           } else {
@@ -108,7 +108,7 @@ object FileServer extends App {
     val (start, end) = (1000, 10000)
     val rnd = new scala.util.Random
     val sleepTime = start + rnd.nextInt((end - start) + 1)
-    logger.info(s" -> Sleep for $sleepTime milli seconds")
+    logger.debug(s" -> Sleep for $sleepTime ms")
     Thread.sleep(sleepTime.toLong)
   }
 
