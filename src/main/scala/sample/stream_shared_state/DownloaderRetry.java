@@ -32,6 +32,7 @@ import java.nio.file.Paths;
  * https://stackoverflow.com/questions/35391005/how-to-use-an-exponential-backoff-strategy-with-apache-httpclient
  */
 public class DownloaderRetry {
+	private static final Logger LOGGER = LoggerFactory.getLogger(DownloaderRetry.class);
 	private static final int DELAY_TO_RETRY_SECONDS = 20;
 
 	public static void main(String[] args) throws Exception {
@@ -40,11 +41,12 @@ public class DownloaderRetry {
 		URI url = new URI("http://127.0.0.1:6001/download/30");
 		//URI url = new URI("http://127.0.0.1:6001/downloadflaky/30");
 
-		Path resFile = new DownloaderRetry().download(url, LocalFileCacheCaffeine.localFileCache().resolve(Paths.get("test.zip")));
+		Path resFile = new DownloaderRetry().download(0, url, LocalFileCacheCaffeine.localFileCache().resolve(Paths.get("test.zip")));
 		System.out.print("Downloaded file: " + resFile.toFile().getName() + " with size: " + resFile.toFile().length() + " bytes");
 	}
 
-	public Path download(URI url, Path destinationFile) {
+	public Path download(int traceID, URI url, Path destinationFile) {
+		LOGGER.info("TRACE_ID: " + traceID + " about to download...");
 		RequestConfig timeoutsConfig = RequestConfig.custom()
 
 				// The time to establish the connection with the remote host [http.connection.timeout].

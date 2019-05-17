@@ -50,14 +50,14 @@ object LocalFileCacheCaffeine {
   }
 
   val scaleFactor = 1 //Raise to stress more
-  val evictionTime = 5.minutes
+  val evictionTime = 5.minutes //Lower eg to 5.seconds to see cache and file system deletes
   val evictionTimeOnError = 10.minutes
   val localFileCache = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
   //Comment out to start with empty local file cache
-  //FileUtils.cleanDirectory(localFileCache.toFile)
+  FileUtils.cleanDirectory(localFileCache.toFile)
 
 
   val writer = new caffeine.cache.CacheWriter[Int, Path] {
@@ -66,7 +66,7 @@ object LocalFileCacheCaffeine {
     }
 
     override def delete(key: Int, value: Path, cause: caffeine.cache.RemovalCause): Unit = {
-      logger.info(s"Deleting from storage for TRACE_ID: $key because of: $cause")
+      logger.info(s"TRACE_ID: $key delete from file system because of: $cause")
       val destinationFile = localFileCache.resolve(value)
       FileUtils.deleteQuietly(destinationFile.toFile)
     }
@@ -97,43 +97,54 @@ object LocalFileCacheCaffeine {
       .mapAsyncUnordered(5) { message =>
 
         def processNext(message: Message): Message = {
-          if (cache.getIfPresent(message.id).isDefined) {
-            val value = cache.getIfPresent(message.id).get
-            logger.info(s"Cache hit for TRACE_ID: ${message.id}")
-            Message(message.group, message.id, value)
-          } else {
-            logger.info(s"TRACE_ID: ${message.id} Cache miss - download...")
 
-              val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
-              //val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
-              val url = new URI("http://127.0.0.1:6001/downloadni/" + message.id.toString)
-              val downloadedFile = new DownloaderRetry().download(url, destinationFile)
-              logger.info(s"TRACE_ID: ${message.id} Successfully downloaded - put into cache...")
-              cache.put(message.id, downloadedFile)
-              Message(message.group, message.id, downloadedFile)
-          }
+          //Using get(key => downloadfunction) is preferable to getIfPresent, because the get method performs the computation atomically
+          //Thus there are no 404 anymore from server - exactly what we need
+          val key = message.id
+          val url = new URI("http://127.0.0.1:6001/downloadni/" + key.toString)
+          val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
+          val downloadedFile = cache.get(message.id, key => new DownloaderRetry().download(key, url, destinationFile))
+          logger.info(s"TRACE_ID: ${message.id} Successfully read from cache")
+          Message(message.group, message.id, downloadedFile)
+
+          //          if (cache.getIfPresent(message.id).isDefined) {
+          //            val value = cache.getIfPresent(message.id).get
+          //            logger.info(s"Cache hit for TRACE_ID: ${message.id}")
+          //            Message(message.group, message.id, value)
+          //          } else {
+          //            logger.info(s"TRACE_ID: ${message.id} Cache miss - download...")
+          //
+          //              val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
+          //              //val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
+          //              val url = new URI("http://127.0.0.1:6001/downloadni/" + message.id.toString)
+          //              val downloadedFile = new DownloaderRetry().download(url, destinationFile)
+          //              logger.info(s"TRACE_ID: ${message.id} Successfully downloaded - put into cache...")
+          //              cache.put(message.id, downloadedFile)
+          //              Message(message.group, message.id, downloadedFile)
+          //          }
         }
-        //"Optimistic approach": Wait for the file to appear in the local file cache
+        //If (for whatever reason) we get a 404 use this "optimistic approach":
+        //Wait for the file to appear in the local file cache
         Future(processNext(message)).recoverWith {
-          case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] =>  {
+          case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] => {
             val rootCause = ExceptionUtils.getRootCause(e)
             val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
             val resultPromise = Promise[Message]()
             if (status == 404) {
-                logger.info(s"TRACE_ID: ${message.id} Request failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
-                Thread.sleep(10000) //TODO Do polling in while loop
-                if (cache.getIfPresent(message.id).isDefined) {
-                  val value = cache.getIfPresent(message.id).get
-                  logger.info(s"TRACE_ID: ${message.id} CACHE hit")
-                  resultPromise.success(Message(message.group, message.id, value))
-                } else {
-                  logger.info(s"TRACE_ID: ${message.id} CACHE miss")
-                  resultPromise.failure(e)
-                }
+              logger.info(s"TRACE_ID: ${message.id} Request failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
+              Thread.sleep(10000) //TODO Do poll
+              if (cache.getIfPresent(message.id).isDefined) {
+                val value = cache.getIfPresent(message.id).get
+                logger.info(s"TRACE_ID: ${message.id} CACHE hit")
+                resultPromise.success(Message(message.group, message.id, value))
+              } else {
+                logger.info(s"TRACE_ID: ${message.id} CACHE miss")
+                resultPromise.failure(e)
               }
+            }
             resultPromise.future
           }
-          case e: Throwable =>  Future.failed(e)
+          case e: Throwable => Future.failed(e)
         }
       }
 
@@ -156,7 +167,7 @@ object LocalFileCacheCaffeine {
     val messagesGroupTwo = List.fill(10000)(Message(2, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupThree = List.fill(10000)(Message(3, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
 
-    val combinedMessages = Source.combine(Source(messagesGroupOne), Source(messagesGroupTwo), Source(messagesGroupThree))(numInputs => MergePrioritized(List(1,1,1)))
+    val combinedMessages = Source.combine(Source(messagesGroupOne), Source(messagesGroupTwo), Source(messagesGroupThree))(numInputs => MergePrioritized(List(1, 1, 1)))
     combinedMessages
       .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
       //Try to go parallel on the TRACE_ID and thus have 2 substreams
