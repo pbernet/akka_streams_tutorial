@@ -1,4 +1,4 @@
-package sample.graphDSL
+package sample.graphdsl
 
 import java.nio.file.Paths
 import java.util.concurrent.ThreadLocalRandom

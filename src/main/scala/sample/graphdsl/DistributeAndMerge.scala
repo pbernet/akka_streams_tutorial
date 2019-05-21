@@ -1,4 +1,4 @@
-package sample.graphDSL
+package sample.graphdsl
 
 import akka.NotUsed
 import akka.actor.ActorSystem
