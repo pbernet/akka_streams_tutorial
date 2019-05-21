@@ -26,16 +26,17 @@ import scala.util.control.NonFatal
 /**
   * Implement a local file cache with caffeine https://github.com/ben-manes/caffeine
   * Use scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
+  * Use CacheWriter to write .zip file to file storage
   *
-  * Before running this class, start alpakka.env.FileServer as faulty HTTP download mock
+  * Before running this class, start alpakka.env.FileServer as (faulty) HTTP download mock
   * Monitor localFileCache dir with:  watch ls -ltr
   *
   * Use case:
   * Process a stream of messages with reoccurring TRACE_ID
-  * For the first TRACE_ID download a .zip file from the FileServer and add it to the local file cache 
-  * For each subsequent TRACE_IDs try to load from local file cache first in order to avoid duplicate downloads per TRACE_ID
-  * On downstream error, the file needs to be kept longer in the local file cache
-  * On system restart: read all files from filesystem (for now: ordered by lastModified)
+  * For the first TRACE_ID download a .zip file from the FileServer and add the Path to the local cache
+  * For each subsequent TRACE_IDs try first to load from the local file cache to avoid duplicate downloads per TRACE_ID
+  * On downstream error, the file needs to be kept longer in the local cache
+  * On system restart: read all files from filesystem to cache (for now: ordered by lastModified)
   */
 object LocalFileCacheCaffeine {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -56,13 +57,13 @@ object LocalFileCacheCaffeine {
 
   logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
-  //Comment out to start with empty local file cache
+  //Comment out to start with empty local file storage on restart
   FileUtils.cleanDirectory(localFileCache.toFile)
 
 
   val writer = new caffeine.cache.CacheWriter[Int, Path] {
     override def write(key: Int, value: Path): Unit = {
-      logger.debug(s"Writing to cache TRACE_ID: $key")
+      logger.debug(s"TRACE_ID: $key write to cache")
     }
 
     override def delete(key: Int, value: Path, cause: caffeine.cache.RemovalCause): Unit = {
@@ -104,7 +105,7 @@ object LocalFileCacheCaffeine {
           val url = new URI("http://127.0.0.1:6001/downloadni/" + key.toString)
           val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
           val downloadedFile = cache.get(message.id, key => new DownloaderRetry().download(key, url, destinationFile))
-          logger.info(s"TRACE_ID: ${message.id} Successfully read from cache")
+          logger.info(s"TRACE_ID: ${message.id} successfully read from cache")
           Message(message.group, message.id, downloadedFile)
 
           //          if (cache.getIfPresent(message.id).isDefined) {
@@ -150,24 +151,22 @@ object LocalFileCacheCaffeine {
 
     val faultyDownstreamFlow: Flow[Message, Message, NotUsed] = Flow[Message]
       .map { message: Message =>
-        try {
-          if (message.group == 0) throw new RuntimeException(s"Simulate error for message: ${message.id} in group 0")
-        } catch {
-          case e@(_: RuntimeException) => {
-            //Force an update (= replacement of value) to extend cache time
-            logger.info(s"Extend eviction time for TRACE_ID: ${message.id} from group: ${message.group}")
-            cache.put(message.id, message.file)
-          }
+        if (message.group == 0) {
+          //Force an update (= replacement of value) to extend time in cache. evictionTimeOnError will be used
+          logger.info(s"TRACE_ID: ${message.id} extend eviction time for message in group: ${message.group}")
+          cache.put(message.id, message.file)
+
         }
         message
       }
 
     //Generate random messages with IDs between 0/50 note that after a while we will have only cache hits
+    //Do it like this to have a higher chance of concurrent messages (= same id)
+    val messagesGroupZero = List.fill(10000)(Message(0, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupOne = List.fill(10000)(Message(1, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupTwo = List.fill(10000)(Message(2, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
-    val messagesGroupThree = List.fill(10000)(Message(3, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
 
-    val combinedMessages = Source.combine(Source(messagesGroupOne), Source(messagesGroupTwo), Source(messagesGroupThree))(numInputs => MergePrioritized(List(1, 1, 1)))
+    val combinedMessages = Source.combine(Source(messagesGroupZero), Source(messagesGroupOne), Source(messagesGroupTwo))(numInputs => MergePrioritized(List(1, 1, 1)))
     combinedMessages
       .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
       //Try to go parallel on the TRACE_ID and thus have 2 substreams
