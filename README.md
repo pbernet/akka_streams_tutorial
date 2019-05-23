@@ -15,7 +15,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 | Class                     | Description     |
 | -------------------       |-----------------|
-| [SimulateWindTurbines.scala](SimulateWindTurbines.scala)| Starts n clients which feed measurements to the server|
+| [SimulateWindTurbines.scala](src/main/scala/sample/stream_actor/SimulateWindTurbines.scala)| Starts n clients which feed measurements to the server|
 | WindTurbineServer.scala   | Start server    |
 
  The clients communicate via websockets with the _WindTurbineServer_. After a restart of _SimulateWindTurbines_ the clients are able to resume. 
