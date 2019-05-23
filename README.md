@@ -1,7 +1,8 @@
 # Akka streams tutorial #
 
-A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs. 
-Two more complex examples are worth mentioning:
+A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs.
+See the class comment on how to run each example. 
+Two more complex examples are described below:
 * Windturbine Example
 * Apache Kafka WordCount
 
@@ -30,7 +31,7 @@ The ubiquitous word and message count. Start the classes in the order below and 
 | ------------------- |-----------------|
 | [KafkaServer.scala](src/main/scala/kafka/KafkaServer.scala)| Standalone Kafka/Zookeeper. Alternative: [Setup Kafka server manually](https://kafka.apache.org/quickstart "Instruction")  
 | [WordCountProducer.scala](src/main/scala/kafka/WordCountProducer.scala)| Client which feeds words to topic _wordcount-input_. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
-| [WordCountKStreams.scala](src/main/java/kafka/WordCountKStreams.scala)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
+| [WordCountKStreams.scala](src/main/java/kafka/WordCountKStreams.java)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
 | [WordCountConsumer.scala](src/main/scala/kafka/WordCountConsumer.scala)| Client which consumes aggregated results from topic _wordcount-output_ and _messagecount-output_. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
 | [DeleteTopicUtil.scala](src/main/scala/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
 
