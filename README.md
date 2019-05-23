@@ -6,7 +6,7 @@ Two more complex examples are worth mentioning:
 * Apache Kafka WordCount
 
 
-## Windturbine Example in pkg _sample.stream_actor_ ##
+## Windturbine Example ##
 Working sample from the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
  from Colin Breck where Actors are used to model shared mutable state, life-cycle management and fault-tolerance in combination with akka streams.
  Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
@@ -15,7 +15,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 | Class                     | Description     |
 | -------------------       |-----------------|
-| SimulateWindTurbines.scala| Starts n clients which feed measurements to the server|
+| [SimulateWindTurbines.scala](SimulateWindTurbines.scala)| Starts n clients which feed measurements to the server|
 | WindTurbineServer.scala   | Start server    |
 
  The clients communicate via websockets with the _WindTurbineServer_. After a restart of _SimulateWindTurbines_ the clients are able to resume. 
@@ -23,7 +23,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
  After restarting _WindTurbineServer_ the clients are able to resume. Since there is no persistence, the processing just continuous.
 
 
-## Apache Kafka WordCount in pkg _kafka_ ##
+## Apache Kafka WordCount ##
 The ubiquitous word and message count. Start the classes in the order below and watch the console output.
 
 | Class               | Description      |
