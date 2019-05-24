@@ -6,6 +6,7 @@ import java.util.List;
 
 /**
  * Read ordered by lastModified
+ * This is not a prerequisite for the cache to work
  * https://stackoverflow.com/questions/203030/best-way-to-list-files-in-java-sorted-by-date-modified
  */
 public class FileLister {
