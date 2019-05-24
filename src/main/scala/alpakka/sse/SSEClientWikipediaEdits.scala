@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
-import alpakka.jms.ProcessingApp.logger
+import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -16,8 +16,8 @@ import scala.sys.process._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Change(serverName: String, user: String, cmdType: String, lengthNew: Int = 0, lengthOld: Int = 0) {
-  override def toString = s"$cmdType on server: $serverName by: $user new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
+case class Change(serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+  override def toString = s"$cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
 }
 
 /**
@@ -28,9 +28,10 @@ case class Change(serverName: String, user: String, cmdType: String, lengthNew: 
   *
   */
 object SSEClientWikipediaEdits {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
-      logger.warn(s"Stream failed with: ${e}, going to restart")
+      logger.warn(s"Stream failed with: $e, going to restart")
       Supervision.Restart
   }
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
@@ -49,6 +50,9 @@ object SSEClientWikipediaEdits {
     if (os == "mac os x") Process("open ./src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
+  private def isNamedBot(bot: Boolean, user: String) : Boolean = {
+     if (bot) user.toLowerCase().contains("bot") else false
+  }
 
   private def sseClient() = {
 
@@ -68,7 +72,7 @@ object SSEClientWikipediaEdits {
       }
     }
 
-    val printSink = Sink.foreach[Change] { each: Change => println(each.toString())}
+    val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString())}
 
     val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
@@ -79,12 +83,15 @@ object SSEClientWikipediaEdits {
         val user = (Json.parse(event.data) \ "user").as[String]
 
         val cmdType = (Json.parse(event.data) \ "type").as[String]
+
+        val bot =  (Json.parse(event.data) \ "bot").as[Boolean]
+
         if (cmdType == "new" || cmdType == "edit") {
           val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
           val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
-          Change(serverName, user, cmdType, tryToInt(lengthNew), tryToInt(lengthOld))
+          Change(serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
         } else {
-          Change(serverName, user, cmdType)
+          Change(serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
         }
       }
     }
