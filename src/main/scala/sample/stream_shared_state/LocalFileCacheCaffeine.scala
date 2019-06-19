@@ -1,6 +1,5 @@
 package sample.stream_shared_state
 
-import java.io.File
 import java.net.URI
 import java.nio.file.{Path, Paths}
 import java.util
@@ -58,7 +57,7 @@ object LocalFileCacheCaffeine {
   logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
   //Comment out to start with empty local file storage on restart
-  FileUtils.cleanDirectory(localFileCache.toFile)
+  //FileUtils.cleanDirectory(localFileCache.toFile)
 
 
   val writer = new caffeine.cache.CacheWriter[Int, Path] {
@@ -83,10 +82,10 @@ object LocalFileCacheCaffeine {
 
   //Doc sync loading, because AsyncLoadingCache does not work with CacheWriter
   //see: https://stackoverflow.com/questions/48356731/caffeine-cant-provide-cachewriter-to-asyncloadingcache/48361538#48361538
-  val loadedResults: util.List[File] = new FileLister().run(localFileCache.toFile)
-  loadedResults.forEach { each: File =>
-    logger.debug(s"Add file: ${each.getName} with lastModified: ${each.lastModified()}")
-    cache.put(each.getName.dropRight(4).toInt, each.toPath)
+  val loadedResults: util.List[Path] = new FileLister().run(localFileCache.toFile)
+  loadedResults.forEach { path: Path =>
+    logger.debug(s"Add file: ${path.toFile.getName} with lastModified: ${path.toFile.lastModified()}")
+    cache.put(path.toFile.getName.dropRight(4).toInt, path)
   }
 
   def main(args: Array[String]): Unit = {
