@@ -34,7 +34,7 @@ import scala.util.{Failure, Success}
   *
   * What is interesting:
   * Acknowledge should be done on the envelope as suggested in:
-  * https://doc.akka.io/docs/alpakka/1.0.0/jms/consumer.html#using-jms-client-acknowledgement
+  * https://doc.akka.io/docs/alpakka/1.0.2/jms/consumer.html#using-jms-client-acknowledgement
   * However, when run against JMS Broker Artemis, we notice that the processing stops and there
   * are remaining messages on the queue.
   * This can "fixed" by by setting the bufferSize to 0 (= Message-by-message acknowledgement)
