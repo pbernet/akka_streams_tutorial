@@ -8,7 +8,7 @@ val akkaVersion = "2.5.22"
 val akkaHTTPVersion = "10.1.8"
 val alpakkaVersion = "1.0.0"
 val akkaStreamKafkaVersion =  "1.0.1"
-val kafkaVersion = "2.2.0"
+val kafkaVersion = "2.2.1"
 val activemqVersion =  "5.15.9"
 
 libraryDependencies ++= Seq(
