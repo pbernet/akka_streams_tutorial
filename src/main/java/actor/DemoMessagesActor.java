@@ -4,22 +4,17 @@ import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
+import akka.pattern.Patterns;
 
-import java.util.concurrent.CompletableFuture;
-
-import static akka.pattern.PatternsCS.ask;
+import java.time.Duration;
+import java.util.concurrent.CompletionStage;
 
 
 /**
  * Untyped Java Actor example
  * Doc:
- * https://developer.lightbend.com/guides/akka-quickstart-java/main-class.html
- * https://doc.akka.io/docs/akka/2.5.18/actors.html?language=java
- *
- * Doc Completable Future:
+ * https://doc.akka.io/docs/akka/2.5.23/actors.html
  * https://www.baeldung.com/java-completablefuture
- *
- * TODO Switch to https://doc.akka.io/api/akka/current/akka/pattern/index.html
  *
  */
 public class DemoMessagesActor extends AbstractLoggingActor {
@@ -32,9 +27,8 @@ public class DemoMessagesActor extends AbstractLoggingActor {
         demoActor.tell(new GreetingTell("Hi tell"), ActorRef.noSender());
 
         //Ask: Wait for answer
-        CompletableFuture<Object> future1 =
-                ask(demoActor, new GreetingAsk("Hi ask"), 1000).toCompletableFuture();
-        future1.thenAccept(s -> System.out.println("Actor returned: " + s));
+        final CompletionStage<Object> future = Patterns.ask(demoActor, new GreetingAsk("Hi ask"), Duration.ofMillis(1000));
+        future.thenAccept(result -> System.out.println("Actor returned: " + result));
     }
 
     static public class GreetingTell {
