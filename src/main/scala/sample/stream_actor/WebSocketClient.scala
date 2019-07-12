@@ -56,7 +56,7 @@ class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorR
               .flatMap(Future.successful)
         }
         .mapAsync(1)(identity)
-        .map(each => println(s"Client recieved msg: $each"))
+        .map(each => println(s"Client received msg: $each"))
     }
 
     FlowShape(flow.in, flow.out)
@@ -86,6 +86,7 @@ class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorR
     windTurbineSimulator ! Terminated
   }
   closed.onComplete {
+    case Success(_)  => windTurbineSimulator ! Connected
     case Failure(ex) => windTurbineSimulator ! ConnectionFailure(ex)
   }
 }
