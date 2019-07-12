@@ -4,11 +4,11 @@ version := "1.0"
 
 scalaVersion := "2.12.8"
 
-val akkaVersion = "2.5.22"
+val akkaVersion = "2.5.23"
 val akkaHTTPVersion = "10.1.8"
-val alpakkaVersion = "1.0.0"
-val akkaStreamKafkaVersion =  "1.0.1"
-val kafkaVersion = "2.2.0"
+val alpakkaVersion = "1.0.2"
+val akkaStreamKafkaVersion =  "1.0.4"
+val kafkaVersion = "2.2.1"
 val activemqVersion =  "5.15.9"
 
 libraryDependencies ++= Seq(
@@ -35,8 +35,8 @@ libraryDependencies ++= Seq(
   
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8",
-  "org.apache.httpcomponents" % "httpclient" % "4.5.8",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.1",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6",
@@ -45,7 +45,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
-  "org.testcontainers" % "testcontainers" % "1.11.2" % "test",
+  "org.testcontainers" % "testcontainers" % "1.11.4" % "test",
   "junit" % "junit" % "4.13-beta-1"
 )
 
