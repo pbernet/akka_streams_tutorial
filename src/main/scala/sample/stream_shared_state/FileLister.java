@@ -46,7 +46,7 @@ public class FileLister {
 					})
 					.collect(Collectors.toList());
 
-			LOGGER.info("Loaded {} file paths from directory {}", filesCounter.get(), directory);
+			LOGGER.info("Loaded {} files from directory {}", filesCounter.get(), directory);
 		} catch (IOException e) {
 			LOGGER.error("Error while loading file paths from directory {}. Please check file system permissions", directory, e);
 		}

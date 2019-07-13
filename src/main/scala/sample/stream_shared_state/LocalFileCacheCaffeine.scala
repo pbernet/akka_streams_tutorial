@@ -10,6 +10,7 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
 import akka.stream.{ActorAttributes, ActorMaterializer, Supervision, ThrottleMode}
 import com.github.benmanes.caffeine
+import com.github.benmanes.caffeine.cache.CacheWriter
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -33,7 +34,7 @@ import scala.util.control.NonFatal
   * Use case:
   * Process a stream of messages with reoccurring TRACE_ID
   * For the first TRACE_ID download a .zip file from the FileServer and add the Path to the cache
-  * For each subsequent TRACE_IDs try first to fetch from the cache to avoid duplicate downloads per TRACE_ID
+  * For subsequent TRACE_IDs try to fetch from the cache to avoid duplicate downloads per TRACE_ID
   * On downstream error: the file needs to be kept longer in the cache
   * On system restart: read all files from filesystem to cache
   */
@@ -50,9 +51,9 @@ object LocalFileCacheCaffeine {
   }
 
   val scaleFactor = 1 //Raise to stress more
-  val evictionTime = 5.minutes //Lower eg to 1.seconds to see cache and file system deletes
-  val evictionTimeOnError = 10.minutes
-  val localFileCache = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
+  val evictionTime: Duration = 5.minutes //Lower eg to 1.seconds to see cache and file system deletes
+  val evictionTimeOnError: Duration = 10.minutes
+  val localFileCache: Path = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
@@ -60,7 +61,7 @@ object LocalFileCacheCaffeine {
   //FileUtils.cleanDirectory(localFileCache.toFile)
 
 
-  val writer = new caffeine.cache.CacheWriter[Int, Path] {
+  val writer: CacheWriter[Int, Path] = new caffeine.cache.CacheWriter[Int, Path] {
     override def write(key: Int, value: Path): Unit = {
       logger.debug(s"TRACE_ID: $key write to cache")
     }
@@ -89,8 +90,8 @@ object LocalFileCacheCaffeine {
   }
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("LocalFileCacheCaffeine")
-    implicit val materializer = ActorMaterializer()
+    implicit val system: ActorSystem = ActorSystem("LocalFileCacheCaffeine")
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     case class Message(group: Int, id: Int, file: Path)
 
@@ -98,33 +99,17 @@ object LocalFileCacheCaffeine {
       .mapAsyncUnordered(5) { message =>
 
         def processNext(message: Message): Message = {
-
-          //Using get(key => downloadfunction) is preferable to getIfPresent, because the get method performs the computation atomically
-          //Thus there are no 404 anymore from server - exactly what we need
           val key = message.id
           val url = new URI("http://127.0.0.1:6001/downloadni/" + key.toString)
           val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
+
+          //Using get(key => downloadfunction) is preferable to getIfPresent, because the get method performs the computation atomically
+          //Thus there are no 404 from server - exactly what we need
           val downloadedFile = cache.get(message.id, key => new DownloaderRetry().download(key, url, destinationFile))
           logger.info(s"TRACE_ID: ${message.id} successfully read from cache")
           Message(message.group, message.id, downloadedFile)
-
-//          if (cache.getIfPresent(message.id).isDefined) {
-//            val value = cache.getIfPresent(message.id).get
-//            logger.info(s"Cache hit for TRACE_ID: ${message.id}")
-//            Message(message.group, message.id, value)
-//          } else {
-//            logger.info(s"TRACE_ID: ${message.id} Cache miss - download...")
-//
-//              val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
-//              //val url = new URI("http://127.0.0.1:6001/downloadflaky/" + message.id.toString)
-//              val url = new URI("http://127.0.0.1:6001/downloadni/" + message.id.toString)
-//              val downloadedFile = new DownloaderRetry().download(url, destinationFile)
-//              logger.info(s"TRACE_ID: ${message.id} Successfully downloaded - put into cache...")
-//              cache.put(message.id, downloadedFile)
-//              Message(message.group, message.id, downloadedFile)
-//          }
         }
-        //If (for whatever reason) we get a 404 from the server, use this "optimistic approach"
+        //If (for whatever reason) we get a 404 from the server, use this "optimistic approach" to retry
         Future(processNext(message)).recoverWith {
           case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] => {
             val rootCause = ExceptionUtils.getRootCause(e)

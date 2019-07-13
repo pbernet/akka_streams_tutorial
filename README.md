@@ -2,9 +2,23 @@
 
 A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs.
 See the class comment on how to run each example. 
-Two more complex examples are described below:
+Three more complex examples are described below:
+* HTTP Download with local file cache
 * Windturbine Example
 * Apache Kafka WordCount
+
+These examples all deal with some kind of shared mutual state.
+
+## HTTP Download with local file cache ##
+Taken from a real world use case:
+  * Process a stream of messages with reoccurring TRACE_ID
+  * For the first message with a TRACE_ID: download a .zip file from a FileServer and add TRACE_ID -> Path to a local cache
+  * For subsequent messages with the same TRACE_ID: fetch from cache to avoid duplicate downloads per TRACE_ID
+
+| Class                     | Description     |
+| -------------------       |-----------------|
+| [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Dummy HTTP FileServer for file download simulation|
+| [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Flow, which uses a local file cache with caffeine to share the state|
 
 
 ## Windturbine Example ##
