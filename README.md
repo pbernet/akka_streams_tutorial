@@ -3,21 +3,21 @@
 A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs.
 See the class comment on how to run each example. 
 Three more complex examples are described below:
-* HTTP Download with local file cache
+* HTTP download with local file cache
 * Windturbine Example
 * Apache Kafka WordCount
 
 These examples all deal with some kind of shared mutable state.
 
-## HTTP Download with local file cache ##
+## HTTP download with local file cache ##
 Taken from a real world use case:
   * Process a stream of messages with reoccurring TRACE_ID
-  * For the first message: download a .zip file from a FileServer and add TRACE_ID -> Path to a local cache
+  * For the first message: download a .zip file from a FileServer and add TRACE_ID->Path to the local cache
   * For subsequent messages with the same TRACE_ID: fetch from cache to avoid duplicate downloads per TRACE_ID
 
 | Class                     | Description     |
 | -------------------       |-----------------|
-| [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Dummy HTTP FileServer for file download simulation|
+| [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Dummy HTTP FileServer for non-idempotent file download simulation|
 | [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams Flow, which uses a local file cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") to share state|
 
 
@@ -39,7 +39,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 
 ## Apache Kafka WordCount ##
-The ubiquitous word and message count. Start the classes in the order below and watch the console output.
+The ubiquitous word (and message) count. Start the classes in the order below and watch the console output.
 
 | Class               | Description      |
 | ------------------- |-----------------|
