@@ -15,6 +15,7 @@ import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
   * Alternatives:
   * - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
   * - Use "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
+  * - Use Confluent Cloud, see: https://www.confluent.io/confluent-cloud/#view-pricing
   */
 object KafkaServer extends App {
 
