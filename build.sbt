@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
-  "javax.jms" % "jms" % "1.1",
+  "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1.1",
   "org.apache.activemq" % "activemq-client" % activemqVersion,
   "org.apache.activemq" % "activemq-broker" % activemqVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
@@ -49,10 +49,7 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13-beta-1"
 )
 
-resolvers ++= Seq(
-  "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public",
-  "Mvnrepository" at "https://mvnrepository.com/artifact"
-)
+resolvers += Resolver.url("repository.jboss.org-public", url("https://repository.jboss.org/nexus/content/groups/public"))
 
 //see: https://github.com/sbt/sbt/issues/3618
 val workaround = {
