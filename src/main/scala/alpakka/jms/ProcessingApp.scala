@@ -20,29 +20,20 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * ProcessingApp consumes messages against local alpakka.env.JMSServer
+  * ProcessingApp is an Alpakka JMS client which consumes messages from a local alpakka.env.JMSServer
   * JMSServer must be re-started manually to see the restart behaviour
   * JMSTextMessageProducerClient is a separate class
   *
-  * Up to 1.0-M1 there was an issue discussed here:
+  * Up to Alpakka 1.0-M1 there was an issue discussed here:
   * Alpakka JMS connector restart behaviour
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
-  * This is fixed with 1.0-M2
+  * This was fixed with 1.0-M2
   *
-  * This example has been upcycled to demonstrate a realistic consumer scenario,
-  * where faulty messages are written to an error queue.
+  * This example has been "upcycled" to demonstrate a realistic consumer scenario,
+  * where faulty messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
   *
-  * What is interesting:
-  * Acknowledge should be done on the envelope as suggested in:
-  * https://doc.akka.io/docs/alpakka/1.0.0/jms/consumer.html#using-jms-client-acknowledgement
-  * However, when run against JMS Broker Artemis, we notice that the processing stops and there
-  * are remaining messages on the queue.
-  * This can "fixed" by by setting the bufferSize to 0 (= Message-by-message acknowledgement)
-  *
-  * Start the Artemis Broker from /docker/docker-compose.yml
-  *
-  * Possibly related to:
-  * https://github.com/akka/alpakka/issues/908
+  * Alternatively to the ActiveMQ JMSServer you may route the JMS Messages via an Artemis JMS Broker:
+  * Start the Broker from: /docker/docker-compose.yml
   *
   */
 object ProcessingApp {
@@ -50,7 +41,6 @@ object ProcessingApp {
   implicit val system = ActorSystem("ProcessingApp")
   implicit val ec = system.dispatcher
 
-  //Exceptions thrown by the flow are handled here, not the re-connect exceptions
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
       logger.info(s"Stream failed with: ${e.getMessage}, going to restart")
@@ -92,30 +82,32 @@ object ProcessingApp {
       .toMat(Sink.ignore)(Keep.left)
       .run()
 
-    watcher(control)
+    pendingMessageWatcher(control)
   }
 
-  //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
-  //This does not interfere with the new 1.0-M2 implementation
+  //The "failover:" part in the brokerURL instructs the ActiveMQ client lib to reconnect on network failure
+  //This re-connect on the client lib works complementary with the new 1.0-M2 implementation for re-connect
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
   val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
     JmsConsumerSettings(consumerConfig, connectionFactory)
       .withQueue("test-queue")
-      .withSessionCount(1)
+      .withSessionCount(5)
 
       // Maximum number of messages to prefetch before applying backpressure. Default value is: 100
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
-      // disabling buffering. The outstanding messages before backpressure will be the sessionCount.
-      .withBufferSize(0)
+      // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
+      .withBufferSize(100)
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
 
-  private def watcher(jmsConsumerControl: JmsConsumerControl) = {
+  //Prior to Alpakka 1.1.x we noticed an effect where (with bufferSize > 0) the processing stopped
+  //and there were pending messages in the queue. This is fixed now and everything works as expected: no more pending messages
+  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
 
     val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
       JmsBrowseSettings(system, connectionFactory)
@@ -123,10 +115,9 @@ object ProcessingApp {
     )
 
     while (true) {
-      val resultBrowse: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
-      val pendingMessages = Await.result(resultBrowse, 600.seconds)
+      val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
+      val pendingMessages = Await.result(browseResult, 600.seconds)
 
-      //Check value of attribute "redeliveryCounter" in log
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }
