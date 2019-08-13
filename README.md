@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial) [![Coverage Status](https://coveralls.io/repos/github/pbernet/akka_streams_tutorial/badge.svg?branch=master)](https://coveralls.io/github/pbernet/akka_streams_tutorial?branch=master)
+[![Build Status](https://travis-ci.org/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial)
 # Akka streams tutorial #
 
 A collection of simple runnable and self contained examples from various akka streams docs, tutorials and blogs.
