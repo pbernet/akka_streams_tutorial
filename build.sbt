@@ -2,12 +2,12 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.9"
 
-val akkaVersion = "2.5.23"
+val akkaVersion = "2.5.24"
 val akkaHTTPVersion = "10.1.9"
-val alpakkaVersion = "1.1.0"
-val akkaStreamKafkaVersion =  "1.0.5"
+val alpakkaVersion = "1.1.1"
+val akkaStreamKafkaVersion = "1.0.5"
 val kafkaVersion = "2.3.0"
 val activemqVersion =  "5.15.9"
 
@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.1",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.3",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",

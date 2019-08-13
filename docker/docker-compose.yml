@@ -5,7 +5,7 @@ services:
   # https://github.com/vromero/activemq-artemis-docker
   artemis:
     restart: always
-    image: vromero/activemq-artemis:2.6.4-alpine
+    image: vromero/activemq-artemis:2.9.0-alpine
     hostname: artemis
     networks:
       - runtime-net
