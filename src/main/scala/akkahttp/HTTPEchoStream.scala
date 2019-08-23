@@ -45,64 +45,74 @@ object HTTPEchoStream extends App with JsonProtocol3 {
 
   def clientDownload(each: Int, address: String, port: Int): Unit = {
 
-    def parse(line: ByteString): Option[ExamplePerson] =
-    line.utf8String.split(" ").headOption.map(ExamplePerson)
+    def parse(line: ByteString): Option[ExamplePerson] = {
+      val result: Option[HTTPEchoStream.ExamplePerson] = line.utf8String.split(",").headOption.map(ExamplePerson)
+      println(s"Client converted from line: ${result.get.name}")
+      result
+    }
 
-  val requests: Source[HttpRequest, NotUsed] = Source
-    .fromIterator(() =>
-      Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
-    )
+    val requests: Source[HttpRequest, NotUsed] = Source
+      .fromIterator(() =>
+        Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
+      )
 
-  val processorFlow: Flow[Option[ExamplePerson], Int, NotUsed] =
-    Flow[Option[ExamplePerson]].map(_.map(_.name.length).getOrElse(0))
+    val processorFlow: Flow[Option[ExamplePerson], Int, NotUsed] =
+      Flow[Option[ExamplePerson]].map(_.map(_.name.length).getOrElse(0))
 
-  // Run and completely consume a single akka http request
-  def runRequestDownload(req: HttpRequest): Future[Option[ExamplePerson]] =
-    Http()
-      .singleRequest(req)
-      .flatMap { response =>
-        response.entity.dataBytes
-          .runReduce(_ ++ _)
-          .map(parse)
-      }
+    // Run and completely consume a single akka http request
+    // TODO Unmarshal(response).to[ExamplePerson]
+    def runRequestDownload(req: HttpRequest): Future[Option[ExamplePerson]] =
+      Http()
+        .singleRequest(req)
+        .flatMap { response =>
+          response.entity.dataBytes
+            .runReduce(_ ++ _)
+            .map(parse)
+        }
 
-    val printSink = Sink.foreach[Int] { each => println(each)}
+    val printSink = Sink.foreach[Int] { size => println(s"Client size: $size")}
 
-  // Run each akka http flow to completion, then continue processing. You'll want to tune the `parallelism`
-  // parameter to mapAsync -- higher values will create more cpu and memory load which may or may not positively
-  // impact performance.
-  requests
-    .mapAsync(2)(runRequestDownload)
-    .via(processorFlow)
-    .runWith(printSink)
+    // Run each akka http flow to completion, then continue processing. You'll want to tune the `parallelism`
+    // parameter to mapAsync -- higher values will create more cpu and memory load which may or may not positively
+    // impact performance.
+    requests
+      .mapAsync(1)(runRequestDownload)
+      .via(processorFlow)
+      .runWith(printSink)
 
   }
 
-  def server(address: String, port: Int): Unit ={
+  def server(address: String, port: Int): Unit = {
 
-    val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson("test"))
+    val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson("test")).take(5)
     implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
 
         get {
-        println(s"Server received download request for: $id ")
-
-          //Ongoing request [GET /download/0 Empty] was dropped because pool is shutting down
-          //https://github.com/akka/akka-http/pull/2630
-          complete(Source(stream))
-
+          println(s"Server received download request for: $id ")
+           withoutSizeLimit {
+            extractRequest { r: HttpRequest =>
+              val finishedWriting = r.discardEntityBytes().future
+              // we only want to respond once the incoming data has been handled:
+              onComplete(finishedWriting) { done =>
+                //Ongoing request [GET /download/0 Empty] was dropped because pool is shutting down
+                //https://github.com/akka/akka-http/pull/2630
+                complete(Source(stream))
+              }
+            }
+          }
         }
       }
 
-//      ~
-//        path("xx") {
-//          get {
-//              println(s"Server received xxx request for:")
-//              complete(StatusCodes.OK)
-//            }
-//          }
+      //      ~
+      //        path("xx") {
+      //          get {
+      //              println(s"Server received xxx request for:")
+      //              complete(StatusCodes.OK)
+      //            }
+      //          }
     }
 
     val bindingFuture = Http().bindAndHandle(routes, address, port)
