@@ -8,9 +8,9 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.ByteString
+import akka.stream.scaladsl.{Sink, Source}
 import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.Future
@@ -32,6 +32,9 @@ trait JsonProtocol3 extends DefaultJsonProtocol with SprayJsonSupport {
   *
   * Doc JSON streaming support:
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/source-streaming-support.html
+  *
+  * Doc Consuming streaming APIs
+  * https://doc.akka.io/docs/akka-http/current/common/json-support.html
   */
 object HTTPEchoStream extends App with JsonProtocol3 {
   implicit val system = ActorSystem("HTTPEchoStream")
@@ -42,43 +45,38 @@ object HTTPEchoStream extends App with JsonProtocol3 {
   server(address, port)
   (1 to 1).par.foreach(each => clientDownload(each, address, port))
 
-
   def clientDownload(each: Int, address: String, port: Int): Unit = {
-
-    def parse(line: ByteString): Option[ExamplePerson] = {
-      val result: Option[HTTPEchoStream.ExamplePerson] = line.utf8String.split(",").headOption.map(ExamplePerson)
-      println(s"Client converted from line: ${result.get.name}")
-      result
-    }
 
     val requests: Source[HttpRequest, NotUsed] = Source
       .fromIterator(() =>
         Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
 
-    val processorFlow: Flow[Option[ExamplePerson], Int, NotUsed] =
-      Flow[Option[ExamplePerson]].map(_.map(_.name.length).getOrElse(0))
+    implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
+      EntityStreamingSupport.json()
 
     // Run and completely consume a single akka http request
-    // TODO Unmarshal(response).to[ExamplePerson]
-    def runRequestDownload(req: HttpRequest): Future[Option[ExamplePerson]] =
+    def runRequestDownload(req: HttpRequest) =
       Http()
         .singleRequest(req)
         .flatMap { response =>
-          response.entity.dataBytes
-            .runReduce(_ ++ _)
-            .map(parse)
-        }
+          val unmarshalled: Future[Source[ExamplePerson, NotUsed]] =
+            Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
 
-    val printSink = Sink.foreach[Int] { size => println(s"Client size: $size")}
+          // flatten the Future[Source[]] into a Source[]:
+          val source: Source[ExamplePerson, Future[NotUsed]] =
+            Source.fromFutureSource(unmarshalled)
+
+          source.runForeach(println(_))
+        }
 
     // Run each akka http flow to completion, then continue processing. You'll want to tune the `parallelism`
     // parameter to mapAsync -- higher values will create more cpu and memory load which may or may not positively
     // impact performance.
     requests
       .mapAsync(1)(runRequestDownload)
-      .via(processorFlow)
-      .runWith(printSink)
+      //.via(processorFlow)
+      .runWith(Sink.ignore)
 
   }
 
