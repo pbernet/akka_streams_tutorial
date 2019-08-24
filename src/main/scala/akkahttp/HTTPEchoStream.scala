@@ -16,13 +16,6 @@ import spray.json.DefaultJsonProtocol
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-trait JsonProtocol3 extends DefaultJsonProtocol with SprayJsonSupport {
-
-  final case class ExamplePerson(name: String)
-
-  implicit def examplePersonFormat = jsonFormat1(ExamplePerson.apply)
-}
-
 /**
   * 1st version
   * Focus on download stream
@@ -36,10 +29,16 @@ trait JsonProtocol3 extends DefaultJsonProtocol with SprayJsonSupport {
   * Doc Consuming streaming APIs
   * https://doc.akka.io/docs/akka-http/current/common/json-support.html
   */
-object HTTPEchoStream extends App with JsonProtocol3 {
+object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
   implicit val system = ActorSystem("HTTPEchoStream")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
+
+  //JSON Protocol and streaming support
+  final case class ExamplePerson(name: String)
+  implicit def examplePersonFormat = jsonFormat1(ExamplePerson.apply)
+  implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
+    EntityStreamingSupport.json()
 
   val (address, port) = ("127.0.0.1", 8080)
   server(address, port)
@@ -51,9 +50,6 @@ object HTTPEchoStream extends App with JsonProtocol3 {
       .fromIterator(() =>
         Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
-
-    implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
-      EntityStreamingSupport.json()
 
     // Run and completely consume a single akka http request
     def runRequestDownload(req: HttpRequest) =
@@ -83,7 +79,6 @@ object HTTPEchoStream extends App with JsonProtocol3 {
   def server(address: String, port: Int): Unit = {
 
     val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson("test")).take(5)
-    implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
