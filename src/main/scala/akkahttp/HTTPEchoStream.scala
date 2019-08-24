@@ -10,7 +10,7 @@ import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, pa
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
 import scala.util.{Failure, Success}
@@ -35,7 +35,9 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
 
   //JSON Protocol and streaming support
   final case class ExamplePerson(name: String)
+
   implicit def examplePersonFormat = jsonFormat1(ExamplePerson.apply)
+
   implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   val (address, port) = ("127.0.0.1", 8080)
@@ -49,6 +51,7 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
         Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
 
+
     // Run and completely consume a single akka http request
     def runRequestDownload(req: HttpRequest) =
       Http()
@@ -56,49 +59,46 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
         .flatMap { response =>
           val unmarshalled = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
           val source = Source.fromFutureSource(unmarshalled)
-
           source.runForeach(i => println(s"Client received: $i"))
         }
 
-    // Run each akka http flow to completion, then continue processing. You'll want to tune the `parallelism`
-    // parameter to mapAsync -- higher values will create more cpu and memory load which may or may not positively
-    // impact performance.
     requests
-      .mapAsync(1)(runRequestDownload)
+      .mapAsync(2)(runRequestDownload)
       //.via(processorFlow)
       .runWith(Sink.ignore)
-
   }
+
+  //TODO Try to use printSink and processorFlow
+  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client received: $each") }
+
+  val processorFlow: Flow[ExamplePerson, ExamplePerson, NotUsed] = Flow[ExamplePerson].map {
+    each: ExamplePerson => {
+      each
+    }
+  }
+
 
   def server(address: String, port: Int): Unit = {
 
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
-
         get {
           println(s"Server received download request for: $id ")
-           withoutSizeLimit {
-            extractRequest { r: HttpRequest =>
-              val finishedWriting = r.discardEntityBytes().future
-              // we only want to respond once the incoming data has been handled:
-              onComplete(finishedWriting) { done =>
-                //Ongoing request [GET /download/0 Empty] was dropped because pool is shutting down
-                //https://github.com/akka/akka-http/pull/2630
-                val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"test$id")).take(5)
-                complete(Source(stream))
-              }
+          extractRequest { r: HttpRequest =>
+            val finishedWriting = r.discardEntityBytes().future
+            // we only want to respond once the incoming data has been handled
+            onComplete(finishedWriting) { done =>
+              val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"test$id")).take(5)
+              complete(Source(stream))
             }
           }
         }
+      } ~ path("upload") {
+        get {
+          println(s"Server received upload request for:")
+          complete(StatusCodes.OK)
+        }
       }
-
-      //      ~
-      //        path("xx") {
-      //          get {
-      //              println(s"Server received xxx request for:")
-      //              complete(StatusCodes.OK)
-      //            }
-      //          }
     }
 
     val bindingFuture = Http().bindAndHandle(routes, address, port)
