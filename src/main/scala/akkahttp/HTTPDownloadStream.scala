@@ -16,8 +16,7 @@ import spray.json.DefaultJsonProtocol
 import scala.util.{Failure, Success}
 
 /**
-  * 1st version
-  * Focus on download stream
+  * Initiate a HTTP request from akka-http client and consume a stream of elements from server
   *
   * Doc streaming implications:
   * https://doc.akka.io/docs/akka-http/current/implications-of-streaming-http-entity.html#implications-of-the-streaming-nature-of-request-response-entities
@@ -28,8 +27,8 @@ import scala.util.{Failure, Success}
   * Doc Consuming streaming APIs
   * https://doc.akka.io/docs/akka-http/current/common/json-support.html
   */
-object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("HTTPEchoStream")
+object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSupport {
+  implicit val system = ActorSystem("HTTPDownloadStream")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
 
@@ -92,11 +91,6 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
               complete(Source(stream))
             }
           }
-        }
-      } ~ path("upload") {
-        get {
-          println(s"Server received upload request for:")
-          complete(StatusCodes.OK)
         }
       }
     }
