@@ -13,7 +13,6 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 import spray.json.DefaultJsonProtocol
 
-import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
@@ -37,12 +36,11 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
   //JSON Protocol and streaming support
   final case class ExamplePerson(name: String)
   implicit def examplePersonFormat = jsonFormat1(ExamplePerson.apply)
-  implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
-    EntityStreamingSupport.json()
+  implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   val (address, port) = ("127.0.0.1", 8080)
   server(address, port)
-  (1 to 1).par.foreach(each => clientDownload(each, address, port))
+  (1 to 2).par.foreach(each => clientDownload(each, address, port))
 
   def clientDownload(each: Int, address: String, port: Int): Unit = {
 
@@ -56,14 +54,10 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
       Http()
         .singleRequest(req)
         .flatMap { response =>
-          val unmarshalled: Future[Source[ExamplePerson, NotUsed]] =
-            Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
+          val unmarshalled = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
+          val source = Source.fromFutureSource(unmarshalled)
 
-          // flatten the Future[Source[]] into a Source[]:
-          val source: Source[ExamplePerson, Future[NotUsed]] =
-            Source.fromFutureSource(unmarshalled)
-
-          source.runForeach(println(_))
+          source.runForeach(i => println(s"Client received: $i"))
         }
 
     // Run each akka http flow to completion, then continue processing. You'll want to tune the `parallelism`
@@ -78,8 +72,6 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
 
   def server(address: String, port: Int): Unit = {
 
-    val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson("test")).take(5)
-
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
 
@@ -92,6 +84,7 @@ object HTTPEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
               onComplete(finishedWriting) { done =>
                 //Ongoing request [GET /download/0 Empty] was dropped because pool is shutting down
                 //https://github.com/akka/akka-http/pull/2630
+                val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"test$id")).take(5)
                 complete(Source(stream))
               }
             }
