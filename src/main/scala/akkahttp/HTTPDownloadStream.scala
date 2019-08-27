@@ -16,7 +16,8 @@ import spray.json.DefaultJsonProtocol
 import scala.util.{Failure, Success}
 
 /**
-  * Initiate a HTTP request from akka-http client and consume a stream of elements from server
+  * Initiate n HTTP requests from akka-http client and for each consume a bounded stream of elements from server
+  * Similar to SSEHeartbeat
   *
   * Doc streaming implications:
   * https://doc.akka.io/docs/akka-http/current/implications-of-streaming-http-entity.html#implications-of-the-streaming-nature-of-request-response-entities
@@ -24,7 +25,7 @@ import scala.util.{Failure, Success}
   * Doc JSON streaming support:
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/source-streaming-support.html
   *
-  * Doc Consuming streaming APIs
+  * Doc Consuming JSON streaming APIs
   * https://doc.akka.io/docs/akka-http/current/common/json-support.html
   */
 object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSupport {
@@ -41,9 +42,9 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   val (address, port) = ("127.0.0.1", 8080)
   server(address, port)
-  (1 to 2).par.foreach(each => clientDownload(each, address, port))
+  (1 to 2).par.foreach(each => client(each, address, port))
 
-  def clientDownload(each: Int, address: String, port: Int): Unit = {
+  def client(each: Int, address: String, port: Int): Unit = {
 
     val requests: Source[HttpRequest, NotUsed] = Source
       .fromIterator(() =>
@@ -67,7 +68,7 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
       .runWith(Sink.ignore)
   }
 
-  //TODO Try to use printSink and processorFlow
+  //TODO Try to use printSink and processorFlow, trouble with types...
   val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client received: $each") }
 
   val processorFlow: Flow[ExamplePerson, ExamplePerson, NotUsed] = Flow[ExamplePerson].map {
