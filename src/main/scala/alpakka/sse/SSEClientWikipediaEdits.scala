@@ -50,10 +50,6 @@ object SSEClientWikipediaEdits {
     if (os == "mac os x") Process("open ./src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
-  private def isNamedBot(bot: Boolean, user: String) : Boolean = {
-     if (bot) user.toLowerCase().contains("bot") else false
-  }
-
   private def sseClient() = {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
@@ -78,6 +74,10 @@ object SSEClientWikipediaEdits {
       event: ServerSentEvent => {
 
         def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
+
+        def isNamedBot(bot: Boolean, user: String) : Boolean = {
+          if (bot) user.toLowerCase().contains("bot") else false
+        }
 
         val serverName = (Json.parse(event.data) \ "server_name").as[String]
         val user = (Json.parse(event.data) \ "user").as[String]
