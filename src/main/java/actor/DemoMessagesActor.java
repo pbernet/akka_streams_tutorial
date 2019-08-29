@@ -1,8 +1,10 @@
 package actor;
 
+import akka.Done;
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import akka.actor.CoordinatedShutdown;
 import akka.actor.Props;
 import akka.pattern.Patterns;
 
@@ -22,6 +24,15 @@ public class DemoMessagesActor extends AbstractLoggingActor {
 		ActorRef demoActor = system.actorOf(DemoMessagesActor.props(0), "demo");
 		system.scheduler()
                 .schedule(Duration.ofMillis(1000), Duration.ofMillis(1000), demoActor, new GreetingTell("Hi tell (scheduled)"), system.dispatcher(), null);
+
+		CoordinatedShutdown.get(system)
+				.addTask(
+						CoordinatedShutdown.PhaseBeforeServiceUnbind(),
+						"stop",
+						() -> {
+							return akka.pattern.Patterns.ask(demoActor, new Stop(), Duration.ofSeconds(5))
+									.thenApply(reply -> Done.getInstance());
+						});
 
 		//Tell: Fire and forget
 		demoActor.tell(new GreetingTell("Hi tell"), ActorRef.noSender());
@@ -55,6 +66,11 @@ public class DemoMessagesActor extends AbstractLoggingActor {
 		}
 	}
 
+	static public class Stop {
+		public Stop() {
+		}
+	}
+
 	/**
 	 * Create Props for an actor of this type.
 	 *
@@ -83,6 +99,10 @@ public class DemoMessagesActor extends AbstractLoggingActor {
 				})
 				.match(GreetingAsk.class, g -> {
 					log().info("I was greeted by {}", g.getGreeter());
+					getSender().tell("OK", getSelf());
+				})
+				.match(Stop.class, s -> {
+					log().info("I was stopped");
 					getSender().tell("OK", getSelf());
 				})
 				.build();
