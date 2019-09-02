@@ -38,7 +38,7 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.3",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
-  "org.apache.avro" % "avro" % "1.8.2",
+  "org.apache.avro" % "avro" % "1.9.1",
   "com.twitter" %% "bijection-avro" % "0.9.6",
   "com.github.blemale" %% "scaffeine" % "3.0.0" % "compile",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
