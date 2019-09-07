@@ -22,21 +22,11 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
-
-
-trait JsonProtocol2 extends DefaultJsonProtocol with SprayJsonSupport {
-
-  final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
-
-  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
-}
-
-
 /**
   * Differences to FileEcho:
-  *  * Uses a Stream for upload instead of a Single requests as in FileEcho
-  *  * Uses the host-level API with a SourceQueue for download
-  *  * Retries via config param max-retries set in application.conf
+  *  * The client sends a Stream of FileHandle instead of a Single requests as in FileEcho
+  *  * The client downloads using the host-level API with a SourceQueue
+  *  * Retries via are set via config param max-retries in application.conf
   *
   * Doc:
   * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
@@ -48,10 +38,14 @@ trait JsonProtocol2 extends DefaultJsonProtocol with SprayJsonSupport {
   *  * Cleanup on pool shutdown
   *
   */
-object FileEchoStream extends App with JsonProtocol2 {
+object FileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
   implicit val system = ActorSystem("FileEchoStream")
   implicit val executionContext = system.dispatcher
   implicit val materializerServer = ActorMaterializer()
+
+  final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
+
+  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
@@ -67,7 +61,7 @@ object FileEchoStream extends App with JsonProtocol2 {
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+            println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
             complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
         }
       } ~
@@ -76,7 +70,7 @@ object FileEchoStream extends App with JsonProtocol2 {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
               //TODO see class comment
               //throw new RuntimeException("Boom server error")
-              println(s"Server received download request for: ${fileHandle.fileName}")
+              println(s"Server: Received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
           }
@@ -94,13 +88,8 @@ object FileEchoStream extends App with JsonProtocol2 {
   }
 
   def filesToUpload(): Source[FileHandle, NotUsed] =
-    Source(List(
-      FileHandle("1.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
-      FileHandle("2.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
-      FileHandle("3.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
-      FileHandle("4.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString),
-      FileHandle("5.jpg", Paths.get(s"./src/main/resources/$resourceFileName").toString)
-    ))
+    //Unbounded stream. Limit for testing purposes by appending eg .take(5)
+    Source(Stream.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
 
 
   def roundtripClient(address: String, port: Int) = {
@@ -164,7 +153,7 @@ object FileEchoStream extends App with JsonProtocol2 {
           val result = resp.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
           result.map {
             ioresult =>
-              println(s"Download client for file: $resp finished downloading: ${ioresult.count} bytes!")
+              println(s"Client: Download file: $resp finished: ${ioresult.count} bytes!")
           }
         case Failure(exception) => println(s"Boom $exception while downloading")
       }
@@ -182,7 +171,7 @@ object FileEchoStream extends App with JsonProtocol2 {
       // multiple pooled connections and may thus "overtake" each other!
       .runForeach {
       case (Success(response: HttpResponse), fileToUpload) =>
-        println(s"Upload for file: $fileToUpload was successful: ${response.status}")
+        println(s"Client: Upload for file: $fileToUpload was successful: ${response.status}")
 
         val fileHandleFuture = Unmarshal(response).to[FileHandle]
         val fileHandle = Await.result(fileHandleFuture, 1.second)  //TODO Do it without blocking
