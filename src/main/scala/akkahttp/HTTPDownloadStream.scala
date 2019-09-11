@@ -11,13 +11,14 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, ThrottleMode}
+import com.typesafe.config.ConfigFactory
 import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Initiate n HTTP requests from akka-http client and for each consume a bounded stream of elements from server
+  * Initiate n singleRequest and in the response consume a stream of elements from server
   * Similar to SSEHeartbeat
   *
   * Doc streaming implications:
@@ -46,15 +47,12 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
   client(address, port)
 
   def client(address: String, port: Int): Unit = {
-    //TODO If the responseStream on the server is unbound, the requestParallelism is limited to max 4 concurrent requests
-    //What is the limiting factor?
-    val requestParallelism = 5
+    val requestParallelism = ConfigFactory.load.getInt("akka.http.host-connection-pool.max-connections")
 
     val requests: Source[HttpRequest, NotUsed] = Source
       .fromIterator(() =>
         Range(0, requestParallelism).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
-
 
     // Run and completely consume a single akka http request
     def runRequestDownload(req: HttpRequest) =
@@ -91,6 +89,7 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
           extractRequest { r: HttpRequest =>
             val finishedWriting = r.discardEntityBytes().future
             onComplete(finishedWriting) { done =>
+              //For testing purposes eg add .take(5)
               val responseStream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"request:$id"))
               complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
             }
