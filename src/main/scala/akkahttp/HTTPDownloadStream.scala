@@ -9,10 +9,11 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{ActorMaterializer, ThrottleMode}
 import spray.json.DefaultJsonProtocol
 
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
@@ -42,13 +43,16 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   val (address, port) = ("127.0.0.1", 8080)
   server(address, port)
-  (1 to 2).par.foreach(each => client(each, address, port))
+  client(address, port)
 
-  def client(each: Int, address: String, port: Int): Unit = {
+  def client(address: String, port: Int): Unit = {
+    //TODO If the responseStream on the server is unbound, the requestParallelism is limited to max 4 concurrent requests
+    //What is the limiting factor?
+    val requestParallelism = 5
 
     val requests: Source[HttpRequest, NotUsed] = Source
       .fromIterator(() =>
-        Range(0, 10).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
+        Range(0, requestParallelism).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
 
 
@@ -63,7 +67,7 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
         }
 
     requests
-      .mapAsync(2)(runRequestDownload)
+      .mapAsync(requestParallelism)(runRequestDownload)
       //.via(processorFlow)
       .runWith(Sink.ignore)
   }
@@ -83,13 +87,12 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
         get {
-          println(s"Server received download request for: $id ")
+          println(s"Server received download request with id: $id ")
           extractRequest { r: HttpRequest =>
             val finishedWriting = r.discardEntityBytes().future
-            // we only want to respond once the incoming data has been handled
             onComplete(finishedWriting) { done =>
-              val stream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"test$id")).take(5)
-              complete(Source(stream))
+              val responseStream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"request:$id"))
+              complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
             }
           }
         }
