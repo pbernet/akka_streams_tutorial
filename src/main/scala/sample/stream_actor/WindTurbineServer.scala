@@ -73,6 +73,14 @@ object WindTurbineServer {
           case (lastMessage: String, measurements: Seq[MeasurementsContainer]) =>
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
+
+            // Optional: generate Server errors at 1/6 of the time
+            // Clients receive:
+            // akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
+            // and are able to recover due to the RestartSource
+            //val time = LocalTime.now()
+            //if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
+
             //only send a single message at a time to the Total actor, backpressure otherwise
             val windSpeeds = measurements.map(each => each.measurements.wind_speed)
             (total ? Increment(measurements.size, average(windSpeeds), measurements.head.id))
