@@ -3,29 +3,30 @@ package actor;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.AbstractBehavior;
+import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
+import akka.actor.typed.javadsl.Receive;
 
 /**
- * Typed Java Actor example
+ * Akka Typed example 1:1
  * Doc:
- * https://doc.akka.io/docs/akka/2.5/typed-actors.html
+ * https://doc.akka.io/docs/akka/2.6/typed/actors.html
  *
  */
-public abstract class HelloWorldMain {
+public class HelloWorldMain extends AbstractBehavior<HelloWorldMain.Start> {
 
     public static void main(String[] args) {
         final ActorSystem<HelloWorldMain.Start> system =
-                ActorSystem.create(HelloWorldMain.main, "HelloWorld");
+                ActorSystem.create(HelloWorldMain.create(), "hello");
 
-        system.tell(new HelloWorldMain.Start("Worldx"));
+        system.tell(new HelloWorldMain.Start("World"));
+        //system.tell(new HelloWorldMain.Start("Akka"));
 
-        //TODO ask seems to be more complicated than in the untyped world
+        //TODO implement ask seems to be more complicated than in the untyped world
         //https://doc.akka.io/docs/akka/current/typed/interaction-patterns.html#request-response-with-ask-between-two-actors
     }
 
-
-    private HelloWorldMain() {
-    }
 
     public static class Start {
         public final String name;
@@ -35,17 +36,26 @@ public abstract class HelloWorldMain {
         }
     }
 
-    public static final Behavior<Start> main =
-            Behaviors.setup(context -> {
-                final ActorRef<HelloWorld.Greet> greeter =
-                        context.spawn(HelloWorld.greeter, "greeter");
+    public static Behavior<Start> create() {
+        return Behaviors.setup(HelloWorldMain::new);
+    }
 
-                return Behaviors.receiveMessage(message -> {
-                    //Explicitly include the properly typed replyTo address in the message
-                    ActorRef<HelloWorld.Greeted> replyTo =
-                            context.spawn(HelloWorldBot.bot(0, 3), message.name);
-                    greeter.tell(new HelloWorld.Greet(message.name, replyTo));
-                    return Behaviors.same();
-                });
-            });
+    private final ActorContext<Start>        context;
+    private final ActorRef<HelloWorld.Greet> greeter;
+
+    private HelloWorldMain(ActorContext<Start> context) {
+        this.context = context;
+        greeter = context.spawn(HelloWorld.create(), "greeter");
+    }
+
+    @Override
+    public Receive<Start> createReceive() {
+        return newReceiveBuilder().onMessage(Start.class, this::onStart).build();
+    }
+
+    private Behavior<Start> onStart(Start command) {
+        ActorRef<HelloWorld.Greeted> replyTo = context.spawn(HelloWorldBot.create(3), command.name);
+        greeter.tell(new HelloWorld.Greet(command.name, replyTo));
+        return this;
+    }
 }
