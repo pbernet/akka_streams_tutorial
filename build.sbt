@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.3",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
