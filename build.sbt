@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % "1.11.4" % "test",
-  "junit" % "junit" % "4.13-beta-1"
+  "junit" % "junit" % "4.13-rc-1"
 )
 
 resolvers += Resolver.url("repository.jboss.org-public", url("https://repository.jboss.org/nexus/content/groups/public"))
