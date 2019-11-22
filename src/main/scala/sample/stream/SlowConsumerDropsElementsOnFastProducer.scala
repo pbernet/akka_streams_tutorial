@@ -5,7 +5,7 @@ import java.time.{Instant, ZoneId, ZonedDateTime}
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
-import akka.stream.{ActorMaterializer, DelayOverflowStrategy, ThrottleMode}
+import akka.stream.{DelayOverflowStrategy, ThrottleMode}
 
 import scala.concurrent.duration._
 import scala.util.Failure
@@ -23,7 +23,6 @@ case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
 object SlowConsumerDropsElementsOnFastProducer {
   implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
     fastSource

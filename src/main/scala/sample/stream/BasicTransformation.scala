@@ -1,7 +1,6 @@
 package sample.stream
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
 /**
@@ -12,7 +11,6 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 object BasicTransformation {
   implicit val system = ActorSystem("BasicTransformation")
   import system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
     val text =

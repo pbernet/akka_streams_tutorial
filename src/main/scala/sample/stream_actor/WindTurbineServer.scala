@@ -7,7 +7,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.Timeout
 import play.api.libs.json._
@@ -33,7 +32,6 @@ object WindTurbineServer {
 
   implicit def executor: ExecutionContext = system.dispatcher
   protected val log = Logging(system.eventStream, "WindTurbineServer-main")
-  protected implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   object Messages  {
 

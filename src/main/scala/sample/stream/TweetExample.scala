@@ -2,7 +2,6 @@ package sample.stream
 
 import akka.NotUsed
 import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{MergePrioritized, Sink, Source}
 
 import scala.concurrent.Future
@@ -33,7 +32,6 @@ object TweetExample {
 
     implicit val system = ActorSystem("TweetGraphExample")
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     val tweetsLowPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 100.millis, Tweet(Author("LowPrio"), System.currentTimeMillis, "#other #akka aBody"))
     val tweetsHighPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 1.second, Tweet(Author("HighPrio"), System.currentTimeMillis, "#akka #other aBody"))

@@ -2,8 +2,8 @@ package sample.stream_divert
 
 import akka.actor.ActorSystem
 import akka.event.Logging
+import akka.stream.Attributes
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, Attributes}
 
 /**
   * Example with alsoTo and akka streams logging (via slf4j and logback)
@@ -17,7 +17,6 @@ import akka.stream.{ActorMaterializer, Attributes}
 object AlsoToExample {
   implicit val system = ActorSystem("AlsoToExample")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
   implicit val adapter = Logging(system, "MyLogger")
 
   def main(args: Array[String]) {

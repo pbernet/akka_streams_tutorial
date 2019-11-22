@@ -1,11 +1,7 @@
 package actor;
 
 import akka.Done;
-import akka.actor.AbstractLoggingActor;
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
-import akka.actor.CoordinatedShutdown;
-import akka.actor.Props;
+import akka.actor.*;
 import akka.pattern.Patterns;
 
 import java.time.Duration;
@@ -23,7 +19,7 @@ public class DemoMessagesActor extends AbstractLoggingActor {
 		final ActorSystem system = ActorSystem.create("DemoMessagesActor");
 		ActorRef demoActor = system.actorOf(DemoMessagesActor.props(0), "demo");
 		system.scheduler()
-                .schedule(Duration.ofMillis(1000), Duration.ofMillis(1000), demoActor, new GreetingTell("Hi tell (scheduled)"), system.dispatcher(), null);
+                .scheduleWithFixedDelay(Duration.ofMillis(1000), Duration.ofMillis(1000), demoActor, new GreetingTell("Hi tell (scheduled)"), system.dispatcher(), null);
 
 		CoordinatedShutdown.get(system)
 				.addTask(

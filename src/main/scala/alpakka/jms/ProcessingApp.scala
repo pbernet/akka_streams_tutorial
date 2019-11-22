@@ -48,9 +48,6 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  implicit val materializer = ActorMaterializer.create(ActorMaterializerSettings.create(system)
-    .withDebugLogging(true), system)
-
   def main(args: Array[String]) {
 
     val control: JmsConsumerControl = jmsConsumerSource

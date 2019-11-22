@@ -3,7 +3,7 @@ package sample.graphdsl
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
-import akka.stream.{ActorMaterializer, FlowShape, UniformFanInShape, UniformFanOutShape}
+import akka.stream.{FlowShape, UniformFanInShape, UniformFanOutShape}
 
 /**
   * A GraphDSL example, which shows the possibility to inject operations (= flows) on a
@@ -18,7 +18,6 @@ object FlowFromGraph {
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem("FlowFromGraph")
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     val processorFlow1: Flow[Int, Int, NotUsed] = Flow[Int].map(_ * 2)
     val processorFlow2: Flow[Int, Int, NotUsed] = Flow[Int].map(_ * 3)
