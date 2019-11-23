@@ -14,9 +14,9 @@ import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.pattern.pipe
+import akka.stream.ThrottleMode
 import akka.stream.alpakka.sse.scaladsl.EventSource
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.testkit.SocketUtil
 import org.scalatest.{AsyncWordSpec, BeforeAndAfterAll, Matchers}
 
@@ -73,11 +73,11 @@ object EventSourceSpec {
     extends Actor
       with ActorLogging {
     import Server._
-    import context.dispatcher
 
-    private implicit val mat = ActorMaterializer()
+    implicit val system = context.system
+    implicit val executionContext = context.system.dispatcher
 
-    context.system.scheduler.scheduleOnce(1.second, self, Bind)
+    system.scheduler.scheduleOnce(1.second, self, Bind)
 
     override def receive = unbound
 
@@ -133,10 +133,9 @@ final class EventSourceSpec extends AsyncWordSpec with Matchers with BeforeAndAf
 
   private implicit val system = ActorSystem()
   private implicit val ec = system.dispatcher
-  private implicit val mat = ActorMaterializer()
 
   "EventSource" should {
-    "communicate correctly with an instable HTTP server" in {
+    "communicate correctly with an unstable HTTP server" in {
       val nrOfSamples = 20
       val (host, port) = hostAndPort()
       val server = system.actorOf(Props(new Server(host, port, 2, true)))
@@ -160,7 +159,7 @@ final class EventSourceSpec extends AsyncWordSpec with Matchers with BeforeAndAf
       val server = system.actorOf(Props(new Server(host, port, 2)))
       val eventSource = EventSource(Uri(s"http://$host:$port"), send, Some("2"), 1.second)
       val events = eventSource.take(nrOfSamples).runWith(Sink.seq)
-      val expected = Seq.tabulate(nrOfSamples)(_ % 2 + 3).map(toServerSentEvent(false))
+      val expected = Seq.tabulate(nrOfSamples)(_ % 2 + 3).map(toServerSentEvent(setEventId = false))
       events.map(_ shouldBe expected).andThen { case _ => system.stop(server) }
     }
   }
