@@ -12,6 +12,7 @@ import scala.concurrent.duration._
 object EncapsulateStreamWithActor extends App {
   implicit val system = ActorSystem()
   implicit val executionContext = system.dispatcher
+
   val actorRef = system.actorOf(Props(classOf[PrintMoreNumbers]))
   system.scheduler.scheduleOnce(10.seconds) {
     actorRef ! "stop"
