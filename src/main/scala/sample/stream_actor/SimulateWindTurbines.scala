@@ -3,7 +3,7 @@ package sample.stream_actor
 import akka.actor.ActorSystem
 import akka.pattern.{Backoff, BackoffSupervisor}
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
+import akka.stream.ThrottleMode
 
 import scala.concurrent.duration._
 
@@ -18,7 +18,6 @@ import scala.concurrent.duration._
   */
 object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
 
   val endpoint = "ws://127.0.0.1:8080"
   val numberOfTurbines = 5
