@@ -2,8 +2,8 @@ package sample.stream
 
 import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.{Flow, MergeHub, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, DelayOverflowStrategy}
 
 import scala.concurrent.duration._
 
@@ -17,7 +17,6 @@ import scala.concurrent.duration._
 object MergeHubWithDynamicSources {
   implicit val system = ActorSystem("MergeHubWithDynamicSources")
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
 

@@ -7,8 +7,8 @@ import akka.actor.ActorSystem
 import akka.kafka.ProducerMessage.Message
 import akka.kafka.ProducerSettings
 import akka.kafka.scaladsl.Producer
+import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 import akka.{Done, NotUsed}
 import org.apache.kafka.clients.producer.{Partitioner, ProducerRecord}
 import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
@@ -25,7 +25,6 @@ import scala.concurrent.duration._
 object WordCountProducer extends App {
   implicit val system = ActorSystem()
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   val bootstrapServers = "localhost:9092"
 

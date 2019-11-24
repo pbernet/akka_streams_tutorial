@@ -28,7 +28,6 @@ import scala.util.{Failure, Success}
 object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
@@ -97,7 +96,7 @@ object SSEHeartbeat {
       maxBackoff = 30.seconds,
       randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
     ) { () =>
-      Source.fromFutureSource {
+      Source.futureSource {
         Http()
           .singleRequest(HttpRequest(
             uri = s"http://$address:$port/events/backoffClient"

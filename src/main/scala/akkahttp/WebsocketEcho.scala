@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 
 import scala.concurrent.duration.DurationInt
@@ -19,7 +18,6 @@ import scala.util.{Failure, Success}
 
 trait ClientCommon {
   implicit val system = ActorSystem("WebsocketEcho")
-  implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
 
   val printSink: Sink[Message, Future[Done]] =

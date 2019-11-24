@@ -6,7 +6,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
 import akkahttp.WebsocketEcho.{helloSource, printSink}
@@ -24,7 +23,6 @@ import scala.concurrent.duration._
   */
 object WebsocketChatEcho {
   implicit val actorSystem = ActorSystem(name = "WebsocketChatEcho")
-  implicit val streamMaterializer = ActorMaterializer()
   implicit val executionContext = actorSystem.dispatcher
   val log: LoggingAdapter = actorSystem.log
 

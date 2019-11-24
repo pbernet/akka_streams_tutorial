@@ -57,4 +57,6 @@ val workaround = {
   ()
 }
 
+scalacOptions += "-deprecation"
+
 fork in run := true

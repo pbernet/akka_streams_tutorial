@@ -3,7 +3,6 @@ package sample.stream
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import akka.{Done, NotUsed}
@@ -23,7 +22,6 @@ import scala.util.{Failure, Success, Try}
 object FlightDelayStreaming {
   implicit val system = ActorSystem("FlightDelayStreaming")
   implicit val executionContext = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
     val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008.csv"))

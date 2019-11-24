@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes, Uri}
 import akka.http.scaladsl.server.Directives.{logRequestResult, path, _}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import akka.stream.ActorMaterializer
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -27,7 +26,6 @@ object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("FileServer")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   val (address, port) = ("127.0.0.1", 6001)
   server(address, port)

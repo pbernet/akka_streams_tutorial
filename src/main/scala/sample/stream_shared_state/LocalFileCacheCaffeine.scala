@@ -8,7 +8,7 @@ import java.util.concurrent.ThreadLocalRandom
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
-import akka.stream.{ActorAttributes, ActorMaterializer, Supervision, ThrottleMode}
+import akka.stream.{ActorAttributes, Supervision, ThrottleMode}
 import com.github.benmanes.caffeine
 import com.github.benmanes.caffeine.cache.CacheWriter
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
@@ -91,7 +91,6 @@ object LocalFileCacheCaffeine {
 
   def main(args: Array[String]): Unit = {
     implicit val system: ActorSystem = ActorSystem("LocalFileCacheCaffeine")
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     case class Message(group: Int, id: Int, file: Path)
 

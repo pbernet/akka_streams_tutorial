@@ -4,7 +4,6 @@ import java.io.{BufferedOutputStream, FileOutputStream}
 import java.util.Base64
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.alpakka.xml.{EndElement, ParseEvent, StartElement, TextEvent}
 import akka.stream.scaladsl.{Sink, Source}
@@ -24,7 +23,6 @@ import scala.util.Try
 object XmlProcessing {
   implicit val system = ActorSystem("XmlProcessing")
   implicit val executionContext = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
     val fileContents = scala.io.Source.fromFile("./src/main/resources/CDA_Level_3.xml").getLines.mkString

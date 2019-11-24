@@ -1,9 +1,9 @@
 package sample.stream_actor
 
 import akka.actor.ActorSystem
-import akka.pattern.{Backoff, BackoffSupervisor}
-import akka.stream.scaladsl.{Sink, Source}
+import akka.pattern.{BackoffOpts, BackoffSupervisor}
 import akka.stream.ThrottleMode
+import akka.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.duration._
 
@@ -32,7 +32,7 @@ object SimulateWindTurbines extends App {
       val id = java.util.UUID.randomUUID.toString
 
       val supervisor = BackoffSupervisor.props(
-        Backoff.onFailure(
+        BackoffOpts.onFailure(
           WindTurbineSimulator.props(id, endpoint),
           childName = id,
           minBackoff = 1.second,

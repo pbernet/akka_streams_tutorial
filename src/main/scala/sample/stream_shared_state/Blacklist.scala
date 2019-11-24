@@ -18,7 +18,6 @@ object Blacklist {
 
   def main(args: Array[String]): Unit = {
     implicit val as = ActorSystem("Blacklist")
-    implicit val mat = ActorMaterializer()
 
     val initBlacklist = Set.empty[String]
 

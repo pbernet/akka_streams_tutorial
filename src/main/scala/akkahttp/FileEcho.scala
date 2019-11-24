@@ -12,7 +12,6 @@ import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
@@ -39,7 +38,6 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 object FileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("FileEcho")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
