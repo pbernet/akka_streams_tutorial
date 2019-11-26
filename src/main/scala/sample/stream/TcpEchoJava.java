@@ -3,7 +3,7 @@ package sample.stream;
 import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
-import akka.stream.ActorMaterializer;
+import akka.stream.Materializer;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
@@ -55,7 +55,7 @@ public class TcpEchoJava {
     }
 
     private static void server(ActorSystem system, InetSocketAddress serverAddress) {
-        final ActorMaterializer materializer = ActorMaterializer.create(system);
+        final Materializer materializer = Materializer.createMaterializer(system);
 
         final Sink<IncomingConnection, CompletionStage<Done>> handler = Sink.foreach(conn -> {
             System.out.println("Client connected from: " + conn.remoteAddress());
@@ -79,7 +79,7 @@ public class TcpEchoJava {
     }
 
     private static void client(ActorSystem system, InetSocketAddress serverAddress) {
-        final ActorMaterializer materializer = ActorMaterializer.create(system);
+        final Materializer materializer = Materializer.createMaterializer(system);
 
         final List<ByteString> testInput = new ArrayList<>();
         for (char c = 'a'; c <= 'z'; c++) {

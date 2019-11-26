@@ -2,7 +2,6 @@ package sample.stream
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
 /**
@@ -17,7 +16,6 @@ object AsyncExecution {
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem("AsyncExecution")
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     def stage(name: String): Flow[Int, Int, NotUsed] =
       Flow[Int].map { index =>

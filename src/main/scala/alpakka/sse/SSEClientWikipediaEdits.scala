@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
+import akka.stream.{ActorAttributes, Supervision}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 
@@ -15,6 +15,7 @@ import scala.concurrent.duration._
 import scala.sys.process._
 import scala.util.Try
 import scala.util.control.NonFatal
+
 
 case class Change(serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
   override def toString = s"$cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
@@ -36,9 +37,6 @@ object SSEClientWikipediaEdits {
   }
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
   implicit val executionContext = system.dispatcher
-  implicit val materializer = ActorMaterializer.create(ActorMaterializerSettings.create(system)
-    .withDebugLogging(true)
-    .withSupervisionStrategy(decider), system)
 
   def main(args: Array[String]) {
     browserClient()
@@ -59,13 +57,13 @@ object SSEClientWikipediaEdits {
       maxBackoff = 30.seconds,
       randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
     ) { () =>
-      Source.fromFutureSource {
+      Source.futureSource {
         Http()
           .singleRequest(HttpRequest(
             uri = "https://stream.wikimedia.org/v2/stream/recentchange"
           ))
           .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-      }
+      }.withAttributes(ActorAttributes.supervisionStrategy(decider))
     }
 
     val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString())}

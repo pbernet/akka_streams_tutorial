@@ -9,17 +9,18 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 import com.typesafe.config.ConfigFactory
 import spray.json.DefaultJsonProtocol
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Initiate n singleRequest and in the response consume a stream of elements from server
-  * Similar to SSEHeartbeat
+  * Initiate n singleRequest and in the response consume the stream of elements from the server
+  * From client point of view similar to SSEHeartbeat
   *
   * Doc streaming implications:
   * https://doc.akka.io/docs/akka-http/current/implications-of-streaming-http-entity.html#implications-of-the-streaming-nature-of-request-response-entities
@@ -27,13 +28,12 @@ import scala.util.{Failure, Success}
   * Doc JSON streaming support:
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/source-streaming-support.html
   *
-  * Doc Consuming JSON streaming APIs
+  * Doc consuming JSON streaming APIs
   * https://doc.akka.io/docs/akka-http/current/common/json-support.html
   */
-object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("HTTPDownloadStream")
+object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSupport {
+  implicit val system = ActorSystem("HTTPResponseStream")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   //JSON Protocol and streaming support
   final case class ExamplePerson(name: String)
@@ -54,27 +54,27 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
         Range(0, requestParallelism).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
 
-    // Run and completely consume a single akka http request
+    // Run singleRequest and completely consume response elements
     def runRequestDownload(req: HttpRequest) =
       Http()
         .singleRequest(req)
         .flatMap { response =>
-          val unmarshalled = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
-          val source = Source.fromFutureSource(unmarshalled)
-          source.runForeach(i => println(s"Client received: $i"))
+          val unmarshalled: Future[Source[ExamplePerson, NotUsed]] = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
+          val source: Source[ExamplePerson, Future[NotUsed]] = Source.futureSource(unmarshalled)
+          source.via(processorFlow).runWith(printSink)
         }
 
     requests
       .mapAsync(requestParallelism)(runRequestDownload)
-      //.via(processorFlow)
       .runWith(Sink.ignore)
   }
 
-  //TODO Try to use printSink and processorFlow, trouble with types...
-  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client received: $each") }
+
+  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client finished processing: $each") }
 
   val processorFlow: Flow[ExamplePerson, ExamplePerson, NotUsed] = Flow[ExamplePerson].map {
     each: ExamplePerson => {
+      //println(s"Process: $each")
       each
     }
   }
@@ -85,11 +85,11 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
     def routes: Route = logRequestResult("httpecho") {
       path("download" / Segment) { id: String =>
         get {
-          println(s"Server received download request with id: $id ")
+          println(s"Server received request with id: $id, stream response...")
           extractRequest { r: HttpRequest =>
             val finishedWriting = r.discardEntityBytes().future
             onComplete(finishedWriting) { done =>
-              //For testing purposes eg add .take(5)
+              //Limit response by appending eg .take(5)
               val responseStream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"request:$id"))
               complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
             }
@@ -103,7 +103,7 @@ object HTTPDownloadStream extends App with DefaultJsonProtocol with SprayJsonSup
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        println(s"Server could not bind to: $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
   }

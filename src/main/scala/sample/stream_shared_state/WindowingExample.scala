@@ -3,7 +3,6 @@ package sample.stream_shared_state
 import java.time.{Instant, OffsetDateTime, ZoneId}
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 
 import scala.collection.mutable
@@ -24,8 +23,7 @@ import scala.util.Random
   */
 object WindowingExample {
   def main(args: Array[String]): Unit = {
-    implicit val as = ActorSystem("WindowingExample")
-    implicit val mat = ActorMaterializer()
+    implicit val system = ActorSystem("WindowingExample")
 
     val random = new Random()
 
@@ -55,7 +53,7 @@ object WindowingExample {
       }
 
     try Await.result(f, 60.seconds)
-    finally as.terminate()
+    finally system.terminate()
   }
 
   case class MyEvent(timestamp: Long)

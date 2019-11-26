@@ -2,14 +2,14 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.9"
+scalaVersion := "2.12.10"
 
-val akkaVersion = "2.5.24"
-val akkaHTTPVersion = "10.1.9"
-val alpakkaVersion = "1.1.1"
-val akkaStreamKafkaVersion = "1.0.5"
-val kafkaVersion = "2.3.0"
-val activemqVersion =  "5.15.9"
+val akkaVersion = "2.6.0"
+val akkaHTTPVersion = "10.1.10"
+val alpakkaVersion = "2.0.0-M1"
+val akkaStreamKafkaVersion = "1.1.0"
+val kafkaVersion = "2.3.1"
+val activemqVersion =  "5.15.10"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.geteventstore" %% "eventstore-client" % "4.1.1",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.9.3",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
   "org.apache.avro" % "avro" % "1.8.2",
@@ -45,7 +45,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
-  "org.testcontainers" % "testcontainers" % "1.11.4" % "test",
+  "org.testcontainers" % "testcontainers" % "1.12.3" % "test",
   "junit" % "junit" % "4.13-beta-1"
 )
 
@@ -56,5 +56,7 @@ val workaround = {
   sys.props += "packaging.type" -> "jar"
   ()
 }
+
+scalacOptions += "-deprecation"
 
 fork in run := true

@@ -2,10 +2,10 @@ package alpakka.jms
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.stream.ThrottleMode
 import akka.stream.alpakka.jms.scaladsl.JmsProducer
 import akka.stream.alpakka.jms.{JmsProducerSettings, JmsTextMessage}
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings, ThrottleMode}
 import com.typesafe.config.Config
 import javax.jms.ConnectionFactory
 import org.apache.activemq.ActiveMQConnectionFactory
@@ -18,8 +18,6 @@ object JMSTextMessageProducerClient {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("JMSTextMessageProducerClient")
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer.create(ActorMaterializerSettings.create(system)
-    .withDebugLogging(true), system)
 
   //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
   //This does not interfere with the new 1.0-M2 implementation

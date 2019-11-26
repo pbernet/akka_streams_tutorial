@@ -1,13 +1,14 @@
 package sample.stream_actor_simple
 
 import akka.actor.Actor
-import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{KillSwitches, UniqueKillSwitch}
 
 import scala.concurrent.duration._
 
-class PrintMoreNumbers(implicit materializer: ActorMaterializer) extends Actor {
-  private implicit val executionContext = context.system.dispatcher
+class PrintMoreNumbers extends Actor {
+  implicit val system = context.system
+  implicit val executionContext = context.system.dispatcher
 
   private val (killSwitch: UniqueKillSwitch, done) =
     Source.tick(0.seconds, 1.second, 1)
@@ -22,7 +23,7 @@ class PrintMoreNumbers(implicit materializer: ActorMaterializer) extends Actor {
   override def receive: Receive = {
     //When the actor is stopped, it will also stop the stream
     case "stop" =>
-      println("Stopping")
+      println("Stopping...")
       killSwitch.shutdown()
     case "done" =>
       println("Done")
