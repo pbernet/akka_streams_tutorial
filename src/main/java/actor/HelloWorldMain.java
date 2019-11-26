@@ -3,6 +3,8 @@ package actor;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.DispatcherSelector;
+import akka.actor.typed.Props;
 import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
@@ -16,18 +18,20 @@ import akka.actor.typed.javadsl.Receive;
  */
 public class HelloWorldMain extends AbstractBehavior<HelloWorldMain.Start> {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         final ActorSystem<HelloWorldMain.Start> system =
                 ActorSystem.create(HelloWorldMain.create(), "hello");
 
         system.tell(new HelloWorldMain.Start("World"));
-        //system.tell(new HelloWorldMain.Start("Akka"));
+        system.tell(new HelloWorldMain.Start("Akka"));
+        //TODO Add ask messages
 
-        //TODO implement ask seems to be more complicated than in the untyped world
-        //https://doc.akka.io/docs/akka/current/typed/interaction-patterns.html#request-response-with-ask-between-two-actors
+        Thread.sleep(3000);
+        system.terminate();
     }
 
 
+    // Start message...
     public static class Start {
         public final String name;
 
@@ -40,12 +44,14 @@ public class HelloWorldMain extends AbstractBehavior<HelloWorldMain.Start> {
         return Behaviors.setup(HelloWorldMain::new);
     }
 
-    private final ActorContext<Start>        context;
     private final ActorRef<HelloWorld.Greet> greeter;
 
     private HelloWorldMain(ActorContext<Start> context) {
-        this.context = context;
-        greeter = context.spawn(HelloWorld.create(), "greeter");
+        super(context);
+
+        final String dispatcherPath = "akka.actor.default-blocking-io-dispatcher";
+        Props greeterProps = DispatcherSelector.fromConfig(dispatcherPath);
+        greeter = getContext().spawn(HelloWorld.create(), "greeter", greeterProps);
     }
 
     @Override
@@ -54,7 +60,8 @@ public class HelloWorldMain extends AbstractBehavior<HelloWorldMain.Start> {
     }
 
     private Behavior<Start> onStart(Start command) {
-        ActorRef<HelloWorld.Greeted> replyTo = context.spawn(HelloWorldBot.create(3), command.name);
+        ActorRef<HelloWorld.Greeted> replyTo =
+                getContext().spawn(HelloWorldBot.create(3), command.name);
         greeter.tell(new HelloWorld.Greet(command.name, replyTo));
         return this;
     }

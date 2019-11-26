@@ -33,10 +33,8 @@ public class HelloWorld extends AbstractBehavior<HelloWorld.Greet> {
         return Behaviors.setup(HelloWorld::new);
     }
 
-    private final ActorContext<Greet> context;
-
     private HelloWorld(ActorContext<Greet> context) {
-        this.context = context;
+        super(context);
     }
 
     @Override
@@ -45,8 +43,8 @@ public class HelloWorld extends AbstractBehavior<HelloWorld.Greet> {
     }
 
     private Behavior<Greet> onGreet(Greet command) {
-        context.getLog().info("Hello {}!", command.whom);
-        command.replyTo.tell(new Greeted(command.whom, context.getSelf()));
+        getContext().getLog().info("Hello {}!", command.whom);
+        command.replyTo.tell(new Greeted(command.whom, getContext().getSelf()));
         return this;
     }
 }

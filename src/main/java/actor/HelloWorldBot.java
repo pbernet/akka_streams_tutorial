@@ -12,12 +12,11 @@ public class HelloWorldBot extends AbstractBehavior<HelloWorld.Greeted> {
         return Behaviors.setup(context -> new HelloWorldBot(context, max));
     }
 
-    private final ActorContext<HelloWorld.Greeted> context;
-    private final int                              max;
-    private       int                              greetingCounter;
+    private final int max;
+    private int greetingCounter;
 
     private HelloWorldBot(ActorContext<HelloWorld.Greeted> context, int max) {
-        this.context = context;
+        super(context);
         this.max = max;
     }
 
@@ -28,11 +27,11 @@ public class HelloWorldBot extends AbstractBehavior<HelloWorld.Greeted> {
 
     private Behavior<HelloWorld.Greeted> onGreeted(HelloWorld.Greeted message) {
         greetingCounter++;
-        context.getLog().info("Greeting {} for {}", greetingCounter, message.whom);
+        getContext().getLog().info("Greeting {} for {}", greetingCounter, message.whom);
         if (greetingCounter == max) {
             return Behaviors.stopped();
         } else {
-            message.from.tell(new HelloWorld.Greet(message.whom, context.getSelf()));
+            message.from.tell(new HelloWorld.Greet(message.whom, getContext().getSelf()));
             return this;
         }
     }
