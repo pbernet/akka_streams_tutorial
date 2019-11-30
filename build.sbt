@@ -42,7 +42,6 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-stream" % camelVersion,
 
   "com.typesafe.play" %% "play" % "2.6.21",
-  "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
