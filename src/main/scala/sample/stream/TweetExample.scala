@@ -2,7 +2,6 @@ package sample.stream
 
 import akka.NotUsed
 import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{MergePrioritized, Sink, Source}
 
 import scala.concurrent.Future
@@ -10,7 +9,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 /**
-  * Adapted tweet example from tutorial
+  * Adapted tweet example from akka streams tutorial
   * - added MergePrioritized Feature - see https://softwaremill.com/akka-2.5.4-features
   *
   */
@@ -31,15 +30,13 @@ object TweetExample {
 
   def main(args: Array[String]): Unit = {
 
-    implicit val system = ActorSystem("TweetGraphExample")
+    implicit val system = ActorSystem("TweetExample")
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     val tweetsLowPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 100.millis, Tweet(Author("LowPrio"), System.currentTimeMillis, "#other #akka aBody"))
     val tweetsHighPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 1.second, Tweet(Author("HighPrio"), System.currentTimeMillis, "#akka #other aBody"))
     val tweetsVeryHighPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 1.second, Tweet(Author("VeryHighPrio"), System.currentTimeMillis, "#akka #other aBody"))
 
-    //Add new 2.5.4 MergePrioritized Feature
     val limitedTweets: Source[Tweet, NotUsed] = Source.combine(tweetsLowPrio, tweetsHighPrio, tweetsVeryHighPrio)(numInputs => MergePrioritized(List(1,10,100))).take(20)
 
     val authors: Source[Author, NotUsed] =

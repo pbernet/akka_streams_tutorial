@@ -17,7 +17,6 @@ object WaitForThreeFlowsToComplete {
 
     implicit val system = ActorSystem("WaitForThreeFlowsToComplete")
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     def reusableLineSink(filename: String): Sink[String, Future[IOResult]] =
       Flow[String]

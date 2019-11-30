@@ -15,7 +15,7 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, OverflowStrategy, QueueOfferResult}
+import akka.stream.{OverflowStrategy, QueueOfferResult}
 import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.duration._
@@ -41,7 +41,6 @@ import scala.util.{Failure, Success}
 object FileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
   implicit val system = ActorSystem("FileEchoStream")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
 

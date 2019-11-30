@@ -2,7 +2,7 @@ package sample.stream
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{ActorMaterializer, DelayOverflowStrategy, OverflowStrategy, QueueOfferResult}
+import akka.stream.{DelayOverflowStrategy, OverflowStrategy, QueueOfferResult}
 import akka.{Done, NotUsed}
 
 import scala.concurrent.Future
@@ -23,7 +23,6 @@ import scala.util.{Failure, Success}
 object PublishToSourceQueueFromStream {
   implicit val system = ActorSystem("PublishToSourceQueueFromStream")
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
 

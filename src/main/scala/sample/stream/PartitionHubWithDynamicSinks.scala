@@ -2,8 +2,8 @@ package sample.stream
 
 import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Keep, PartitionHub, RunnableGraph, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 
 import scala.concurrent.duration._
 
@@ -19,7 +19,6 @@ import scala.concurrent.duration._
 object PartitionHubWithDynamicSinks {
   implicit val system = ActorSystem()
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
 

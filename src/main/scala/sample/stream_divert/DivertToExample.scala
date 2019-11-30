@@ -2,7 +2,6 @@ package sample.stream_divert
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
 
@@ -20,7 +19,6 @@ case class Invalid[T](payload: T, cause: Option[Throwable])
 object DivertToExample {
   implicit val system = ActorSystem("DivertToExample")
   import system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
 

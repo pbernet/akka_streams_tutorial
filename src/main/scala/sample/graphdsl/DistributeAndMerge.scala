@@ -21,7 +21,6 @@ import scala.util.hashing.MurmurHash3
 object DistributeAndMerge {
   implicit val system = ActorSystem("DistributeAndMerge")
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   def main(args: Array[String]): Unit = {
 

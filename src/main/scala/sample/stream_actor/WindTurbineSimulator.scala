@@ -2,7 +2,6 @@ package sample.stream_actor
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.http.scaladsl.model.StatusCode
-import akka.stream.ActorMaterializer
 import sample.stream_actor.WindTurbineSimulator._
 
 case class WindTurbineSimulatorException(id: String) extends RuntimeException
@@ -13,8 +12,8 @@ case class WindTurbineSimulatorException(id: String) extends RuntimeException
   * - running
   */
 object WindTurbineSimulator {
-  def props(id: String, endpoint: String)(implicit materializer: ActorMaterializer) =
-    Props(classOf[WindTurbineSimulator], id, endpoint, materializer)
+  def props(id: String, endpoint: String) =
+    Props(classOf[WindTurbineSimulator], id, endpoint)
 
   final case object Upgraded
   final case object Connected
@@ -24,7 +23,6 @@ object WindTurbineSimulator {
 }
 
 class WindTurbineSimulator(id: String, endpoint: String)
-                          (implicit materializer: ActorMaterializer)
   extends Actor with ActorLogging {
   implicit private val system = context.system
   implicit private val executionContext = system.dispatcher

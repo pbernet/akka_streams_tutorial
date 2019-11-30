@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, FlowShape, SourceShape}
+import akka.stream.{FlowShape, SourceShape}
 import sample.stream_actor.WindTurbineSimulator._
 
 import scala.concurrent.duration._
@@ -16,16 +16,14 @@ object WebSocketClient {
   def apply(id: String, endpoint: String, windTurbineSimulator: ActorRef)
            (implicit
             system: ActorSystem,
-            materializer: ActorMaterializer,
             executionContext: ExecutionContext) = {
-    new WebSocketClient(id, endpoint, windTurbineSimulator)(system, materializer, executionContext)
+    new WebSocketClient(id, endpoint, windTurbineSimulator)(system, executionContext)
   }
 }
 
 class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorRef)
                      (implicit
                       system: ActorSystem,
-                      materializer: ActorMaterializer,
                       executionContext: ExecutionContext) {
 
 

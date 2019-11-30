@@ -9,8 +9,8 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, ThrottleMode}
 import com.typesafe.config.ConfigFactory
 import spray.json.DefaultJsonProtocol
 
@@ -34,7 +34,6 @@ import scala.util.{Failure, Success}
 object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSupport {
   implicit val system = ActorSystem("HTTPResponseStream")
   implicit val executionContext = system.dispatcher
-  implicit val materializerServer = ActorMaterializer()
 
   //JSON Protocol and streaming support
   final case class ExamplePerson(name: String)
@@ -61,7 +60,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
         .singleRequest(req)
         .flatMap { response =>
           val unmarshalled: Future[Source[ExamplePerson, NotUsed]] = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
-          val source: Source[ExamplePerson, Future[NotUsed]] = Source.fromFutureSource(unmarshalled)
+          val source: Source[ExamplePerson, Future[NotUsed]] = Source.futureSource(unmarshalled)
           source.via(processorFlow).runWith(printSink)
         }
 

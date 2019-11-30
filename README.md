@@ -1,17 +1,17 @@
 [![Build Status](https://travis-ci.org/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial)
 # Akka streams tutorial #
 
-A collection of simple, runnable and self contained examples from various akka streams docs, tutorials and blogs.
-See the class comment on how to run each example. 
-Three more complex examples are described below:
+"It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
+This repo contains a collection of simple, runnable and self contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
+See the class comment on how to run each example. Three more complex examples are described below:
 * HTTP download with local file cache
 * Windturbine Example
 * Apache Kafka WordCount
 
 These three examples all deal with some kind of shared mutable state.
-Other smaller examples are throttled so you can see from the console output what is happening.
+Most examples are throttled so you can see from the console output what is happening.
 Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
-Almost no unit tests, sorry.
+No unit tests, sorry.
 
 ## HTTP download with local file cache ##
 Simplified real world use case:

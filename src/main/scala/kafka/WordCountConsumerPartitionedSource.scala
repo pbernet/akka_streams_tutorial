@@ -7,7 +7,6 @@ import akka.actor.{ActorSystem, Props}
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerMessage, ConsumerSettings, Subscriptions}
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import kafka.TotalFake.IncrementWord
@@ -30,7 +29,6 @@ import scala.concurrent.duration._
 object WordCountConsumerPartitionedSource extends App {
   implicit val system = ActorSystem()
   implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   val total = system.actorOf(Props[TotalFake], "totalFake")
 

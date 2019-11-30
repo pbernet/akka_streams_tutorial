@@ -1,7 +1,6 @@
 package sample.stream
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
 
@@ -53,7 +52,6 @@ object TcpEcho extends App {
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
     implicit val sys = system
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
 
@@ -97,7 +95,6 @@ object TcpEcho extends App {
   def client(id: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))

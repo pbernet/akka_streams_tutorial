@@ -20,7 +20,6 @@ object WritePrimes {
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem("WritePrimes")
     import system.dispatcher
-    implicit val materializer = ActorMaterializer()
 
     // generate random numbers
     val maxRandomNumberSize = 1000000
