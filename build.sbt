@@ -9,7 +9,9 @@ val akkaHTTPVersion = "10.1.10"
 val alpakkaVersion = "2.0.0-M1"
 val akkaStreamKafkaVersion = "1.1.0"
 val kafkaVersion = "2.3.1"
-val activemqVersion =  "5.15.11"
+val activemqVersion =  "5.15.10"
+val streamzVersion = "0.11-RC1"
+val camelVersion = "2.20.4"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -32,9 +34,14 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
-  
+
+  "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
+  "org.apache.camel" % "camel-netty4" % camelVersion,
+  "org.apache.camel" % "camel-jetty" % camelVersion,
+  "org.apache.camel" % "camel-core" % camelVersion,
+  "org.apache.camel" % "camel-stream" % camelVersion,
+
   "com.typesafe.play" %% "play" % "2.6.21",
-  "com.geteventstore" %% "eventstore-client" % "4.1.1",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
@@ -49,7 +56,8 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13-beta-1"
 )
 
-resolvers += Resolver.url("repository.jboss.org-public", url("https://repository.jboss.org/nexus/content/groups/public"))
+resolvers += "streamz at bintray" at "http://dl.bintray.com/streamz/maven"
+resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618
 val workaround = {
