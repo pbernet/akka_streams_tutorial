@@ -7,9 +7,6 @@ matrix:
     - env: JDK='GraalVM 19'
       install: . ./install-jdk.sh --url "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-19.3.0/graalvm-ce-java8-linux-amd64-19.3.0.tar.gz"
 
-script:
-  - mvn package -Pnative -Dnative-image.docker-build=true
-
 dist:
   trusty
 language:
@@ -20,3 +17,4 @@ jdk:
   - oraclejdk8
   - openjdk8
   - openjdk11
+  - GraalVM 19
