@@ -5,7 +5,7 @@ version := "1.0"
 scalaVersion := "2.12.10"
 
 val akkaVersion = "2.6.1"
-val akkaHTTPVersion = "10.1.10"
+val akkaHTTPVersion = "10.1.11"
 val alpakkaVersion = "2.0.0-M1"
 val akkaStreamKafkaVersion = "1.1.0"
 val kafkaVersion = "2.3.1"
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13-beta-1"
 )
 
-resolvers += "streamz at bintray" at "http://dl.bintray.com/streamz/maven"
+resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618
