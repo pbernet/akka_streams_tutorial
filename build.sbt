@@ -4,14 +4,14 @@ version := "1.0"
 
 scalaVersion := "2.12.10"
 
-val akkaVersion = "2.6.0"
-val akkaHTTPVersion = "10.1.10"
+val akkaVersion = "2.6.1"
+val akkaHTTPVersion = "10.1.11"
 val alpakkaVersion = "2.0.0-M1"
 val akkaStreamKafkaVersion = "1.1.0"
 val kafkaVersion = "2.3.1"
-val activemqVersion =  "5.15.10"
+val activemqVersion =  "5.15.11"
 val streamzVersion = "0.11-RC1"
-val camelVersion = "2.20.4"
+val camelVersion = "2.24.2"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -52,11 +52,11 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
-  "org.testcontainers" % "testcontainers" % "1.12.3" % "test",
-  "junit" % "junit" % "4.13-rc-2"
+  "org.testcontainers" % "testcontainers" % "1.12.4" % "test",
+  "junit" % "junit" % "4.13-beta-1"
 )
 
-resolvers += "streamz at bintray" at "http://dl.bintray.com/streamz/maven"
+resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618
