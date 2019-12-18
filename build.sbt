@@ -40,6 +40,7 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-jetty" % camelVersion,
   "org.apache.camel" % "camel-core" % camelVersion,
   "org.apache.camel" % "camel-stream" % camelVersion,
+  "org.apache.camel" % "camel-cxf" % camelVersion,
 
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",

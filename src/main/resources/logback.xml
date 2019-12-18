@@ -17,6 +17,9 @@
     <!-- Turn down Kafka noise -->
     <logger name="org.apache.kafka" level="WARN" />
 
+    <!-- Turn up Camel whisper -->
+    <logger name="org.apache.camel" level="TRACE" />
+
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <!-- <appender-ref ref="FILE" /> -->
