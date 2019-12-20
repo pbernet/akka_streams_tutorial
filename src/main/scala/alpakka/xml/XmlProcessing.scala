@@ -25,8 +25,10 @@ object XmlProcessing {
   implicit val executionContext = system.dispatcher
 
   def main(args: Array[String]): Unit = {
-    val fileContents = scala.io.Source.fromFile("./src/main/resources/CDA_Level_3.xml").getLines.mkString
+    val source =  scala.io.Source.fromFile("./src/main/resources/CDA_Level_3.xml")
+    val fileContents = source.getLines.mkString
     val byteStringDoc = ByteString.fromString(fileContents, "UTF-8")
+    source.close()
 
     val result: Future[immutable.Seq[String]] = Source
       .single(byteStringDoc)
