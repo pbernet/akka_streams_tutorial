@@ -11,7 +11,7 @@ val akkaStreamKafkaVersion = "1.1.0"
 val kafkaVersion = "2.3.1"
 val activemqVersion =  "5.15.11"
 val streamzVersion = "0.11-RC1"
-val camelVersion = "2.24.2"
+val camelVersion = "2.20.4" //Same as in streamz
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -34,7 +34,6 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
-  //"com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
@@ -42,6 +41,11 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-core" % camelVersion,
   "org.apache.camel" % "camel-stream" % camelVersion,
   "org.apache.camel" % "camel-cxf" % camelVersion,
+  "org.apache.camel" % "camel-http" % camelVersion,
+
+  //TODO are these dependencies needed?
+  "org.apache.cxf" % "cxf-rt-frontend-jaxws" % "3.3.4",
+  "org.apache.cxf" % "cxf-rt-transports-http" % "3.3.4",
 
   "com.typesafe.play" %% "play" % "2.6.21",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
