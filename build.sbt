@@ -42,6 +42,7 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-stream" % camelVersion,
   "org.apache.camel" % "camel-cxf" % camelVersion,
   "org.apache.camel" % "camel-http" % camelVersion,
+  "org.apache.camel" % "camel-cxf-transport" % camelVersion,
 
   //TODO are these dependencies needed?
   "org.apache.cxf" % "cxf-rt-frontend-jaxws" % "3.3.4",

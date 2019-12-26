@@ -14,18 +14,13 @@ import scala.collection.immutable.Seq
   *
   * Status:
   * Although the camel component/endpoint are created according to the log statements,
-  * the processing hangs on the first request at the {scaladsl produce} method. Occurs also if WS endpoint is down
+  * we get an 200 response but with an unknown error
   *
   * Possible causes:
-  * Incorrect "Camel type converter" for request/response?
-  * Wrong endpoint URI - https://camel.apache.org/manual/latest/faq/how-do-i-configure-endpoints.html
+  * Wrong MESSAGE format
   *
   * Doc Camel cxf endpoint:
   * https://camel.apache.org/components/latest/cxf-component.html
-  *
-  * TODO example calling camel cxf endpoint example from camel repo
-  * https://github.com/apache/camel/tree/master/examples/camel-example-cxf-proxy
-  *
   *
   * Doc streamz DSL:
   * https://github.com/krasserm/streamz/blob/master/streamz-camel-akka/README.md
@@ -38,21 +33,17 @@ object Cxf extends App {
   implicit val system = ActorSystem("Cxf")
   implicit val streamContext: StreamContext = StreamContext()
 
-  //TODO analyse URI param
-
-  val cxfEndpointUri = "cxf://http://localhost:8080/castlemock/mock/soap/project/EG8XBV/AccountsPort?wsdlURL=src/main/resources/accountservice.wsdl&dataFormat=PAYLOAD&loggingFeatureEnabled=true&operationName=GetAccountDetails"
+  //TODO verifiy options for chosen dataFormat=MESSAGE
+  val cxfEndpointUri = "cxf://http://localhost:8080/castlemock/mock/soap/project/EG8XBV/AccountsPort?wsdlURL=src/main/resources/accountservice.wsdl&dataFormat=MESSAGE&loggingFeatureEnabled=true&defaultOperationName=GetAccountDetails"
 
   val request =
-    """
-      |<x:Envelope xmlns:x="http://www.w3.org/2003/05/soap-envelope" xmlns:acc="http://com/blog/samples/webservices/accountservice">
-      |    <x:Header/>
+    """<x:Envelope xmlns:x="http://www.w3.org/2003/05/soap-envelope" xmlns:acc="http://www.w3.org/2003/05/soap-envelope">
       |    <x:Body>
       |        <acc:AccountDetailsRequest>
       |            <acc:accountNumber>1</acc:accountNumber>
       |        </acc:AccountDetailsRequest>
       |    </x:Body>
-      |</x:Envelope>
-       """.stripMargin
+      |</x:Envelope>""".stripMargin
 
   // CXF service send
   val source = Source(Seq(request, request, request))
@@ -60,7 +51,8 @@ object Cxf extends App {
 
   val flow = source
     .map{each => println("About to send request: " + each); each}
-    //TODO It hangs here, even if WS is not up
+    //TODO We get an 200 response (with an error)
+    //If WS is not up, camel does not complain
     .sendRequest[String](cxfEndpointUri, parallelism = 1)
 
   flow.runWith(printSink)
