@@ -15,9 +15,9 @@ import scala.concurrent.duration._
   */
 
 object Blacklist {
+  implicit val system = ActorSystem("Blacklist")
 
   def main(args: Array[String]): Unit = {
-    implicit val as = ActorSystem("Blacklist")
 
     val initBlacklist = Set.empty[String]
 
@@ -26,20 +26,18 @@ object Blacklist {
         .throttle(1, 1.second, 10, ThrottleMode.shaping)
         .viaMat(new ZipWithState(initBlacklist))(Keep.right)
         .filterNot { case (blacklist: Set[String], elem: String) => blacklist(elem) }
-        .to(Sink.foreach(println))
+        .to(Sink.foreach(each => println(each._2)))
         .run()
 
-    println("Starting with empty blacklist on a list of 'yes' elements")
+    println("Starting with empty blacklist on a list of 'yes' elements - elements are passing")
 
     Thread.sleep(2000)
-    println("Inject new blacklist with value: 'yes'")
-    val newBlacklist = Set("yes")
-    service.update(newBlacklist)
+    println("Inject new blacklist with value: 'yes' - elements are filtered")
+    service.update(Set("yes"))
 
-    Thread.sleep(2000)
-    println("Inject new blacklist with value: 'no'")
-    val newBlacklist2 = Set("no")
-    service.update(newBlacklist2)
+    Thread.sleep(5000)
+    println("Inject new blacklist with value: 'no' - elements are passing")
+    service.update(Set("no"))
   }
 }
 
