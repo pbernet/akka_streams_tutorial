@@ -23,12 +23,14 @@ import scala.concurrent.duration._
   *
   */
 object WordCountProducer extends App {
-  implicit val system = ActorSystem()
+  implicit val system = ActorSystem("WordCountProducer")
   implicit val ec = system.dispatcher
 
   val bootstrapServers = "localhost:9092"
 
   val topic = "wordcount-input"
+  val fakeNewsKeyword = "fakeNews"
+
 
   //initial msg in topic, required to create the topic before any consumer subscribes to it
   val InitialMsg = "truth"
@@ -71,7 +73,7 @@ object WordCountProducer extends App {
   }
 
   initializeTopic(topic)
-  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, "fakeNews").split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
+  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, WordCountProducer.fakeNewsKeyword).split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
   val doneFuture = produce(topic, randomMap)
 
   doneFuture.recover{
@@ -106,7 +108,7 @@ class CustomPartitioner extends Partitioner {
 
     //println("CustomPartitioner received key: " + key + " and value: " + value)
 
-    if (value.toString.contains("fakeNews")) {
+    if (value.toString.contains(WordCountProducer.fakeNewsKeyword)) {
       //println("CustomPartitioner send message: " + value + " to fakeNewsPartition")
       fakeNewsPartition
     }
