@@ -1,12 +1,12 @@
 package alpakka.sftp
 
 import java.net.InetAddress
-import java.nio.file.Paths
+import java.nio.file.{Files, Paths}
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.ftp.scaladsl.Sftp
 import akka.stream.alpakka.ftp.{FtpCredentials, FtpFile, SftpSettings}
-import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
 import akka.stream.{IOResult, ThrottleMode}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
@@ -49,7 +49,7 @@ object SFTPEcho {
 
     //uploadFileBasic()
 
-    cleanSftp().onComplete {
+    removeAll().onComplete {
       case Success(_) =>
         println("Successfully cleaned ...")
         uploadClient()
@@ -121,13 +121,7 @@ object SFTPEcho {
       listFiles(s"/$destinationDirName")
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 5) { ftpFile =>
-          println(s"About to download file: $ftpFile")
-          val localPath = localTargetDir.resolve(ftpFile.name)
-          val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
-            .runWith(FileIO.toPath(localPath))
-          fetchFile.map { ioResult =>
-            (ftpFile.path, ioResult)
-          }
+          fetch(ftpFile)
         }
         .runWith(Sink.seq)
 
@@ -145,7 +139,16 @@ object SFTPEcho {
         case Failure(exception) =>
           println(s"The stream failed with: ${exception.getCause}")
       }
+
+    //TODO Add shutdown code
+//    system.terminate()
+//    system.whenTerminated.onComplete { _ =>
+//      //stop docker image
+//    }
+
   }
+
+
 
 
   private def mkdir(basePath: String, directoryName: String): Source[Done, NotUsed] =
@@ -161,13 +164,34 @@ object SFTPEcho {
   private def retrieveFromPath(path: String): Source[ByteString, Future[IOResult]] =
     Sftp.fromPath(path, sftpSettings)
 
-  private def remove() =
-    Sftp.remove(sftpSettings)
+
+  private def fetch(ftpFile: FtpFile) = {
+    println(s"About to fetch file: $ftpFile")
+    val localPath = localTargetDir.resolve(ftpFile.name)
+    val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
+      .runWith(FileIO.toPath(localPath))
+    fetchFile.map { ioResult =>
+      (ftpFile.path, ioResult)
+    }
+  }
 
 
-  private def cleanSftp() = {
+  private def fetchAndMove(ftpFile: FtpFile) = {
+  }
+
+
+  private def processAndMove(sourcePath: String,
+                             destinationPath: FtpFile => String) = {
+    Sftp
+      .ls(sourcePath, sftpSettings)
+      .flatMapConcat(ftpFile => Sftp.fromPath(ftpFile.path, sftpSettings).map((_, ftpFile)))
+      .alsoTo(FileIO.toPath(Files.createTempFile("downloaded", "tmp")).contramap(_._1))
+      .toMat(Sftp.move(destinationPath, sftpSettings).contramap(_._2))(Keep.right)
+  }
+
+  private def removeAll() = {
     val source = listFiles("/")
-    val sink = remove()
+    val sink = Sftp.remove(sftpSettings)
     source.runWith(sink)
   }
 }
