@@ -13,12 +13,24 @@ import akka.{Done, NotUsed}
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.FileSystemFile
+import org.apache.commons.lang3.exception.ExceptionUtils
 
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
+
+/**
+  * Reproducer to show these issues:
+  * - Alpakka mkdir and move operations fail silently
+  * - After around 85 files the download fails with: net.schmizz.sshj.sftp.SFTPException: Failure
+  *
+  * Remarks:
+  * - Start the SFTP server from: /docker/docker-compose.yml with: docker-compose up -d sftp
+  * - Try to use as many alpakka features as possible and thus do the cleaning manually
+  *
+  */
 object SFTPEcho extends App {
   implicit val system = ActorSystem("SFTPEcho")
   implicit val executionContext = system.dispatcher
@@ -27,6 +39,7 @@ object SFTPEcho extends App {
   val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
 
   val sftpDirName = "echo"
+  val processedDirName = "processed"
   val localTargetDir = Paths.get(s"/tmp/$sftpDirName")
 
   val hostname =   "127.0.0.1"
@@ -61,8 +74,8 @@ object SFTPEcho extends App {
 
     //Simulate unbounded stream of files to upload
     //Generate file content in memory to avoid the overhead of generating n test files on the filesystem
-    Source(1 to 10)
-      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+    Source(1 to 100)
+      .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .wireTap(number => println(s"Upload file with TRACE_ID: $number"))
       .runForeach { each =>
        val result: Future[IOResult] = Source
@@ -73,13 +86,12 @@ object SFTPEcho extends App {
   }
 
 
-  //TODO Due to the nature of the ftp ls cmd, the download happens only once...
-  //A continous download would be nice
-  def downloadClient() = {
-    println("Starting download...")
+  def downloadClient() : Unit= {
+    println("Starting download run...")
 
     val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
       listFiles(s"/$sftpDirName")
+        .take(10) //Try to batch
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 5) (ftpFile => fetchAndMove(ftpFile))
         .runWith(Sink.seq)
@@ -91,11 +103,14 @@ object SFTPEcho extends App {
       }
       .onComplete {
         case Success(errors) if errors.isEmpty =>
-          println("All files fetched for this run")
+          println("All files fetched for this run. About to start next run.")
+          downloadClient() //Try to do a continuous download
         case Success(errors) =>
           println(s"Errors occurred: ${errors.mkString("\n")}")
+          system.terminate()
         case Failure(exception) =>
-          println(s"The stream failed with: ${exception.getCause}")
+          println(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
+          system.terminate()
       }
   }
 
@@ -133,8 +148,7 @@ object SFTPEcho extends App {
 
   //TODO This just fails silently, no folders are created
   private def createFolders() = {
-    mkdir(sftpDirName, "upload" )
-    mkdir(sftpDirName, "processed" )
+    mkdir(sftpDirName, processedDirName )
   }
 
   //works
@@ -142,11 +156,9 @@ object SFTPEcho extends App {
     val sshClient = createSshClientAndConnect()
     val sftpClient = sshClient.newSFTPClient()
 
-    sftpClient.rmdir(s"$sftpDirName/upload")
-    sftpClient.rmdir(s"$sftpDirName/processed")
-
-    sftpClient.mkdir(s"$sftpDirName/upload")
-    sftpClient.mkdir(s"$sftpDirName/processed")
+    sftpClient.rmdir(s"$sftpDirName/$processedDirName")
+    sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+    sftpClient.close()
   }
 
   //works
@@ -154,7 +166,8 @@ object SFTPEcho extends App {
     val sshClient = createSshClientAndConnect()
     val sftpClient = sshClient.newSFTPClient()
 
-    sftpClient.rename(ftpFile.path, s"$sftpDirName/processed/${ftpFile.name}")
+    sftpClient.rename(ftpFile.path, s"$sftpDirName/$processedDirName/${ftpFile.name}")
+    sftpClient.close()
   }
 
 
