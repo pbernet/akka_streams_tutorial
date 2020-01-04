@@ -22,13 +22,15 @@ import scala.util.{Failure, Success}
 
 
 /**
+  * Implement an upload/download echo flow using alpakka sftp features for everything
+  *
   * Reproducer to show these issues:
-  * - Alpakka mkdir and move operations fail silently
-  * - After around 85 files the download fails with: net.schmizz.sshj.sftp.SFTPException: Failure
+  * - Alpakka SFTP mkdir() and move() operations fail silently
+  * - Trying to use the sshj rename() instead leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
+  *   It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
   *
   * Remarks:
-  * - Start the SFTP server from: /docker/docker-compose.yml with: docker-compose up -d sftp
-  * - Try to use as many alpakka features as possible and thus do the cleaning manually
+  * - Start the docker SFTP server from: /docker/docker-compose.yml with cmd line: docker-compose up -d sftp
   *
   */
 object SFTPEcho extends App {
@@ -42,11 +44,11 @@ object SFTPEcho extends App {
   val processedDirName = "processed"
   val localTargetDir = Paths.get(s"/tmp/$sftpDirName")
 
-  val hostname =   "127.0.0.1"
+  val hostname = "127.0.0.1"
   val port = 2222
-  val username =  "echouser"
-  val password =  "password"
-  val credentials = FtpCredentials.create(username, password )
+  val username = "echouser"
+  val password = "password"
+  val credentials = FtpCredentials.create(username, password)
 
   //val identity = SftpIdentity.createFileSftpIdentity(pathToIdentityFile, privateKeyPassphrase)
   val sftpSettings = SftpSettings(InetAddress.getByName(hostname))
@@ -56,17 +58,16 @@ object SFTPEcho extends App {
     .withCredentials(credentials)
 
 
-   removeAll().onComplete {
-      case Success(_) =>
-        println("Successfully cleaned...")
-        createFoldersNative()
-        uploadClient()
-        Thread.sleep(5000) //wait to get some files
-        downloadClient()
-      case Failure(e) =>
-        println(s"Failure while cleaning: ${e.getMessage}. About to terminate...")
-        system.terminate()
-    }
+  removeAll().onComplete {
+    case Success(_) =>
+      println("Successfully cleaned...")
+      createFoldersNative()
+      uploadClient()
+      downloadClient()
+    case Failure(e) =>
+      println(s"Failure while cleaning: ${e.getMessage}. About to terminate...")
+      system.terminate()
+  }
 
 
   def uploadClient() = {
@@ -78,22 +79,23 @@ object SFTPEcho extends App {
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .wireTap(number => println(s"Upload file with TRACE_ID: $number"))
       .runForeach { each =>
-       val result: Future[IOResult] = Source
-      .single(ByteString(s"this is the file contents for: $each"))
-      .runWith(uploadToPath(sftpDirName + s"/file_$each.txt"))
-      result.onComplete(res => println(s"Client uploaded file with TRACE_ID: $each. Result: $res"))
-    }
+        val result: Future[IOResult] = Source
+          .single(ByteString(s"this is the file contents for: $each"))
+          .runWith(uploadToPath(sftpDirName + s"/file_$each.txt"))
+        result.onComplete(res => println(s"Client uploaded file with TRACE_ID: $each. Result: $res"))
+      }
   }
 
 
-  def downloadClient() : Unit= {
+  def downloadClient(): Unit = {
+    Thread.sleep(5000) //wait to get some files
     println("Starting download run...")
 
     val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
       listFiles(s"/$sftpDirName")
         .take(10) //Try to batch
         .filter(ftpFile => ftpFile.isFile)
-        .mapAsyncUnordered(parallelism = 5) (ftpFile => fetchAndMove(ftpFile))
+        .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMove(ftpFile))
         .runWith(Sink.seq)
 
     fetchedFiles
@@ -124,9 +126,8 @@ object SFTPEcho extends App {
       .runWith(FileIO.toPath(localPath))
     fetchFile.map { ioResult =>
       //Fails silently
-      //Sftp.move((ftpFile) => s"$sftpDirName/processed/", sftpSettings)
+      //Sftp.move((ftpFile) => s"$sftpDirName/$processedDirName/", sftpSettings)
 
-      //works
       moveFileNative(ftpFile)
       (ftpFile.path, ioResult)
     }
@@ -148,7 +149,7 @@ object SFTPEcho extends App {
 
   //TODO This just fails silently, no folders are created
   private def createFolders() = {
-    mkdir(sftpDirName, processedDirName )
+    mkdir(sftpDirName, processedDirName)
   }
 
   //works
@@ -156,18 +157,27 @@ object SFTPEcho extends App {
     val sshClient = createSshClientAndConnect()
     val sftpClient = sshClient.newSFTPClient()
 
-    sftpClient.rmdir(s"$sftpDirName/$processedDirName")
-    sftpClient.mkdir(s"$sftpDirName/$processedDirName")
-    sftpClient.close()
+    try {
+      sftpClient.rmdir(s"$sftpDirName/$processedDirName")
+      sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+    } finally
+      sftpClient.close()
+      sshClient.close()
   }
 
-  //works
   private def moveFileNative(ftpFile: FtpFile) = {
     val sshClient = createSshClientAndConnect()
     val sftpClient = sshClient.newSFTPClient()
 
-    sftpClient.rename(ftpFile.path, s"$sftpDirName/$processedDirName/${ftpFile.name}")
-    sftpClient.close()
+    try {
+      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj :-(
+      //sftpClient.rename(ftpFile.path, s"$sftpDirName/$processedDirName/${ftpFile.name}")
+
+      //rm works
+      sftpClient.rm(ftpFile.path)
+    } finally
+      sftpClient.close()
+      sshClient.close()
   }
 
 
@@ -182,17 +192,20 @@ object SFTPEcho extends App {
     val sshClient = createSshClientAndConnect()
     val sftpClient = sshClient.newSFTPClient()
 
-    val targetFileOnServer = Paths.get(sftpDirName)
-      .resolve(resourceFileName).toString().replace("\\", "/")
+    try {
+      val targetFileOnServer = Paths.get(sftpDirName)
+        .resolve(resourceFileName).toString.replace("\\", "/")
 
-    // to prevent updating file attributes of uploaded file at destination SFTP server, by default
-    // the library will update target file permissions and modify access time and modification time
-    sftpClient.getFileTransfer().setPreserveAttributes(false)
-    sftpClient.put(new FileSystemFile(resourceFilePath.toFile), targetFileOnServer)
+      // to prevent updating file attributes of uploaded file at destination SFTP server, by default
+      // the library will update target file permissions and modify access time and modification time
+      sftpClient.getFileTransfer.setPreserveAttributes(false)
+      sftpClient.put(new FileSystemFile(resourceFilePath.toFile), targetFileOnServer)
+    } finally
+      sftpClient.close()
+      sshClient.close()
   }
 
-  private def createSshClientAndConnect() =
-  {
+  private def createSshClientAndConnect() = {
     val sshClient = new SSHClient
     sshClient.addHostKeyVerifier(new PromiscuousVerifier) // to skip host verification
 
