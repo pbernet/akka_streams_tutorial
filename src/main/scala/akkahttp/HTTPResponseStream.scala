@@ -70,7 +70,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   }
 
 
-  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client finished processing: $each") }
+  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client processed element: $each") }
 
   val processorFlow: Flow[ExamplePerson, ExamplePerson, NotUsed] = Flow[ExamplePerson].map {
     each: ExamplePerson => {

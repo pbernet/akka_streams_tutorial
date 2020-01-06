@@ -2,13 +2,14 @@ package sample.stream_shared_state
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
 
 import scala.collection.mutable
-import scala.concurrent.Await
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 /**
   * Windowing sample taken from:
@@ -17,17 +18,24 @@ import scala.util.Random
   * Doc:
   * https://softwaremill.com/windowing-data-in-akka-streams
   *
+  * The limitation of this approach is the limited maxSubstreams param on the groupBy operator
+  * Thus after a while the processing fails with:
+  * Cannot open a new substream as there are too many substreams open
+  *
   * Probably Apache Flink is more suited for stateful stream processing - see:
   * https://ci.apache.org/projects/flink/flink-docs-release-1.3/concepts/programming-model.html#windows
   * https://flink.apache.org/news/2015/12/04/Introducing-windows.html
   */
 object WindowingExample {
-  def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("WindowingExample")
+  implicit val system = ActorSystem("WindowingExample")
+  implicit val executionContext = system.dispatcher
 
+  val maxSubstreams = 40
+
+  def main(args: Array[String]): Unit = {
     val random = new Random()
 
-    val f = Source
+    val done = Source
       .tick(0.seconds, 1.second, "")
       .map { _ =>
         val now = System.currentTimeMillis()
@@ -38,7 +46,7 @@ object WindowingExample {
         val generator = new CommandGenerator()
         ev => generator.forEvent(ev)
       }
-      .groupBy(64, command => command.w)
+      .groupBy(maxSubstreams, command => command.w)
       .takeWhile(!_.isInstanceOf[CloseWindow])
       .fold(AggregateEventData((0L, 0L), 0)) {
         case (agg, OpenWindow(window)) => agg.copy(w = window)
@@ -52,9 +60,21 @@ object WindowingExample {
         println(agg.toString)
       }
 
-    try Await.result(f, 60.seconds)
-    finally system.terminate()
+    terminateWhen(done)
   }
+
+  def terminateWhen(done: Future[Done]) = {
+    done.onComplete {
+      case Success(b) =>
+        println("Flow Success. About to terminate...")
+        system.terminate()
+      case Failure(e) =>
+        println(s"Flow Failure: ${e.getMessage}. About to terminate...")
+        system.terminate()
+    }
+  }
+
+
 
   case class MyEvent(timestamp: Long)
 

@@ -22,13 +22,13 @@ class TotalFake extends Actor {
 
   override def receive: Receive = {
     case IncrementWord(value, id) =>
-      println(s"$id - WORD count: $value (+ ${value - totalWords})")
+      println(s"$id - WORD count fakeNews: $value (+ ${value - totalWords})")
       totalWords = value
       sender ! Done
 
     case IncrementMessage(value, id) =>
       totalNews += value
-      println(s"$id - MESSAGE count: $totalNews (+ $value)")
+      println(s"$id - MESSAGES count: $totalNews (+ $value)")
       sender ! Done
   }
 }

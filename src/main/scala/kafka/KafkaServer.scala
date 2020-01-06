@@ -1,5 +1,6 @@
 package kafka
 
+import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.util.Properties
@@ -12,6 +13,9 @@ import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
   * KafkaServer which embedded Zookeeper, inspired by:
   * https://github.com/jamesward/koober/blob/master/kafka-server/src/main/scala/KafkaServer.scala
   *
+  * Remarks:
+  * - Zookeeper starts an admin server on http://localhost:8080/commands
+  *
   * Alternatives:
   * - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
   * - Use "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
@@ -19,10 +23,12 @@ import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
   */
 object KafkaServer extends App {
 
+  val zookeeperPort = 2181
+
   val quorumConfiguration = new QuorumPeerConfig {
-    override def getDataDir: String = Files.createTempDirectory("zookeeper").toString
-    override def getDataLogDir: String = Files.createTempDirectory("zookeeper-logs").toString
-    override def getClientPortAddress: InetSocketAddress = new InetSocketAddress(2181)
+    override def getDataDir: File = Files.createTempDirectory("zookeeper").toFile
+    override def getDataLogDir: File = Files.createTempDirectory("zookeeper-logs").toFile
+    override def getClientPortAddress: InetSocketAddress = new InetSocketAddress(zookeeperPort)
   }
 
   class StoppableZooKeeperServerMain extends ZooKeeperServerMain {
@@ -42,7 +48,7 @@ object KafkaServer extends App {
 
   //Maybe not all the properties below are needed, they were copied from a working standalone Kafka installation
   val kafkaProperties = new Properties()
-  kafkaProperties.put("zookeeper.connect", "localhost:2181")
+  kafkaProperties.put("zookeeper.connect", s"localhost:$zookeeperPort")
   kafkaProperties.put("broker.id", "0")
   kafkaProperties.put("offsets.topic.replication.factor", "1")
   kafkaProperties.put("log.dirs", "/tmp/kafka-logs")
