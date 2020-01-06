@@ -1,5 +1,6 @@
 package alpakka.sftp
 
+import java.io.File
 import java.net.InetAddress
 import java.nio.file.Paths
 
@@ -42,7 +43,6 @@ object SFTPEcho extends App {
 
   val sftpDirName = "echo"
   val processedDirName = "processed"
-  val localTargetDir = Paths.get(s"/tmp/$sftpDirName")
 
   val hostname = "127.0.0.1"
   val port = 2222
@@ -119,7 +119,7 @@ object SFTPEcho extends App {
 
   private def fetchAndMove(ftpFile: FtpFile) = {
 
-    val localPath = localTargetDir.resolve(ftpFile.name)
+    val localPath = File.createTempFile(ftpFile.name, ".tmp.client").toPath
     println(s"About to fetch file: $ftpFile to local path: $localPath")
 
     val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
@@ -158,8 +158,13 @@ object SFTPEcho extends App {
     val sftpClient = sshClient.newSFTPClient()
 
     try {
-      sftpClient.rmdir(s"$sftpDirName/$processedDirName")
-      sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+      if (sftpClient.statExistence(s"$sftpDirName/$processedDirName") == null)
+        {
+          sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+        } else {
+          sftpClient.rmdir(s"$sftpDirName/$processedDirName")
+          sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+      }
     } finally
       sftpClient.close()
       sshClient.close()
