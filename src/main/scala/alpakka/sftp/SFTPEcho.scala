@@ -27,7 +27,7 @@ import scala.util.{Failure, Success}
   *
   * Reproducer to show these issues:
   * - Alpakka SFTP mkdir() and move() operations fail silently
-  * - Trying to use the sshj rename() instead leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
+  * - Trying to use the native sshj rename() instead leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
   *   It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
   *
   * Remarks:
@@ -186,8 +186,18 @@ object SFTPEcho extends App {
   }
 
 
+  //works
   private def removeAll() = {
     val source = listFiles("/")
+    val sink = Sftp.remove(sftpSettings)
+    source.runWith(sink)
+  }
+
+  //Passing path of file to be removed does not work
+  //This works, but feels clumsy
+  private def remove(path: String) = {
+    val source = listFiles("/")
+      .filter(each => each.path.equals(path))
     val sink = Sftp.remove(sftpSettings)
     source.runWith(sink)
   }
