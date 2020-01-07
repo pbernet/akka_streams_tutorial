@@ -12,6 +12,7 @@ import akka.stream.{IOResult, ThrottleMode}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.FileSystemFile
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -23,16 +24,19 @@ import scala.util.{Failure, Success}
 
 
 /**
-  * Implement an upload/download echo flow using alpakka sftp features for everything
+  * Implement an upload/download echo flow for the happy path, trying to use alpakka sftp features for everything
   *
   * Reproducer to show these issues:
   * - Alpakka SFTP mkdir() and move() operations fail silently
-  * - Trying to use the native sshj rename() instead leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
+  * - Trying to use the native sshj rename() instead of SFTP.move() leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
   *   It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
   *
   * Remarks:
   * - Start the docker SFTP server from: /docker/docker-compose.yml with cmd line: docker-compose up -d sftp
   *
+  * TODOs
+  * - Implement failure scenarios
+  * - Add shutdown code
   */
 object SFTPEcho extends App {
   implicit val system = ActorSystem("SFTPEcho")
@@ -57,6 +61,7 @@ object SFTPEcho extends App {
     .withStrictHostKeyChecking(false)
     .withCredentials(credentials)
 
+  var sshClient = createSshClientAndConnect()
 
   removeAll().onComplete {
     case Success(_) =>
@@ -93,7 +98,7 @@ object SFTPEcho extends App {
 
     val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
       listFiles(s"/$sftpDirName")
-        .take(10) //Try to batch
+        //.take(10) //Try to batch
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMove(ftpFile))
         .runWith(Sink.seq)
@@ -119,7 +124,9 @@ object SFTPEcho extends App {
 
   private def fetchAndMove(ftpFile: FtpFile) = {
 
-    val localPath = File.createTempFile(ftpFile.name, ".tmp.client").toPath
+    val localFile = File.createTempFile(ftpFile.name, ".tmp.client")
+    //localFile.deleteOnExit()
+    val localPath = localFile.toPath
     println(s"About to fetch file: $ftpFile to local path: $localPath")
 
     val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
@@ -154,8 +161,7 @@ object SFTPEcho extends App {
 
   //works
   private def createFoldersNative() = {
-    val sshClient = createSshClientAndConnect()
-    val sftpClient = sshClient.newSFTPClient()
+    val sftpClient = newSFTPClient()
 
     try {
       if (sftpClient.statExistence(s"$sftpDirName/$processedDirName") == null)
@@ -167,12 +173,10 @@ object SFTPEcho extends App {
       }
     } finally
       sftpClient.close()
-      sshClient.close()
   }
 
   private def moveFileNative(ftpFile: FtpFile) = {
-    val sshClient = createSshClientAndConnect()
-    val sftpClient = sshClient.newSFTPClient()
+    val sftpClient = newSFTPClient()
 
     try {
       //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj :-(
@@ -182,7 +186,6 @@ object SFTPEcho extends App {
       sftpClient.rm(ftpFile.path)
     } finally
       sftpClient.close()
-      sshClient.close()
   }
 
 
@@ -204,8 +207,7 @@ object SFTPEcho extends App {
 
   //works
   private def uploadFileNative() = {
-    val sshClient = createSshClientAndConnect()
-    val sftpClient = sshClient.newSFTPClient()
+    val sftpClient = newSFTPClient()
 
     try {
       val targetFileOnServer = Paths.get(sftpDirName)
@@ -217,10 +219,16 @@ object SFTPEcho extends App {
       sftpClient.put(new FileSystemFile(resourceFilePath.toFile), targetFileOnServer)
     } finally
       sftpClient.close()
-      sshClient.close()
   }
 
-  private def createSshClientAndConnect() = {
+  private def newSFTPClient(): SFTPClient = {
+    if (!sshClient.isConnected) {
+      sshClient = createSshClientAndConnect()
+    }
+    sshClient.newSFTPClient()
+  }
+
+  private def createSshClientAndConnect():SSHClient = {
     val sshClient = new SSHClient
     sshClient.addHostKeyVerifier(new PromiscuousVerifier) // to skip host verification
 
