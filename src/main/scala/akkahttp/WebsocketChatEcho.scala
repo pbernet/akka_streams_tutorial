@@ -1,38 +1,31 @@
 package akkahttp
 
-import akka.actor.ActorSystem
-import akka.event.LoggingAdapter
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
-import akkahttp.WebsocketEcho.{helloSource, printSink}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * A simple WebSocket chat system using only Akka Streams with the help of MergeHub Source and BroadcastHub Sink
+  * A simple WebSocket chat system using only akka streams with the help of MergeHub Source and BroadcastHub Sink
   *
   * Shamelessly copied from:
   * https://github.com/calvinlfer/akka-http-streaming-response-examples/blob/master/src/main/scala/com/experiments/calvin/WebsocketStreamsMain.scala
   * Doc:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
   */
-object WebsocketChatEcho {
-  implicit val actorSystem = ActorSystem(name = "WebsocketChatEcho")
-  implicit val executionContext = actorSystem.dispatcher
-  val log: LoggingAdapter = actorSystem.log
-
+object WebsocketChatEcho extends ClientCommon {
 
   def main(args: Array[String]) {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
 
-    val maxClients = 2
-    (1 to maxClients).par.foreach(_ => clientWebSocketClientFlow(address, port))
+    val clients = List("Bob", "Alice")
+    clients.par.foreach(clientname => clientWebSocketClientFlow(clientname, address, port))
   }
 
   private def server(address: String, port: Int) = {
@@ -61,7 +54,7 @@ object WebsocketChatEcho {
 
     val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) =
       MergeHub.source[String]
-        .map { elem => println(s"Server received after MergeHub: $elem"); elem}
+        //.wireTap(elem => println(s"Server received after MergeHub: $elem"))
         .via(sampleProcessing)
         .toMat(BroadcastHub.sink[String])(Keep.both).run()
 
@@ -94,13 +87,13 @@ object WebsocketChatEcho {
       .map(addr => println(s"Server bound to: $addr"))
   }
 
-  private def clientWebSocketClientFlow(address: String, port: Int) = {
+  private def clientWebSocketClientFlow(clientname: String, address: String, port: Int) = {
 
     // flow to use (note: not re-usable!)
     val webSocketFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echochat"))
 
     val (upgradeResponse, closed) =
-      helloSource
+      namedSource(clientname)
         .viaMat(webSocketFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
         .toMat(printSink)(Keep.both) // also keep the Future[Done]
         .run()
