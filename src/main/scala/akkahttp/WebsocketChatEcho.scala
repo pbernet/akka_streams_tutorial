@@ -4,8 +4,10 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
+import akkahttp.WebsocketEcho.handleWebSocketMessages
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -18,20 +20,18 @@ import scala.concurrent.duration._
   * Doc:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
   */
-object WebsocketChatEcho extends ClientCommon {
+object WebsocketChatEcho extends App with ClientCommon {
 
-  def main(args: Array[String]) {
-    val (address, port) = ("127.0.0.1", 6000)
+    val (address, port) = ("127.0.0.1", 6002)
     server(address, port)
-
+    browserClient()
     val clients = List("Bob", "Alice")
     clients.par.foreach(clientname => clientWebSocketClientFlow(clientname, address, port))
-  }
 
   private def server(address: String, port: Int) = {
 
     /*
-  many clients -> Merge Hub -> Broadcast Hub -> many clients
+  clients -> Merge Hub -> Broadcast Hub -> clients
   Visually
                                                                                                          Akka Streams Flow
                   ________________________________________________________________________________________________________________________________________________________________________________________
@@ -76,12 +76,22 @@ object WebsocketChatEcho extends ClientCommon {
       }
       .map[Message](string => TextMessage.Strict("Hello " + string + "!"))
 
-    def wsChatStreamsOnlyRoute =
+    def wsClientRoute: Route =
       path("echochat") {
         handleWebSocketMessages(echoFlow)
       }
 
-    val bindingFuture = Http().bindAndHandle(wsChatStreamsOnlyRoute, address, port)
+    //The browser client has a different route but hooks into the same flow
+    def wsBrowserClientRoute: Route =
+      path("echo") {
+        handleWebSocketMessages(echoFlow)
+      }
+
+    def routes: Route = {
+      wsClientRoute ~ wsBrowserClientRoute
+    }
+
+    val bindingFuture = Http().bindAndHandle(routes, address, port)
     bindingFuture
       .map(_.localAddress)
       .map(addr => println(s"Server bound to: $addr"))

@@ -40,6 +40,11 @@ trait ClientCommon {
       .concatMat(Source.maybe[Message])(Keep.right)
   }
 
+  def browserClient() = {
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") Process("open ./src/main/resources/WebsocketEcho.html").!
+  }
+
 }
 
 /**
@@ -93,12 +98,6 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
       println("Terminated... Bye")
     }
   }
-
-  private def browserClient() = {
-    val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/WebsocketEcho.html").!
-  }
-
 
   def singleWebSocketRequestClient(id: Int, address: String, port: Int) = {
 
