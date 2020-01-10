@@ -55,14 +55,14 @@ object SplitWhen extends App {
         //.throttle(100, 1.second)
         .via(csvToRecord)
         .splitWhen(SubstreamCancelStrategy.drain) {
-          var lastKey: Option[String] = None
-          item =>
-            lastKey match {
-              case Some(item.key) | None =>
-                lastKey = Some(item.key)
+          var lastRecordKey: Option[String] = None
+          currentRecord =>
+            lastRecordKey match {
+              case Some(currentRecord.key) | None =>
+                lastRecordKey = Some(currentRecord.key)
                 false
               case _ =>
-                lastKey = Some(item.key)
+                lastRecordKey = Some(currentRecord.key)
                 true
             }
         }
