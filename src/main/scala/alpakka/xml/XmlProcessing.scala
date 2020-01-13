@@ -16,8 +16,11 @@ import scala.util.Try
 /**
   * Parse XML and extract embedded base64 application/pdf docs
   *
-  * TODO Extraction of the file name is missing,
-  * all the files are saved under the same dummy name
+  * Remarks:
+  * - Extraction of the file name is missing,
+  *   all the files are saved under the same dummy name
+  * - State case class could be used inside statefulMapConcat
+  * - Results could be written to fileSink (FileIO.toPath)
   */
 
 object XmlProcessing {
