@@ -1,8 +1,8 @@
 package sample.stream
 
 import akka.actor.ActorSystem
+import akka.stream._
 import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{DelayOverflowStrategy, OverflowStrategy, QueueOfferResult}
 import akka.{Done, NotUsed}
 
 import scala.concurrent.Future
@@ -27,7 +27,7 @@ object PublishToSourceQueueFromStream {
   def main(args: Array[String]): Unit = {
 
     val bufferSize = 100
-    val parallelism = 1
+    val parallelism = 10
 
     val slowSink: Sink[Seq[Int], NotUsed] =
       Flow[Seq[Int]]
@@ -49,12 +49,21 @@ object PublishToSourceQueueFromStream {
       queue.offer(each).map {
         case QueueOfferResult.Enqueued    => println(s"enqueued $each")
         case QueueOfferResult.Dropped     => println(s"dropped $each")
-        case QueueOfferResult.Failure(ex) => println(s"Offer failed ${ex.getMessage}")
+        case QueueOfferResult.Failure(ex) => println(s"Offer failed $ex")
         case QueueOfferResult.QueueClosed => println("Source Queue closed")
       }
-    }}.runWith(Sink.ignore)
+    }}
+      .withAttributes(ActorAttributes.supervisionStrategy(decider))
+      .runWith(Sink.ignore)
     signalWhen(donePublishing, "publishing")
   }
+
+  //We need to decide this level, because the OverflowStrategy.backpressure causes an IllegalStateException
+  val decider: Supervision.Decider = {
+    case _: IllegalStateException => Supervision.Resume
+    case _                      => Supervision.Stop
+  }
+
 
   def signalWhen(done: Future[Done], operation: String) = {
     done.onComplete {
