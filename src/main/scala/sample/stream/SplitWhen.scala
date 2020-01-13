@@ -19,6 +19,11 @@ import scala.util.{Failure, Success}
   *
   * Inspired by:
   * https://discuss.lightbend.com/t/groupwhile-on-akka-streams/5592/3
+  *
+  * Note that this implementation is ok, as long as the stream gets materialized only once
+  * see discussion:
+  * https://discuss.lightbend.com/t/state-inside-of-flow-operators/5717
+  *
   */
 object SplitWhen extends App {
   implicit val system = ActorSystem("SplitWhen")
@@ -80,7 +85,7 @@ object SplitWhen extends App {
         println("Flow Success. About to terminate...")
         system.terminate()
       case Failure(e) =>
-        println(s"Flow Failure: ${e.getMessage}. About to terminate...")
+        println(s"Flow Failure: $e. About to terminate...")
         system.terminate()
     }
   }
