@@ -12,11 +12,12 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
+  * Alpakka File echo flow with sth to process:
   * file -> base64 encoding -> file -> base64 decoding -> file
   *
-  * TODO Compiles, but:
-  * FlowFailure on decoding, BUT probably encoding does not work correctly
-  * Decoding on its own works testfile.jpg1.enc
+  * Remark:
+  * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
+  * see: https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks
   *
   */
 object FileEchoFlow extends App {
@@ -31,15 +32,13 @@ object FileEchoFlow extends App {
   val dec2 = Base64.getMimeDecoder
   val dec3 = Base64.getUrlDecoder
 
-  val sourceOrig = FileIO.fromPath(Paths.get("./src/main/resources/testfile.jpg"), 1000)
+  val sourceOrig = FileIO.fromPath(Paths.get("./src/main/resources/testfile.jpg"), 3000)
   val encFileName = "test.enc"
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
 
   val doneEnc = sourceOrig
     .wireTap(each => println(s"Chunk enc: $each"))
-    //Does not seem to work, because the result can not be used
     .map(each => ByteString(enc1.encode(each.toByteBuffer)))
-    //.map(each => ByteString(enc1.encode(StringUtils.strip(each.utf8String, "\n\t").getBytes("UTF-8"))))
     .runWith(sinkEnc)
 
   doneEnc.onComplete {
