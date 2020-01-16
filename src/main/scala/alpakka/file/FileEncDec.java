@@ -14,34 +14,17 @@ import java.nio.file.Paths;
 import java.util.Base64;
 
 /**
- * Streaming enc/dec roundtrip
- *
+ * Streaming enc/dec roundtrip "Byte by Byte"
+ * Avoids OutOfMemoryError:
  * https://stackoverflow.com/questions/9579874/out-of-memory-when-encoding-file-to-base64
- *
  */
-public class FileEncDec
-{
+public class FileEncDec {
+	public static void main(String[] args) {
 
-	//Using commons codec Base64OutputStream
-	public void encode(File fileIn, File fileOut ) throws IOException {
-
-		try (OutputStream base64OutputStream = new FileOutputStream(fileOut);
-				InputStream is = new FileInputStream(fileIn);
-		) {
-			OutputStream out = new Base64OutputStream(base64OutputStream);
-			IOUtils.copy(is, out);
-		}
-	}
-
-
-	public static void main(String[] args)
-	{
-
-        String filename = "testfile.jpg";
+		String filename = "testfile.jpg";
 		Path path = Paths.get("./src/main/resources/" + filename);
 
-		try (FileInputStream fis = new FileInputStream(path.toFile()))
-		{
+		try (FileInputStream fis = new FileInputStream(path.toFile())) {
 			Base64.Encoder enc1 = Base64.getEncoder();
 			Base64.Encoder enc2 = Base64.getMimeEncoder();
 			Base64.Encoder enc3 = Base64.getUrlEncoder();
@@ -49,8 +32,7 @@ public class FileEncDec
 			OutputStream os2 = enc2.wrap(new FileOutputStream(filename + "2.enc"));
 			OutputStream os3 = enc3.wrap(new FileOutputStream(filename + "3.enc"));
 			int _byte;
-			while ((_byte = fis.read()) != -1)
-			{
+			while ((_byte = fis.read()) != -1) {
 				os1.write(_byte);
 				os2.write(_byte);
 				os3.write(_byte);
@@ -58,15 +40,12 @@ public class FileEncDec
 			os1.close();
 			os2.close();
 			os3.close();
-		}
-		catch (IOException ioe)
-		{
+		} catch (IOException ioe) {
 			System.err.printf("I/O error: %s%n", ioe.getMessage());
 		}
 		try (FileOutputStream fos1 = new FileOutputStream("1" + filename);
 				FileOutputStream fos2 = new FileOutputStream("2" + filename);
-				FileOutputStream fos3 = new FileOutputStream("3" + filename))
-		{
+				FileOutputStream fos3 = new FileOutputStream("3" + filename)) {
 			Base64.Decoder dec1 = Base64.getDecoder();
 			Base64.Decoder dec2 = Base64.getMimeDecoder();
 			Base64.Decoder dec3 = Base64.getUrlDecoder();
@@ -83,10 +62,18 @@ public class FileEncDec
 			is1.close();
 			is2.close();
 			is3.close();
-		}
-		catch (IOException ioe)
-		{
+		} catch (IOException ioe) {
 			System.err.printf("I/O error: %s%n", ioe.getMessage());
+		}
+	}
+
+	//Using commons codec
+	public void encode(File fileIn, File fileOut) throws IOException {
+
+		try (InputStream is = new FileInputStream(fileIn);
+				OutputStream out = new Base64OutputStream(new FileOutputStream(fileOut));
+		) {
+			IOUtils.copy(is, out);
 		}
 	}
 }

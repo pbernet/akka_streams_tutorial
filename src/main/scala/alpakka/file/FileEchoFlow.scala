@@ -12,8 +12,8 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Alpakka File echo flow with sth to process:
-  * file -> base64 encoding -> file -> base64 decoding -> file
+  * Alpakka file echo flow with sth to process:
+  * testfile.jpg -> base64 encoding -> test.enc -> base64 decoding -> test_result.jpg
   *
   * Remark:
   * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
@@ -24,30 +24,24 @@ object FileEchoFlow extends App {
   implicit val system = ActorSystem("FileEchoFlow")
   implicit val executionContext = system.dispatcher
 
-  val enc1 = Base64.getEncoder
-  val enc2 = Base64.getMimeEncoder
-  val enc3 = Base64.getUrlEncoder
-
-  val dec1 = Base64.getDecoder
-  val dec2 = Base64.getMimeDecoder
-  val dec3 = Base64.getUrlDecoder
+  val encFileName = "test.enc"
+  val resultFileName = "test_result.jpg"
 
   val sourceOrig = FileIO.fromPath(Paths.get("./src/main/resources/testfile.jpg"), 3000)
-  val encFileName = "test.enc"
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
 
   val doneEnc = sourceOrig
     .wireTap(each => println(s"Chunk enc: $each"))
-    .map(each => ByteString(enc1.encode(each.toByteBuffer)))
+    .map(each => ByteString(Base64.getEncoder.encode(each.toByteBuffer)))
     .runWith(sinkEnc)
 
   doneEnc.onComplete {
     case Success(_) => {
       val sourceEnc = FileIO.fromPath(Paths.get(encFileName))
-      val sinkDec = FileIO.toPath(Paths.get("test_result.jpg"))
+      val sinkDec = FileIO.toPath(Paths.get(resultFileName))
       val doneDec = sourceEnc
         .wireTap(each => println(s"Chunk dec: $each"))
-        .map(each => ByteString(dec1.decode(each.toByteBuffer)))
+        .map(each => ByteString(Base64.getDecoder.decode(each.toByteBuffer)))
         .runWith(sinkDec)
       terminateWhen(doneDec)
     }
