@@ -1,6 +1,7 @@
 package sample.stream
 
 import akka.actor.ActorSystem
+import akka.stream.Supervision.Decider
 import akka.stream._
 import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
 import akka.{Done, NotUsed}
@@ -30,7 +31,7 @@ object PublishToSourceQueueFromStream extends App {
   val slowSink: Sink[Seq[Int], NotUsed] =
     Flow[Seq[Int]]
       .delay(1.seconds, DelayOverflowStrategy.backpressure)
-      .to(Sink.foreach(e => println(s"Reached Sink: $e")))
+      .to(Sink.foreach(e => println(s"Reached sink: $e")))
 
   val sourceQueue: SourceQueueWithComplete[Int] = Source
     .queue[Int](bufferSize, OverflowStrategy.backpressure)
@@ -42,29 +43,42 @@ object PublishToSourceQueueFromStream extends App {
   signalWhen(doneConsuming, "consuming") //never completes...
 
 
-  //simulate publishing clients
+  simulatePublishingClientsFromStream()
+
+  //Does not finish, because is not able to handle backpressure signals
+  //simulatePublishingClientsSimple()
+
+
+
   //We need to decide on the stream level, because the OverflowStrategy.backpressure
   //on the sourceQueue causes an IllegalStateException
-  val decider: Supervision.Decider = {
-    case _: IllegalStateException => Supervision.Resume
-    case _ => Supervision.Stop
+  //Handling this on the stream level allows to restart the stream
+  private def simulatePublishingClientsFromStream() = {
+
+    val decider: Decider = {
+      case _: IllegalStateException => println("Got backpressure signal for offered element, restart..."); Supervision.Restart
+      case _ => Supervision.Stop
+    }
+
+    val donePublishing: Future[Done] = Source(1 to 1000)
+      .mapAsync(parallelism)(offerToSourceQueue)
+      .withAttributes(ActorAttributes.supervisionStrategy(decider))
+      .runWith(Sink.ignore)
+    signalWhen(donePublishing, "publishing")
   }
 
-  val donePublishing: Future[Done] = Source(1 to 1000)
-    .mapAsync(parallelism) { each => {
-      sourceQueue.offer(each).map {
-        case QueueOfferResult.Enqueued => println(s"enqueued $each")
-        case QueueOfferResult.Dropped => println(s"dropped $each")
-        case QueueOfferResult.Failure(ex) => println(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => println("Source Queue closed")
-      }
-    }
-    }
-    .withAttributes(ActorAttributes.supervisionStrategy(decider))
-    .runWith(Sink.ignore)
-  signalWhen(donePublishing, "publishing")
+  private def simulatePublishingClientsSimple() = (1 to 1000).par.foreach(offerToSourceQueue)
 
-  def signalWhen(done: Future[Done], operation: String) = {
+  private def offerToSourceQueue(each: Int) = {
+    sourceQueue.offer(each).map {
+      case QueueOfferResult.Enqueued => println(s"enqueued $each")
+      case QueueOfferResult.Dropped => println(s"dropped $each")
+      case QueueOfferResult.Failure(ex) => println(s"Offer failed: $ex")
+      case QueueOfferResult.QueueClosed => println("Source Queue closed")
+    }
+  }
+
+  private def signalWhen(done: Future[Done], operation: String) = {
     done.onComplete {
       case Success(b) =>
         println(s"Finished: $operation")
