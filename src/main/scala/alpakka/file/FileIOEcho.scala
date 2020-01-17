@@ -20,18 +20,19 @@ import scala.util.{Failure, Success}
   * see: https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks
   *
   */
-object FileEchoFlow extends App {
-  implicit val system = ActorSystem("FileEchoFlow")
+object FileIOEcho extends App {
+  implicit val system = ActorSystem("FileIOEcho")
   implicit val executionContext = system.dispatcher
 
-  val encFileName = "test.enc"
-  val resultFileName = "test_result.jpg"
+  val sourceFileName = "./src/main/resources/testfile.jpg"
+  val encFileName = "testfile.enc"
+  val resultFileName = "testfile_result.jpg"
 
-  val sourceOrig = FileIO.fromPath(Paths.get("./src/main/resources/testfile.jpg"), 3000)
+  val sourceOrig = FileIO.fromPath(Paths.get(sourceFileName), 3000)
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
 
   val doneEnc = sourceOrig
-    .wireTap(each => println(s"Chunk enc: $each"))
+    //.wireTap(each => println(s"Chunk enc: $each"))
     .map(each => ByteString(Base64.getEncoder.encode(each.toByteBuffer)))
     .runWith(sinkEnc)
 
@@ -39,8 +40,9 @@ object FileEchoFlow extends App {
     case Success(_) => {
       val sourceEnc = FileIO.fromPath(Paths.get(encFileName))
       val sinkDec = FileIO.toPath(Paths.get(resultFileName))
+
       val doneDec = sourceEnc
-        .wireTap(each => println(s"Chunk dec: $each"))
+        //.wireTap(each => println(s"Chunk dec: $each"))
         .map(each => ByteString(Base64.getDecoder.decode(each.toByteBuffer)))
         .runWith(sinkDec)
       terminateWhen(doneDec)
@@ -50,8 +52,8 @@ object FileEchoFlow extends App {
 
   def terminateWhen(done: Future[IOResult]) = {
     done.onComplete {
-      case Success(b) =>
-        println("Flow Success. About to terminate...")
+      case Success(_) =>
+        println(s"Flow Success. Written file: $resultFileName About to terminate...")
         system.terminate()
       case Failure(e) =>
         println(s"Flow Failure: $e. About to terminate...")

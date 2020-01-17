@@ -3,18 +3,14 @@ package alpakka.file;
 import org.apache.commons.codec.binary.Base64OutputStream;
 import org.apache.commons.io.IOUtils;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 
 /**
- * Streaming enc/dec roundtrip "Byte by Byte"
+ * Java 8 streaming enc/dec roundtrip "Byte by Byte"
+ *
  * Avoids OutOfMemoryError:
  * https://stackoverflow.com/questions/9579874/out-of-memory-when-encoding-file-to-base64
  */
