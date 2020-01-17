@@ -1,4 +1,4 @@
-package sample.stream
+package sample.stream_shared_state
 
 import java.nio.file.Paths
 
@@ -10,7 +10,6 @@ import akka.util.ByteString
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-
 
 /**
   * Given a sorted stream of records e.g. read a file that has records sorted based on key
