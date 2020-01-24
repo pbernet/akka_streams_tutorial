@@ -7,40 +7,38 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-
-case class Valid[T](payload: T)
-
-case class Invalid[T](payload: T, cause: Option[Throwable])
-
 /**
   * Inspired by:
   * Colin Breck talk scala days NY 2018
   *
   * Concepts:
   *  - treat errors as data
-  *  - divert invalid elements instead of filtering/dropping them
+  *  - divert invalid elements at the enc, instead of filtering/dropping them
   *  - keep order of elements downstream
   */
-object DivertToExample extends App {
-  implicit val system = ActorSystem("DivertToExample")
+object DivertTo extends App {
+  implicit val system = ActorSystem("DivertTo")
   implicit val executionContext = system.dispatcher
 
   val source = Source(1 to 10)
 
-  val sink = Sink.foreach[Either[Valid[Int], Invalid[Int]]](each => println(s"Reached sink: ${each.left.get} is valid"))
+  val sink = Sink.foreach[Either[Valid[Int], Invalid[Int]]](each => println(s"Reached sink: ${each.left.get}"))
 
   val errorSink = Flow[Invalid[Int]]
-    .map(each => println(s"Reached errorSink: $each is invalid, because of: ${each.cause.getOrElse(new Throwable("N/A"))}"))
+    .map(each => println(s"Reached errorSink: $each"))
     .to(Sink.ignore)
 
   val flow: Flow[Int, Either[Valid[Int], Invalid[Int]], NotUsed] = Flow[Int]
     .map { x =>
       if (x % 2 == 0) Left(Valid(x))
-      else Right(Invalid(x, Some(new Throwable("Is odd"))))
+      else Right(Invalid(x, Some(new Exception("Is odd"))))
     }
     .map {
       //Drawback of this approach: Pattern matching on all downstream operations
-      case left@Left(_) => left
+      case left@Left(value) => {
+        if (value.payload > 5) left
+        else Right(Invalid(value.payload, Some(new Exception("Is smaller than 5"))))
+      }
       case right@Right(_) => right
     }
     .map {
@@ -65,3 +63,7 @@ object DivertToExample extends App {
     }
   }
 }
+
+case class Valid[T](payload: T)
+
+case class Invalid[T](payload: T, cause: Option[Throwable])
