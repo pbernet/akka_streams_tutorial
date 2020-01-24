@@ -1,21 +1,19 @@
-package actor
+package sample.stream_actor.typed
 
-import actor.CustomCache.{AddDevices, CacheRequests, CacheResponses, CachedDevices}
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{RestartSource, Sink, Source}
 import akka.util.Timeout
+import sample.stream_actor.typed.CustomCache.{AddDevices, CacheRequests, CacheResponses, CachedDevices}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Use typed actor as cache to show:
+  * Use typed actor as cache to show shared state and:
   *  - Request with tell from outside (= a stream)
   *  - Request-Response with ask from outside (= a stream)
-  *
-  * TODO Find nice names and move to pkg stream_shared_state.actor
   *
   * Inspired by:
   * https://blog.colinbreck.com/rethinking-streaming-workloads-with-akka-streams-part-iii
@@ -26,11 +24,11 @@ import scala.concurrent.duration._
   */
 object CustomCacheRunner extends App {
   // the system is also the top level actor ref
-  implicit val cache = ActorSystem[CacheRequests](CustomCache.empty, "Cache")
+  implicit val cache = ActorSystem[CacheRequests](CustomCache.empty, "CustomCache")
   implicit val ec = cache.executionContext
   implicit val timeout: Timeout = 5.seconds
 
-  val stream = RestartSource
+  RestartSource
     .withBackoff(
       minBackoff = 0.seconds,
       maxBackoff = 60.seconds,
@@ -39,17 +37,19 @@ object CustomCacheRunner extends App {
       Source
         .tick(initialDelay = 0.seconds, interval = 2.seconds, tick = ())
         .mapAsync(parallelism = 1) { _ => cache.ref.ask(ref => CustomCache.Get("42", ref)) }
-
-        //TODO Fails for first element (= CacheResponses.EmptyCache)
-        .map((each: CacheResponses) => println(s"Current amount of cached devices: ${each.asInstanceOf[CachedDevices].devices.size}"))
+        .map((each: CacheResponses) =>
+          each match {
+            case cachedDevices: CachedDevices => cache.log.info(s"Current amount of cached devices: ${cachedDevices.devices.size}")
+            case _ => cache.log.info("No devices")
+          })
         .recover {
-          case ex => cache.log.error(s"Failed to read cached devices : $ex")
+          case ex => cache.log.error("Failed to read cached devices: ", ex)
         }
     }
     .runWith(Sink.ignore)
 
-  val sourceOfInt = Source(List.fill(10000)(java.util.UUID.randomUUID.toString))
-  sourceOfInt
+  val sourceOfUUID = Source(Stream.continually(java.util.UUID.randomUUID.toString).take(100))
+  sourceOfUUID
     .throttle(10, 1.second, 10, ThrottleMode.shaping)
     .mapAsync(parallelism = 10)(each => Future(cache ! AddDevices(List(DeviceId(each)))))
     .runWith(Sink.ignore)

@@ -1,14 +1,15 @@
-package actor
+package sample.stream_actor.typed
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 
+case class DeviceId(id: String)
 
 object CustomCache {
   sealed trait CacheRequests
   final case class Get(requestId: String, replyTo: ActorRef[CacheResponses]) extends CacheRequests
   final case class Devices(devices: List[DeviceId])                          extends CacheRequests
-  final case class AddDevices(devices: List[DeviceId])                          extends CacheRequests
+  final case class AddDevices(devices: List[DeviceId])                       extends CacheRequests
 
   sealed trait CacheResponses
   final case object EmptyCache                            extends CacheResponses
@@ -41,7 +42,7 @@ object CustomCache {
           context.log.info(s"Updating cache with: ${updatedDevices.size} devices")
           cached(updatedDevices)
         case AddDevices(updatedDevices) =>
-          context.log.info(s"Adding ${updatedDevices.size} devices.")
+          context.log.info(s"Adding: ${updatedDevices.size} devices.")
           cached(devices = devices ++ updatedDevices)
       }
     }
