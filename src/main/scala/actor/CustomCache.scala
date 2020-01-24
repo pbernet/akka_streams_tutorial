@@ -8,6 +8,7 @@ object CustomCache {
   sealed trait CacheRequests
   final case class Get(requestId: String, replyTo: ActorRef[CacheResponses]) extends CacheRequests
   final case class Devices(devices: List[DeviceId])                          extends CacheRequests
+  final case class AddDevices(devices: List[DeviceId])                          extends CacheRequests
 
   sealed trait CacheResponses
   final case object EmptyCache                            extends CacheResponses
@@ -21,7 +22,10 @@ object CustomCache {
           replyTo ! EmptyCache
           Behaviors.same
         case Devices(devices) =>
-          context.log.info("Initializing cache.")
+          context.log.info(s"Initializing cache with: ${devices.size} devices")
+          cached(devices)
+        case AddDevices(devices) =>
+          context.log.info(s"Initializing cache with: ${devices.size} devices")
           cached(devices)
       }
     }
@@ -34,8 +38,11 @@ object CustomCache {
           replyTo ! CachedDevices(devices)
           Behaviors.same
         case Devices(updatedDevices) =>
-          context.log.info("Updating cache.")
+          context.log.info(s"Updating cache with: ${updatedDevices.size} devices")
           cached(updatedDevices)
+        case AddDevices(updatedDevices) =>
+          context.log.info(s"Adding ${updatedDevices.size} devices.")
+          cached(devices = devices ++ updatedDevices)
       }
     }
 }

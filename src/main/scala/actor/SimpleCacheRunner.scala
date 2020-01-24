@@ -14,8 +14,10 @@ case class DeviceId(id: String)
 case class RequestId(id: String)
 
 /**
-  * Akka typed actor ask example
+  * Request-Response with ask from outside of typed actor
   *
+  * Doc:
+  * https://doc.akka.io/docs/akka/current/typed/interaction-patterns.html#request-response-with-ask-from-outside-an-actor
   *
   */
 object SimpleCacheRunner extends App {
@@ -37,7 +39,7 @@ object SimpleCacheRunner extends App {
   val result: Future[CachedDeviceIds] = cache.ref.ask(ref => SimpleCache.Get(requestId, ref))
 
   result.onComplete {
-    case Success(ids) => ids.devices.foreach(println)
+    case Success(ids: CachedDeviceIds) => ids.devices.foreach(println)
     case Failure(ex) => println(s"Failure: $ex")
   }
 }
