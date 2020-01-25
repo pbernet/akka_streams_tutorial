@@ -12,8 +12,8 @@ import scala.util.{Failure, Success}
   * Colin Breck talk scala days NY 2018
   *
   * Concepts:
-  *  - treat errors as data
-  *  - divert invalid elements at the enc, instead of filtering/dropping them
+  *  - treat errors as data by using Either
+  *  - divert invalid elements at the end (instead of filtering/dropping earlier)
   *  - keep order of elements downstream
   */
 object DivertTo extends App {
@@ -35,18 +35,21 @@ object DivertTo extends App {
     }
     .map {
       //Drawback of this approach: Pattern matching on all downstream operations
-      case left@Left(value) => {
-        if (value.payload > 5) left
-        else Right(Invalid(value.payload, Some(new Exception("Is smaller than 5"))))
-      }
+      case left@Left(_) => businessLogicOn(left)
       case right@Right(_) => right
     }
     .map {
       case left@Left(_) => left
       case right@Right(_) => right
     }
-    //contramap: apply "isRight" to each incoming upstream element before it is passed to the sink
+    //Divert invalid elements
+    //contramap: apply "right.get" to each incoming upstream element *before* it is passed to the errorSink
     .divertTo(errorSink.contramap(_.right.get), _.isRight)
+
+  private def businessLogicOn(left: Left[Valid[Int], Invalid[Int]]) = {
+    if (left.value.payload > 5) left
+    else Right(Invalid(left.value.payload, Some(new Exception("Is smaller than 5"))))
+  }
 
   val done = source.via(flow).runWith(sink)
   terminateWhen(done)
