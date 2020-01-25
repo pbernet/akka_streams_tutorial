@@ -16,6 +16,7 @@ import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.FileSystemFile
 import org.apache.commons.lang3.exception.ExceptionUtils
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
 import scala.concurrent.Future
@@ -27,18 +28,19 @@ import scala.util.{Failure, Success}
   * Implement an upload/download echo flow for the happy path, trying to use alpakka sftp features for everything
   *
   * Reproducer to show these issues:
-  * - Alpakka SFTP mkdir() and move() operations fail silently
-  * - Trying to use the native sshj rename() instead of SFTP.move() leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException: Failure
-  *   It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
+  *  - Alpakka SFTP mkdir() and move() operations fail silently
+  *  - Trying to use the native sshj rename() instead of SFTP.move() leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException
+  * It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
   *
   * Remarks:
-  * - Start the docker SFTP server from: /docker/docker-compose.yml with cmd line: docker-compose up -d sftp
+  *  - Prerequisite: start the docker SFTP server from: /docker/docker-compose.yml (eg by cmd line: docker-compose up -d sftp)
+  *  - Log noise from libs is turned down in logback.xml
   *
   * TODOs
-  * - Implement failure scenarios
-  * - Add shutdown code
+  *  - Implement failure scenarios during upload/download
   */
 object SFTPEcho extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SFTPEcho")
   implicit val executionContext = system.dispatcher
 
@@ -65,58 +67,60 @@ object SFTPEcho extends App {
 
   removeAll().onComplete {
     case Success(_) =>
-      println("Successfully cleaned...")
+      logger.info("Successfully cleaned...")
       createFoldersNative()
       uploadClient()
       downloadClient()
     case Failure(e) =>
-      println(s"Failure while cleaning: ${e.getMessage}. About to terminate...")
+      logger.info(s"Failure while cleaning: ${e.getMessage}. About to terminate...")
       system.terminate()
   }
 
 
   def uploadClient() = {
-    println("Starting upload...")
+    logger.info("Starting upload...")
 
-    //Simulate unbounded stream of files to upload
-    //Generate file content in memory to avoid the overhead of generating n test files on the filesystem
     Source(1 to 100)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
-      .wireTap(number => println(s"Upload file with TRACE_ID: $number"))
-      .runForeach { each =>
-        val result: Future[IOResult] = Source
-          .single(ByteString(s"this is the file contents for: $each"))
-          .runWith(uploadToPath(sftpDirName + s"/file_$each.txt"))
-        result.onComplete(res => println(s"Client uploaded file with TRACE_ID: $each. Result: $res"))
+      .wireTap(number => logger.info(s"Upload file with TRACE_ID: $number"))
+      .mapAsync(parallelism = 10) {
+        each =>
+          val result = Source
+            //Generate file content in memory to avoid the overhead of generating n test files on the filesystem
+            .single(ByteString(s"this is the file contents for: $each"))
+            .runWith(uploadToPath(sftpDirName + s"/file_$each.txt"))
+          result.onComplete(res => logger.info(s"Client uploaded file with TRACE_ID: $each. Result: $res"))
+          result
       }
+      .runWith(Sink.ignore)
   }
 
 
   def downloadClient(): Unit = {
     Thread.sleep(5000) //wait to get some files
-    println("Starting download run...")
+    logger.info("Starting download run...")
 
     val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
       listFiles(s"/$sftpDirName")
-        //.take(10) //Try to batch
+        .take(10) //Try to batch
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMove(ftpFile))
         .runWith(Sink.seq)
 
     fetchedFiles
       .map { files: immutable.Seq[(String, IOResult)] =>
-        println(s"Fetched: ${files.seq.size} files: " + files)
+        logger.info(s"Fetched: ${files.seq.size} files: " + files)
         files.filter { case (_, r) => r.status.isFailure }
       }
       .onComplete {
         case Success(errors) if errors.isEmpty =>
-          println("All files fetched for this run. About to start next run.")
+          logger.info("All files fetched for this run. About to start next run.")
           downloadClient() //Try to do a continuous download
         case Success(errors) =>
-          println(s"Errors occurred: ${errors.mkString("\n")}")
+          logger.info(s"Errors occurred: ${errors.mkString("\n")}")
           system.terminate()
         case Failure(exception) =>
-          println(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
+          logger.info(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
           system.terminate()
       }
   }
@@ -127,7 +131,7 @@ object SFTPEcho extends App {
     val localFile = File.createTempFile(ftpFile.name, ".tmp.client")
     //localFile.deleteOnExit()
     val localPath = localFile.toPath
-    println(s"About to fetch file: $ftpFile to local path: $localPath")
+    logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
 
     val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
       .runWith(FileIO.toPath(localPath))
@@ -164,12 +168,11 @@ object SFTPEcho extends App {
     val sftpClient = newSFTPClient()
 
     try {
-      if (sftpClient.statExistence(s"$sftpDirName/$processedDirName") == null)
-        {
-          sftpClient.mkdir(s"$sftpDirName/$processedDirName")
-        } else {
-          sftpClient.rmdir(s"$sftpDirName/$processedDirName")
-          sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+      if (sftpClient.statExistence(s"$sftpDirName/$processedDirName") == null) {
+        sftpClient.mkdir(s"$sftpDirName/$processedDirName")
+      } else {
+        sftpClient.rmdir(s"$sftpDirName/$processedDirName")
+        sftpClient.mkdir(s"$sftpDirName/$processedDirName")
       }
     } finally
       sftpClient.close()
@@ -228,7 +231,7 @@ object SFTPEcho extends App {
     sshClient.newSFTPClient()
   }
 
-  private def createSshClientAndConnect():SSHClient = {
+  private def createSshClientAndConnect(): SSHClient = {
     val sshClient = new SSHClient
     sshClient.addHostKeyVerifier(new PromiscuousVerifier) // to skip host verification
 
