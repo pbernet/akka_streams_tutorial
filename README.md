@@ -2,13 +2,13 @@
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of simple, runnable and self contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
+This repo contains a collection of runnable and self contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. Three more complex examples are described below:
 * HTTP download with local file cache
 * Windturbine Example
 * Apache Kafka WordCount
 
-These three examples all deal with some kind of shared mutable state.
+These three examples all deal with some kind of shared state.
 Most examples are throttled so you can see from the console output what is happening.
 Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
 No unit tests, sorry.
@@ -27,7 +27,7 @@ Simplified real world use case:
 
 ## Windturbine Example ##
 Working sample from the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
- from Colin Breck where an Actor is used to model shared mutable state, life-cycle management and fault-tolerance in combination with akka-streams.
+ from Colin Breck where an Actor is used to model shared state, life-cycle management and fault-tolerance in combination with akka-streams.
  Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
 Islands in the Stream: Integrating Akka Streams and Akka Actors
 ](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
