@@ -20,5 +20,11 @@ services:
       - JMX_PORT=1199
       - JMX_RMI_PORT=1198
 
+  sftp:
+    image: atmoz/sftp
+    ports:
+      - "2222:22"
+    command: echouser:password:::echo
+
 networks:
   runtime-net:

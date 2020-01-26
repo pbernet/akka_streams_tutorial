@@ -1,5 +1,4 @@
 <!doctype html>
-<html ng-app="app">
 <!-- Shamelessly stolen from: https://github.com/ticofab/simple-websocket-client -->
 <head>
     <meta charset="utf-8">
@@ -33,7 +32,7 @@
         }
         function sendMsg() {
             var message = document.getElementById("myMessage").value;
-            myWebSocket.send(message);
+            myWebSocket.send("Browser-" + message);
         }
         function closeConn() {
             myWebSocket.close();
@@ -55,7 +54,5 @@
 <input type="button" onclick="sendMsg()" value="Send message" />
 
 <input type="button" onclick="closeConn()" value="Close connection" />
-
-
 </body>
 </html>
