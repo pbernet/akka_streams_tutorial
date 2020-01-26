@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
-  "junit" % "junit" % "4.13-beta-1"
+  "junit" % "junit" % "4.13"
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
