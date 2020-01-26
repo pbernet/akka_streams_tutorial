@@ -11,7 +11,7 @@ val akkaStreamKafkaVersion = "2.0.0-RC1"
 val kafkaVersion = "2.4.0"
 val activemqVersion =  "5.15.11"
 val streamzVersion = "0.11-RC1"
-val camelVersion = "2.24.2"
+val camelVersion = "2.24.3"
 val testContainersVersion = "1.12.5"
 
 libraryDependencies ++= Seq(
