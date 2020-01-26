@@ -1,6 +1,6 @@
 package alpakka.sse
 
-import java.time.{Instant, LocalDateTime, ZoneId}
+import java.time.{Instant, ZoneId}
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -19,8 +19,11 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 
-case class Change(localDateTime: LocalDateTime, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
-  override def toString = s"$localDateTime - $cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
+case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+  override def toString = {
+    val localDateTime = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime
+    s"$localDateTime - $cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
+  }
 }
 
 /**
@@ -31,14 +34,14 @@ case class Change(localDateTime: LocalDateTime, serverName: String, user: String
   *
   */
 object SSEClientWikipediaEdits {
+  implicit val system = ActorSystem("SSEClientWikipediaEdits")
+  implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")
       Supervision.Restart
   }
-  implicit val system = ActorSystem("SSEClientWikipediaEdits")
-  implicit val executionContext = system.dispatcher
 
   def main(args: Array[String]) {
     browserClient()
@@ -79,8 +82,7 @@ object SSEClientWikipediaEdits {
           if (bot) user.toLowerCase().contains("bot") else false
         }
 
-        val ts = (Json.parse(event.data) \ "timestamp").as[Long]
-        val localDateTime = Instant.ofEpochSecond(ts).atZone(ZoneId.systemDefault()).toLocalDateTime
+        val timestamp = (Json.parse(event.data) \ "timestamp").as[Long]
 
         val serverName = (Json.parse(event.data) \ "server_name").as[String]
 
@@ -93,9 +95,9 @@ object SSEClientWikipediaEdits {
         if (cmdType == "new" || cmdType == "edit") {
           val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
           val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
-          Change(localDateTime, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
+          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
         } else {
-          Change(localDateTime, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
+          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
         }
       }
     }
