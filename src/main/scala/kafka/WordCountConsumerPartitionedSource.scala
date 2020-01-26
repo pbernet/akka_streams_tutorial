@@ -6,7 +6,7 @@ import akka.Done
 import akka.actor.{ActorSystem, Props}
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
 import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerMessage, ConsumerSettings, Subscriptions}
+import akka.kafka.{CommitterSettings, ConsumerMessage, ConsumerSettings, Subscriptions}
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import kafka.TotalFake.IncrementWord
@@ -27,10 +27,12 @@ import scala.concurrent.duration._
   * compared to WordCountConsumer
   */
 object WordCountConsumerPartitionedSource extends App {
-  implicit val system = ActorSystem()
+  implicit val system = ActorSystem("WordCountConsumerPartitionedSource")
   implicit val ec = system.dispatcher
 
   val total = system.actorOf(Props[TotalFake], "totalFake")
+
+  val committerSettings = CommitterSettings(system)
 
   def createConsumerSettings(group: String): ConsumerSettings[String, java.lang.Long] = {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
@@ -46,16 +48,22 @@ object WordCountConsumerPartitionedSource extends App {
     Consumer.committablePartitionedSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .flatMapMerge(2, _._2)
       .batch(max = 20, first => CommittableOffsetBatch.empty.updated(first.committableOffset)) { (batch: CommittableOffsetBatch, msg: ConsumerMessage.CommittableMessage[String, lang.Long]) =>
-        println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
-        if (msg.record.key() == "fakenews") {
+        //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
+        if (msg.record.key().equalsIgnoreCase("fakeNews")) { //WTF WordCountProducer.fakeNewsKeyword does not work
           import akka.pattern.ask
           implicit val askTimeout = Timeout(30.seconds)
         (total ? IncrementWord(msg.record.value.toInt, id)).mapTo[Done]
       }
       batch.updated(msg.committableOffset)
       }
+      //For unknown reasons commitScaladsl can not be replaced with DrainingControl construct...
       .mapAsync(3)(_.commitScaladsl())
       .runWith(Sink.ignore)
+  }
+
+  sys.addShutdownHook{
+    println("Got shutdown cmd from shell, about to shutdown...")
+    system.terminate()
   }
 
   createAndRunConsumerWordCount("W.1")
@@ -68,9 +76,4 @@ object WordCountConsumerPartitionedSource extends App {
   createAndRunConsumerWordCount("W.8")
   createAndRunConsumerWordCount("W.9")
   createAndRunConsumerWordCount("W.10")
-
-  sys.addShutdownHook{
-    println("Got shutdown cmd from shell, about to shutdown...")
-    system.terminate()
-  }
 }

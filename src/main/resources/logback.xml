@@ -15,7 +15,10 @@
     </appender>
 
     <!-- Turn down Kafka noise -->
-    <logger name="org.apache.kafka" level="WARN" />
+    <logger name="org.apache.kafka" level="WARN"/>
+    <!-- Turn down sshj noise in sftp -->
+    <logger name="net.schmizz.sshj" level="ERROR"/>
+    <logger name="com.hierynomus.sshj" level="ERROR"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
