@@ -30,22 +30,19 @@ import scala.util.{Failure, Success}
   * Reproducer to show these issues:
   *  - Alpakka SFTP mkdir() and move() operations fail silently
   *  - Trying to use the native sshj rename() instead of SFTP.move() leads after around 85 elements to: net.schmizz.sshj.sftp.SFTPException
-  * It looks as if this is an sshj issue, since sshj rm() works, see moveFileNative() below
+  * It looks as if this could be a sshj issue, see moveFileNative() below
+  *
+  * Prerequisite:
+  *  - Start the docker SFTP server from: /docker/docker-compose.yml (eg by cmd line: docker-compose up -d atmoz_sftp)
   *
   * Remarks:
-  *  - Prerequisite: start the docker SFTP server from: /docker/docker-compose.yml (eg by cmd line: docker-compose up -d sftp)
-  *  - Log noise from libs is turned down in logback.xml
-  *
-  * TODOs
+  *  - Log noise from sshj lib is turned down in logback.xml
   *  - Implement failure scenarios during upload/download
   */
 object SFTPEcho extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SFTPEcho")
   implicit val executionContext = system.dispatcher
-
-  val resourceFileName = "testfile.jpg"
-  val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
 
   val sftpDirName = "echo"
   val processedDirName = "processed"
@@ -107,18 +104,10 @@ object SFTPEcho extends App {
         .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMove(ftpFile))
         .runWith(Sink.seq)
 
-    fetchedFiles
-      .map { files: immutable.Seq[(String, IOResult)] =>
-        logger.info(s"Fetched: ${files.seq.size} files: " + files)
-        files.filter { case (_, r) => r.status.isFailure }
-      }
-      .onComplete {
-        case Success(errors) if errors.isEmpty =>
-          logger.info("All files fetched for this run. About to start next run.")
-          downloadClient() //Try to do a continuous download
-        case Success(errors) =>
-          logger.info(s"Errors occurred: ${errors.mkString("\n")}")
-          system.terminate()
+    fetchedFiles.onComplete {
+        case Success(results) =>
+          logger.info(s"Successfully fetched: ${results.size} files for this run. About to start next run...")
+          downloadClient()
         case Failure(exception) =>
           logger.info(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
           system.terminate()
@@ -210,6 +199,8 @@ object SFTPEcho extends App {
 
   //works
   private def uploadFileNative() = {
+    val resourceFileName = "testfile.jpg"
+    val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
     val sftpClient = newSFTPClient()
 
     try {

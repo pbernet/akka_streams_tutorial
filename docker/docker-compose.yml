@@ -20,7 +20,7 @@ services:
       - JMX_PORT=1199
       - JMX_RMI_PORT=1198
 
-  sftp:
+  atmoz_sftp:
     image: atmoz/sftp
     ports:
       - "2222:22"
