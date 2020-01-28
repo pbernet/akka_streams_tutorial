@@ -12,6 +12,7 @@ val kafkaVersion = "2.4.0"
 val activemqVersion =  "5.15.11"
 val streamzVersion = "0.11-RC1"
 val camelVersion = "2.24.2"
+val testContainersVersion = "1.12.5"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -35,6 +36,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   //"com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
@@ -42,10 +45,11 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-core" % camelVersion,
   "org.apache.camel" % "camel-stream" % camelVersion,
 
-  "com.typesafe.play" %% "play" % "2.6.21",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.2",
+  "com.typesafe.play" %% "play" % "2.8.0",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.6",
+  "org.apache.commons" % "commons-lang3" % "3.9",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6",
   "com.github.blemale" %% "scaffeine" % "3.0.0" % "compile",
@@ -53,7 +57,8 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.0.6" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
-  "org.testcontainers" % "testcontainers" % "1.12.4" % "test",
+  "org.testcontainers" % "testcontainers" % testContainersVersion,
+  "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "junit" % "junit" % "4.13-beta-1"
 )
 

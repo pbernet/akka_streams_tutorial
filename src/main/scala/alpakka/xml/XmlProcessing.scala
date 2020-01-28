@@ -1,13 +1,13 @@
 package alpakka.xml
 
 import java.io.{BufferedOutputStream, FileOutputStream}
+import java.nio.file.Paths
 import java.util.Base64
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.alpakka.xml.{EndElement, ParseEvent, StartElement, TextEvent}
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.ByteString
+import akka.stream.scaladsl.{FileIO, Sink}
 
 import scala.collection.immutable
 import scala.concurrent.Future
@@ -16,8 +16,11 @@ import scala.util.Try
 /**
   * Parse XML and extract embedded base64 application/pdf docs
   *
-  * TODO Extraction of the file name is missing,
-  * all the files are saved under the same dummy name
+  * Remarks:
+  * - Extraction of the file name is missing,
+  *   all the files are saved under the same dummy name
+  * - State case class could be used inside statefulMapConcat
+  * - Results could be written to fileSink (FileIO.toPath)
   */
 
 object XmlProcessing {
@@ -25,13 +28,7 @@ object XmlProcessing {
   implicit val executionContext = system.dispatcher
 
   def main(args: Array[String]): Unit = {
-    val source =  scala.io.Source.fromFile("./src/main/resources/CDA_Level_3.xml")
-    val fileContents = source.getLines.mkString
-    val byteStringDoc = ByteString.fromString(fileContents, "UTF-8")
-    source.close()
-
-    val result: Future[immutable.Seq[String]] = Source
-      .single(byteStringDoc)
+    val result: Future[immutable.Seq[String]] = FileIO.fromPath(Paths.get("./src/main/resources/largeEmbeddedPDF.xml"))
       .via(XmlParsing.parser)
       .statefulMapConcat(() => {
         // state
@@ -46,7 +43,7 @@ object XmlProcessing {
               immutable.Seq(mediaType)
             case s: EndElement if s.localName == "observationMedia" =>
               val text = textBuffer.toString
-              println("Add payload: " + text)
+              println("Add payload: " + text)  //Note that large embedded PDFs are read into memory
               immutable.Seq(text)
             case t: TextEvent =>
               textBuffer.append(t.text)
