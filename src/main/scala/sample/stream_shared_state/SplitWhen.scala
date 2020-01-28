@@ -19,7 +19,7 @@ import scala.util.{Failure, Success}
   * Inspired by:
   * https://discuss.lightbend.com/t/groupwhile-on-akka-streams/5592/3
   *
-  * Note that this implementation is ok, as long as the stream gets materialized only once
+  * Note that this implementation is ok-ish, as long as the stream gets materialized only once
   * see discussion:
   * https://discuss.lightbend.com/t/state-inside-of-flow-operators/5717
   *
@@ -74,6 +74,7 @@ object SplitWhen extends App {
         .mergeSubstreams
         .runForeach(println)
       terminateWhen(done)
+    case Failure(exception) => println(s"Exception: $exception")
   }
 
   case class Record(key: String, value: String)
