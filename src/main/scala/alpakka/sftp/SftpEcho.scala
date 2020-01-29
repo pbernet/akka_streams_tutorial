@@ -27,9 +27,8 @@ import scala.util.{Failure, Success}
   * Prerequisite:
   *  - Start the docker SFTP server from: /docker/docker-compose.yml (eg by cmd line: docker-compose up -d atmoz_sftp)
   *
-  * Reproducer to show these issues:
-  *  - TODO Alpakka SFTP mkdir() operations fails silently
-  *  - TODO Method processAndMove hangs after 30 elements
+  * Reproducer to show these issue:
+  *  - Method processAndMove hangs after 30 elements
   *
   * Remarks:
   *  - Log noise from sshj lib is turned down in logback.xml
@@ -66,7 +65,7 @@ object SftpEcho extends App {
   removeAll().onComplete {
     case Success(_) =>
       logger.info("Successfully cleaned...")
-      createFoldersNative()
+      createFolders()
       uploadClient()
       downloadClient()
     case Failure(e) =>
@@ -111,7 +110,6 @@ object SftpEcho extends App {
       .flatMapConcat(ftpFile => Sftp.fromPath(ftpFile.path, sftpSettings).map((_, ftpFile)))
       .wireTap(each => logger.info(s"About to process: $each"))
       .alsoTo(FileIO.toPath(Files.createTempFile("downloaded", "tmp")).contramap(_._1))
-      .wireTap(each => logger.info(s"About to move: $each"))
       .to(Sftp.move(destinationPath, sftpSettings).contramap(_._2))
 
 
@@ -128,10 +126,8 @@ object SftpEcho extends App {
   private def retrieveFromPath(path: String): Source[ByteString, Future[IOResult]] =
     Sftp.fromPath(path, sftpSettings)
 
-
-  //TODO This fails silently, no folders are created
   private def createFolders() = {
-    mkdir(sftpRootDir, processedDir)
+    mkdir(s"/$sftpRootDir", s"/$sftpRootDir/$processedDir")
   }
 
   //works
