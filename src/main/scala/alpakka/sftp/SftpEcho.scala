@@ -34,7 +34,7 @@ import scala.util.{Failure, Success}
   *
   * Reproducer to show these issues:
   *  - Method [[SftpEcho.createFolders]] does not work. Workaround: [[SftpEcho.createFoldersNative]]
-  *  - Method [[SftpEcho.processAndMove]] () hangs after 30 elements. [[SftpEcho.processAndMoveVerbose]]
+  *  - Method [[SftpEcho.processAndMove]] hangs after 30 elements. [[SftpEcho.processAndMoveVerbose]]
   *
   * Remarks:
   *  - Log noise from sshj lib is turned down in logback.xml
@@ -110,7 +110,7 @@ object SftpEcho extends App {
   def processAndMoveVerbose(): Unit = {
     val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
       listFiles(s"/$sftpRootDir")
-        .take(10) //Try to batch
+        .take(50) //Try to batch
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMoveVerbose(ftpFile))
         .runWith(Sink.seq)
@@ -209,8 +209,8 @@ object SftpEcho extends App {
     val sftpClient = newSftpClient()
 
     try {
-      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj :-(
-      //sftpClient.rename(ftpFile.path, s"$sftpDirName/$processedDirName/${ftpFile.name}")
+      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj after around 60 elements
+      //sftpClient.rename(ftpFile.path, s"/$sftpRootDir/$processedDir/${ftpFile.name}")
 
       //rm native works
       sftpClient.rm(ftpFile.path)
