@@ -1,5 +1,6 @@
 package alpakka.sftp
 
+import java.io.File
 import java.net.InetAddress
 import java.nio.file.{Files, Paths}
 
@@ -14,21 +15,26 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.FileSystemFile
+import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
 /**
-  * Implement an upload/download echo flow for the happy path, trying to use alpakka sftp features for everything
+  * Implement an upload/download echo flow for the happy path,
+  * trying to use alpakka sftp features for everything
   *
   * Prerequisite:
-  *  - Start the docker SFTP server from: /docker/docker-compose.yml (eg by cmd line: docker-compose up -d atmoz_sftp)
+  *  - Start the docker SFTP server from: /docker/docker-compose.yml
+  *    eg by cmd line: docker-compose up -d atmoz_sftp
   *
-  * Reproducer to show these issue:
-  *  - Method processAndMove hangs after 30 elements
+  * Reproducer to show these issues:
+  *  - Method [[SftpEcho.createFolders]] does not work. Workaround: [[SftpEcho.createFoldersNative]]
+  *  - Method [[SftpEcho.processAndMove]] () hangs after 30 elements. [[SftpEcho.processAndMoveVerbose]]
   *
   * Remarks:
   *  - Log noise from sshj lib is turned down in logback.xml
@@ -65,7 +71,7 @@ object SftpEcho extends App {
   removeAll().onComplete {
     case Success(_) =>
       logger.info("Successfully cleaned...")
-      createFolders()
+      createFoldersNative()
       uploadClient()
       downloadClient()
     case Failure(e) =>
@@ -97,9 +103,47 @@ object SftpEcho extends App {
     Thread.sleep(5000) //wait to get some files
     logger.info("Starting download run...")
 
-    processAndMove(s"/$sftpRootDir", (file: FtpFile) => s"/$sftpRootDir/$processedDir/${file.name}", sftpSettings)
-      .run()
+    //processAndMove(s"/$sftpRootDir", (file: FtpFile) => s"/$sftpRootDir/$processedDir/${file.name}", sftpSettings).run()
+    processAndMoveVerbose()
   }
+
+  def processAndMoveVerbose(): Unit = {
+    val fetchedFiles: Future[immutable.Seq[(String, IOResult)]] =
+      listFiles(s"/$sftpRootDir")
+        .take(10) //Try to batch
+        .filter(ftpFile => ftpFile.isFile)
+        .mapAsyncUnordered(parallelism = 5)(ftpFile => fetchAndMoveVerbose(ftpFile))
+        .runWith(Sink.seq)
+
+    fetchedFiles.onComplete {
+      case Success(results) =>
+        logger.info(s"Successfully fetched: ${results.size} files for this run. About to start next run...")
+        downloadClient()
+      case Failure(exception) =>
+        logger.info(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
+        system.terminate()
+    }
+  }
+
+  private def fetchAndMoveVerbose(ftpFile: FtpFile) = {
+
+    val localFile = File.createTempFile(ftpFile.name, ".tmp.client")
+    //localFile.deleteOnExit()
+    val localPath = localFile.toPath
+    logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
+
+    val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
+      .runWith(FileIO.toPath(localPath))
+    fetchFile.map { ioResult =>
+      //Fails silently
+      //Sftp.move((ftpFile) => s"$sftpDirName/$processedDirName/", sftpSettings)
+
+      moveFileNative(ftpFile)
+      (ftpFile.path, ioResult)
+    }
+  }
+
+
 
   //TODO This hangs after 30 elements
   def processAndMove(sourcePath: String,
@@ -108,7 +152,7 @@ object SftpEcho extends App {
     Sftp
       .ls(sourcePath, sftpSettings)
       .flatMapConcat(ftpFile => Sftp.fromPath(ftpFile.path, sftpSettings).map((_, ftpFile)))
-      .wireTap(each => logger.info(s"About to process: $each"))
+      .wireTap(each => logger.info(s"About to process file: ${each._2.name}"))
       .alsoTo(FileIO.toPath(Files.createTempFile("downloaded", "tmp")).contramap(_._1))
       .to(Sftp.move(destinationPath, sftpSettings).contramap(_._2))
 
@@ -159,6 +203,19 @@ object SftpEcho extends App {
       .filter(each => each.path.equals(path))
     val sink = Sftp.remove(sftpSettings)
     source.runWith(sink)
+  }
+
+  private def moveFileNative(ftpFile: FtpFile) = {
+    val sftpClient = newSftpClient()
+
+    try {
+      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj :-(
+      //sftpClient.rename(ftpFile.path, s"$sftpDirName/$processedDirName/${ftpFile.name}")
+
+      //rm native works
+      sftpClient.rm(ftpFile.path)
+    } finally
+      sftpClient.close()
   }
 
   //works
