@@ -23,8 +23,8 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
-  * Differences to FileEcho:
-  *  * The client sends a Stream of FileHandle instead of a Single requests as in FileEcho
+  * Differences to [[HttpFileEcho]]:
+  *  * The client sends a Stream of FileHandle instead of a Single requests
   *  * The client downloads using the host-level API with a SourceQueue
   *  * Retries via are set via config param max-retries in application.conf
   *
@@ -38,8 +38,8 @@ import scala.util.{Failure, Success}
   *  * Cleanup on pool shutdown
   *
   */
-object FileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("FileEchoStream")
+object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
+  implicit val system = ActorSystem("HttpFileEchoStream")
   implicit val executionContext = system.dispatcher
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
@@ -123,7 +123,7 @@ object FileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport
     }
 
 
-    def download(fileHandle: FileEchoStream.FileHandle) = {
+    def download(fileHandle: HttpFileEchoStream.FileHandle) = {
       val queueSize = 1
       val poolClientFlowDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
       val queue =

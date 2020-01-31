@@ -27,7 +27,7 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 }
 
 /**
-  * This file upload/download round trip is inspired by:
+  * This HTTP file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
   * It's possible to upload/download files up to 60MB, see settings in application.conf
@@ -35,8 +35,8 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * - Run FileEcho with limited Heap eg -Xms256m -Xmx256m
   * - Monitor the heap with visualvm.github.io
   */
-object FileEcho extends App with JsonProtocol {
-  implicit val system = ActorSystem("FileEcho")
+object HttpFileEcho extends App with JsonProtocol {
+  implicit val system = ActorSystem("HttpFileEcho")
   implicit val executionContext = system.dispatcher
 
   val resourceFileName = "testfile.jpg"
@@ -85,7 +85,7 @@ object FileEcho extends App with JsonProtocol {
     }
   }
 
-  def uploadClient(id: Int, address: String, port: Int): Future[FileEcho.FileHandle] = {
+  def uploadClient(id: Int, address: String, port: Int): Future[HttpFileEcho.FileHandle] = {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
