@@ -4,7 +4,7 @@
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. Three more complex examples are described below:
-* HTTP download with local file cache
+* HTTP file download with local cache
 * Windturbine Example
 * Apache Kafka WordCount
 
@@ -14,7 +14,7 @@ Remarks:
 * Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
 * No unit tests, sorry.
 
-## HTTP download with local file cache ##
+## HTTP file download with local cache ##
 Use case:
   * Process a stream of incoming messages with reoccurring TRACE_ID
   * For the first message: download a .zip file from a _FileServer_ and add TRACE_ID->Path to the local cache
