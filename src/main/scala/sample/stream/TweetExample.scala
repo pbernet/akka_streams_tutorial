@@ -1,20 +1,30 @@
 package sample.stream
 
+import java.time.{Instant, ZoneId}
+
 import akka.NotUsed
 import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.scaladsl.{MergePrioritized, Sink, Source}
+import akka.stream.DelayOverflowStrategy
+import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
+import org.apache.commons.lang3.exception.ExceptionUtils
+import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success}
 
 /**
-  * Adapted tweet example from akka streams tutorial
-  * - added MergePrioritized Feature - see https://softwaremill.com/akka-2.5.4-features
+  * Adapted tweet example from akka streams tutorial,
+  * added MergePrioritized Feature
   *
+  * Doc:
+  * https://doc.akka.io/docs/akka/current/stream/operators/Source/combine.html
+  * https://softwaremill.com/akka-2.5.4-features
   */
 
-object TweetExample {
+object TweetExample extends App {
+  implicit val system = ActorSystem("TweetExample")
+  implicit val ec = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   final case class Author(handle: String)
 
@@ -23,35 +33,41 @@ object TweetExample {
   final case class Tweet(author: Author, timestamp: Long, body: String) {
     def hashtags: Set[Hashtag] =
       body.split(" ").collect { case t if t.startsWith("#") => Hashtag(t) }.toSet
+
+    override def toString = {
+      val localDateTime = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime
+      s"$localDateTime - ${author.handle} tweeted: ${body.take(5)}..."
+    }
   }
 
   val akkaTag = Hashtag("#akka")
 
+  val tweetsLowPrio: Source[Tweet, Cancellable] = Source.tick(1.second, 200.millis, NotUsed).map(_ => Tweet(Author("LowPrio"), System.currentTimeMillis, "#other #akka aBody"))
+  val tweetsHighPrio: Source[Tweet, Cancellable] = Source.tick(2.second, 1.second, NotUsed).map(_ => Tweet(Author("HighPrio"), System.currentTimeMillis, "#akka #other aBody"))
+  val tweetsVeryHighPrio: Source[Tweet, Cancellable] = Source.tick(2.second, 1.second, NotUsed).map(_ => Tweet(Author("VeryHighPrio"), System.currentTimeMillis, "#akka #other aBody"))
 
-  def main(args: Array[String]): Unit = {
+  val limitedTweets: Source[Tweet, NotUsed] = Source.combine(tweetsLowPrio, tweetsHighPrio, tweetsVeryHighPrio)(_ => MergePrioritized(List(1, 10, 100))).take(20)
 
-    implicit val system = ActorSystem("TweetExample")
-    implicit val ec = system.dispatcher
+  val processingFlow = Flow[Tweet]
+    .filter(_.hashtags.contains(akkaTag))
+    .wireTap(each => logger.info(s"$each"))
 
-    val tweetsLowPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 100.millis, Tweet(Author("LowPrio"), System.currentTimeMillis, "#other #akka aBody"))
-    val tweetsHighPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 1.second, Tweet(Author("HighPrio"), System.currentTimeMillis, "#akka #other aBody"))
-    val tweetsVeryHighPrio: Source[Tweet, Cancellable]  = Source.tick(1.second, 1.second, Tweet(Author("VeryHighPrio"), System.currentTimeMillis, "#akka #other aBody"))
+  val slowDownstream  =
+    Flow[Tweet]
+      .delay(5.seconds, DelayOverflowStrategy.backpressure)
 
-    val limitedTweets: Source[Tweet, NotUsed] = Source.combine(tweetsLowPrio, tweetsHighPrio, tweetsVeryHighPrio)(numInputs => MergePrioritized(List(1,10,100))).take(20)
+  val processedTweets =
+    limitedTweets
+      .via(processingFlow)
+      .via(slowDownstream)
+      .runWith(Sink.seq)
 
-    val authors: Source[Author, NotUsed] =
-      limitedTweets
-        .filter(_.hashtags.contains(akkaTag))
-        .map(_.author)
-
-    authors.runWith(Sink.foreach(println))
-
-    val sumSink: Sink[Int, Future[Int]] = Sink.fold[Int, Int](0)(_ + _)
-    val sum: Future[Int] = limitedTweets.map(t => 1).runWith(sumSink)
-    sum.onComplete { result: Try[Int] =>
-      println("Resulting Future from run completed with result: " + result)
+  processedTweets.onComplete {
+    case Success(results) =>
+      logger.info(s"Successfully processed: ${results.size} tweets")
       system.terminate()
-    }
-    sum.foreach(c => println(s"Number of limitedTweets processed: $c"))
+    case Failure(exception) =>
+      logger.info(s"The stream failed with: ${ExceptionUtils.getRootCause(exception)}")
+      system.terminate()
   }
 }
