@@ -8,10 +8,11 @@ See the class comment on how to run each example. Three more complex examples ar
 * Windturbine Example
 * Apache Kafka WordCount
 
-These three examples all deal with some kind of shared state.
-Most examples are throttled so you can see from the console output what is happening.
-Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
-No unit tests, sorry.
+These three examples all deal with some kind of shared state. The *Echo classes implement roundtrips eg in [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) a HTTP upload/download.
+Remarks:
+* Most examples are throttled so you can see from the console output what is happening.
+* Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
+* No unit tests, sorry.
 
 ## HTTP download with local file cache ##
 Use case:
