@@ -15,12 +15,13 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Dummy HTTP FileServer for local file download simulation
+  * HTTP FileServer for local file download simulation
   *
-  * Normal response: /download/[id]
-  * Flaky response:  /downloadflaky/[id]
-  * Non-idempotent response: /downloadni/[id]
-  *  Allow each id only once, answer with 404 on consecutive requests
+  * The client can request these types of response:
+  *  - Normal response: /download/[id]
+  *  - Flaky response:  /downloadflaky/[id]
+  *  - Non-idempotent response: /downloadni/[id]
+  *    Allow each id only once, answer with 404 on consecutive requests
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)

@@ -14,14 +14,14 @@ Some examples deliberately throw RuntimeExceptions, so you can observe recovery.
 No unit tests, sorry.
 
 ## HTTP download with local file cache ##
-Simplified real world use case:
+Use case:
   * Process a stream of incoming messages with reoccurring TRACE_ID
   * For the first message: download a .zip file from a _FileServer_ and add TRACE_ID->Path to the local cache
   * For subsequent messages with the same TRACE_ID: fetch file from cache to avoid duplicate downloads per TRACE_ID
 
 | Class                     | Description     |
 | -------------------       |-----------------|
-| [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Dummy HTTP FileServer for non-idempotent file download simulation|
+| [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Local HTTP FileServer for non-idempotent file download simulation|
 | [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams flow, which uses a local file cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") to share state|
 
 

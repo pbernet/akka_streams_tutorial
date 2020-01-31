@@ -24,19 +24,19 @@ import scala.util.control.NonFatal
 
 
 /**
-  * Implement a local file cache with caffeine https://github.com/ben-manes/caffeine
-  * Use scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
-  * Use CacheWriter to write .zip file to file storage
+  * Use case:
+  *  - Process a stream of messages with reoccurring TRACE_ID
+  *  - For the first TRACE_ID download a .zip file from the FileServer and add the Path to the cache
+  *  - For subsequent TRACE_IDs try to fetch from the cache to avoid duplicate downloads per TRACE_ID
+  *  - On downstream error: the file needs to be kept longer in the cache
+  *  - On system restart: read all files from filesystem to cache
   *
-  * Before running this class, start alpakka.env.FileServer as (faulty) HTTP download mock
+  * Before running this class: start [[FileServer]] to simulate non idempotent responses
   * Monitor localFileCache dir with:  watch ls -ltr
   *
-  * Use case:
-  * Process a stream of messages with reoccurring TRACE_ID
-  * For the first TRACE_ID download a .zip file from the FileServer and add the Path to the cache
-  * For subsequent TRACE_IDs try to fetch from the cache to avoid duplicate downloads per TRACE_ID
-  * On downstream error: the file needs to be kept longer in the cache
-  * On system restart: read all files from filesystem to cache
+  * Remarks:
+  *  - Caffeine: https://github.com/ben-manes/caffeine
+  *  - Scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
   */
 object LocalFileCacheCaffeine {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -145,7 +145,7 @@ object LocalFileCacheCaffeine {
       }
 
     //Generate random messages with IDs between 0/50 note that after a while we will have only cache hits
-    //Do it like this to have a higher chance of concurrent messages (= same id)
+    //Done like this to have a higher chance of producing messages with the same ID
     val messagesGroupZero = List.fill(10000)(Message(0, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupOne = List.fill(10000)(Message(1, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupTwo = List.fill(10000)(Message(2, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
