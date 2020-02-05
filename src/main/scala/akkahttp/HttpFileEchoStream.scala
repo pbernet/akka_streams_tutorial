@@ -24,8 +24,8 @@ import scala.util.{Failure, Success}
 
 /**
   * Differences to [[HttpFileEcho]]:
-  *  - The client sends a Stream of FileHandle instead of a Single requests
-  *  - The client downloads using the host-level API with a SourceQueue
+  *  - The upload client is processing a stream of FileHandle
+  *  - The download client is using the host-level API with a SourceQueue
   *  - Number of retries set via config param max-retries in application.conf
   *
   * Doc:
