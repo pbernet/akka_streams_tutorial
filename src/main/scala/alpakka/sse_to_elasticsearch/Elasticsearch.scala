@@ -1,25 +1,28 @@
 package alpakka.sse_to_elasticsearch
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.alpakka.elasticsearch.ElasticsearchWriteSettings
 import akka.stream.alpakka.elasticsearch.WriteMessage.createIndexMessage
 import akka.stream.alpakka.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
+import akka.stream.alpakka.elasticsearch.{ElasticsearchWriteSettings, ReadResult, WriteMessage}
 import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
 import akka.stream.{ActorAttributes, Supervision}
+import akka.{Done, NotUsed}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.elasticsearch.ElasticsearchContainer
 import play.api.libs.json._
+import spray.json
 import spray.json.DefaultJsonProtocol.{jsonFormat8, _}
 import spray.json.JsonFormat
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.sys.process.Process
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -27,7 +30,7 @@ import scala.util.control.NonFatal
   * Read Wikipedia edits via SSE (like in SSEClientWikipediaEdits) and write to Elasticsearch version 6.x
   *
   * Improvement:
-  * - Add JSON directly to index without using type class Change, Doc:
+  * - Add JSON directly to index without using type class [[Elasticsearch.Change]], Doc:
   *   https://doc.akka.io/docs/alpakka/current/elasticsearch.html#storing-documents-from-strings
   */
 object Elasticsearch {
@@ -46,14 +49,14 @@ object Elasticsearch {
   val elasticsearchVersion = "6.8.6"
   val elasticsearchContainer = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch-oss:" + elasticsearchVersion)
   elasticsearchContainer.start()
-  val elasticsearchAddress = elasticsearchContainer.getHttpHostAddress.split(":")
+  val elasticsearchAddress: Array[String] = elasticsearchContainer.getHttpHostAddress.split(":")
 
   implicit val elasticSearchClient: RestClient = RestClient.builder(new HttpHost(elasticsearchAddress(0), elasticsearchAddress(1).toInt)).build()
 
   val indexName = "wikipediaedits"
   val typeName = "_doc"
-  val elasticsearchSink = ElasticsearchSink.create[Change](indexName, typeName, ElasticsearchWriteSettings.create())
-  val elasticsearchSource = ElasticsearchSource.create(indexName, typeName, """{"match_all": {}}""")
+  val elasticsearchSink: Sink[WriteMessage[Change, NotUsed], Future[Done]] = ElasticsearchSink.create[Change](indexName, typeName, ElasticsearchWriteSettings.create())
+  val elasticsearchSource: Source[ReadResult[json.JsObject], NotUsed] = ElasticsearchSource.create(indexName, typeName, """{"match_all": {}}""")
 
 
   def main(args: Array[String]) {
@@ -62,6 +65,8 @@ object Elasticsearch {
     readFromWikipediaAndWriteToElasticsearch()
 
     Thread.sleep(10.seconds.toMillis)
+
+    browserClient()
 
     for {
       result <- readFromElasticsearch(indexName, typeName)
@@ -144,5 +149,10 @@ object Elasticsearch {
       elasticSearchClient.close()
       elasticsearchContainer.stop()
     }
+  }
+
+  private def browserClient() = {
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") Process(s"open http://localhost:${elasticsearchAddress(1).toInt}/wikipediaedits/_search?q=*").!
   }
 }
