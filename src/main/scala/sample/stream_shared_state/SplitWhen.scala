@@ -28,17 +28,18 @@ object SplitWhen extends App {
   implicit val system = ActorSystem("SplitWhen")
   implicit val executionContext = system.dispatcher
 
-  val capacity = 1000
+  val nonLinearCapacityFactor = 100 //raise to see how it scales
   val filename = "splitWhen.csv"
 
   def genResourceFile() = {
+    logger.info(s"Writing resource file: $filename...")
 
     def fileSink(filename: String): Sink[String, Future[IOResult]] =
       Flow[String]
         .map(s => ByteString(s + "\n"))
         .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right)
 
-    Source.fromIterator(() => (1 to capacity).toList.combinations(2))
+    Source.fromIterator(() => (1 to nonLinearCapacityFactor).toList.combinations(2))
       .map(each => s"${each.head},${each.last}")
       .runWith(fileSink(filename))
   }
@@ -51,30 +52,46 @@ object SplitWhen extends App {
     .map(_.split(",").map(_.trim))
     .map(stringArrayToRecord)
 
-  def stringArrayToRecord(cols: Array[String]) = Record(cols(0), cols(1))
+  val terminationHook: Flow[Record, Record, Unit] = Flow[Record]
+    .watchTermination() { (_, done) =>
+      done.onComplete {
+        case Failure(err) => logger.info(s"Flow failed: $err")
+        case _ => system.terminate(); logger.info(s"Flow terminated")
+      }
+    }
+
+  val printSink = Sink.foreach[Vector[Record]](each => println(s"Reached sink: $each"))
+
+  private def stringArrayToRecord(cols: Array[String]) = Record(cols(0), cols(1))
+
+  private def hasKeyChanged = {
+    () => {
+      var lastRecordKey: Option[String] = None
+      currentRecord: Record =>
+        lastRecordKey match {
+          case Some(currentRecord.key) | None =>
+            lastRecordKey = Some(currentRecord.key)
+            List((currentRecord, false))
+          case _ =>
+            lastRecordKey = Some(currentRecord.key)
+            List((currentRecord, true))
+        }
+    }
+  }
 
   genResourceFile().onComplete {
     case Success(_) =>
-      val done = sourceOfLines
-        //.throttle(100, 1.second)
+      logger.info(s"Start processing...")
+      sourceOfLines
         .via(csvToRecord)
-        .splitWhen(SubstreamCancelStrategy.drain) {
-          var lastRecordKey: Option[String] = None
-          currentRecord =>
-            lastRecordKey match {
-              case Some(currentRecord.key) | None =>
-                lastRecordKey = Some(currentRecord.key)
-                false
-              case _ =>
-                lastRecordKey = Some(currentRecord.key)
-                true
-            }
-        }
-        .fold(Vector.empty[Record])(_ :+ _)
-        .mergeSubstreams
-        .runForeach(println)
-      terminateWhen(done)
-    case Failure(exception) => println(s"Exception: $exception")
+        .via(terminationHook)
+        .statefulMapConcat(hasKeyChanged)   // stateful decision
+        .splitWhen(_._2)                    // split when key has changed
+        .map(_._1)                          // proceed with payload
+        .fold(Vector.empty[Record])(_ :+ _) // sum payload
+        .mergeSubstreams                    // better performance, but why?
+        .runWith(printSink)
+    case Failure(exception) => logger.info(s"Exception: $exception")
   }
 
   case class Record(key: String, value: String)
