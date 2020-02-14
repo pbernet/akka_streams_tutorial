@@ -19,6 +19,9 @@ case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
   * https://doc.akka.io/docs/akka/2.5/stream/stream-cookbook.html#dropping-elements
   * https://github.com/DimaD/akka-streams-slow-consumer/blob/master/src/main/scala/Example.scala
   *
+  * Doc:
+  * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/conflate.html
+  *
   */
 object SlowConsumerDropsElementsOnFastProducer {
   implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
@@ -58,8 +61,8 @@ object SlowConsumerDropsElementsOnFastProducer {
       }
 
   val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
-    //Conflate is "rate aware", it combines elements from upstream while downstream backpressures
-    //The reducer function takes the freshest element. This in a simple dropping operation.
+    //Conflate is "rate aware", it combines/aggregates elements from upstream while downstream backpressures
+    //The reducer function here takes the freshest element. This in a simple dropping operation.
     Flow[SourceEvent]
       .conflate((lastEvent, newEvent) => newEvent)
 }
