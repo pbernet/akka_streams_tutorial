@@ -4,27 +4,45 @@ import java.nio.file.Paths
 
 import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
-import akka.stream.{IOResult, SubstreamCancelStrategy}
 import akka.util.ByteString
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Given a sorted stream of records e.g. read a file that has records sorted based on key
-  * Create a new Group / Subflow and collect records while the record key is the same as before (predicate),
-  * once we encounter a new key, emit the aggregation for the previous group and create a new group.
+  * Given a sorted stream of records e.g. from a file that has records sorted based on key
+  *
+  * key, value
+  * 1,2
+  * 1,3
+  * 1,4
+  * 1,5
+  * 2,3  <--
+  * 2,4
+  * 2,5
+  * 3,4  <--
+  * 3,5
+  * 4,5  <--
+  *
+  * Create a new group and collect records while the record key is the same as before.
+  * When we encounter a changed key, emit the aggregation for the previous group and create a new group.
   *
   * Inspired by:
   * https://discuss.lightbend.com/t/groupwhile-on-akka-streams/5592/3
   *
-  * Note that this implementation is ok-ish, as long as the stream gets materialized only once
-  * see discussion:
+  * and by doc:
+  * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/splitWhen.html
+  *
+  * Note that this implementation can be materialized many times because the
+  * stateful decision is done in statefulMapConcat, see discussion:
   * https://discuss.lightbend.com/t/state-inside-of-flow-operators/5717
   *
   */
 object SplitWhen extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SplitWhen")
   implicit val executionContext = system.dispatcher
 
@@ -95,15 +113,4 @@ object SplitWhen extends App {
   }
 
   case class Record(key: String, value: String)
-
-  def terminateWhen(done: Future[_]) = {
-    done.onComplete {
-      case Success(b) =>
-        println("Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        println(s"Flow Failure: $e. About to terminate...")
-        system.terminate()
-    }
-  }
 }
