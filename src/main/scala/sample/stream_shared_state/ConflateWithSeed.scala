@@ -12,7 +12,7 @@ import scala.util.Random
   * Inspired by:
   * https://discuss.lightbend.com/t/mutable-state-in-conflatewithseed-functions/5933/3
   *
-  * Conflate here acts as a stateful collector/aggregator of reoccuring values
+  * conflateWithSeed here acts as a stateful collector/aggregator of reoccuring values
   * on slow downstream sinks
   *
   */
@@ -29,6 +29,9 @@ object ConflateWithSeed extends App {
     state
   }
 
+  // lazyFlow is not really needed here, but nice to know that it exists
+  // conflateWithSeed invokes the seed method every time, so it
+  // is safe to materialize this flow multiple times
   val lazyFlow = Flow.lazyFlow(() =>
     Flow[Int]
     .map(_ => Random.nextInt(100))
@@ -40,7 +43,6 @@ object ConflateWithSeed extends App {
     .throttle(1, 1.second) //simulate slow sink
     .runForeach(each => logger.info(s"1st reached sink: $each"))
 
-//safe to materialize multiple times due to lazyFlow
 //  Source(1 to 10)
 //    .via(lazyFlow)
 //    .throttle(1, 1.second) //simulate slow sink
