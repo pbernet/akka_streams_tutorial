@@ -2,27 +2,30 @@ package sample.stream_shared_state
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 
-import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source}
 
 import scala.collection.mutable
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.Random
 
 /**
-  * Windowing sample taken from:
+  * Time-based sliding windows of:
+  *  - length 10 seconds
+  *  - step 1 second
+  *
+  * Stolen from:
   * https://gist.github.com/adamw/3803e2361daae5bdc0ba097a60f2d554
   *
   * Doc:
   * https://softwaremill.com/windowing-data-in-akka-streams
   *
-  * The limitation of this approach is the limited maxSubstreams param on the groupBy operator
-  * Thus after a while the processing fails with:
-  * Cannot open a new substream as there are too many substreams open
+  * Remarks:
+  *  - Note that the additional param allowClosedSubstreamRecreation on groupBy
+  *    allows reusing closed substreams and thus avoids potential memory issues
+  *  - The printSink is needed. Sink.ignore would not work
   *
-  * Probably Apache Flink is more suited for stateful stream processing - see:
+  * Apache Flink supports sliding windows out of the box - see:
   * https://ci.apache.org/projects/flink/flink-docs-release-1.3/concepts/programming-model.html#windows
   * https://flink.apache.org/news/2015/12/04/Introducing-windows.html
   */
@@ -30,12 +33,14 @@ object WindowingExample {
   implicit val system = ActorSystem("WindowingExample")
   implicit val executionContext = system.dispatcher
 
-  val maxSubstreams = 40
+  val maxSubstreams = 64
+
+  val printSink = Sink.foreach[AggregateEventData](each => println(s"Reached sink: $each"))
 
   def main(args: Array[String]): Unit = {
     val random = new Random()
 
-    val done = Source
+    Source
       .tick(0.seconds, 1.second, "")
       .map { _ =>
         val now = System.currentTimeMillis()
@@ -46,7 +51,7 @@ object WindowingExample {
         val generator = new CommandGenerator()
         ev => generator.forEvent(ev)
       }
-      .groupBy(maxSubstreams, command => command.w)
+      .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
       .takeWhile(!_.isInstanceOf[CloseWindow])
       .fold(AggregateEventData((0L, 0L), 0)) {
         case (agg, OpenWindow(window)) => agg.copy(w = window)
@@ -56,25 +61,9 @@ object WindowingExample {
       }
       .async
       .mergeSubstreams
-      .runForeach { agg =>
-        println(agg.toString)
-      }
-
-    terminateWhen(done)
+      .to(printSink)
+      .run()
   }
-
-  def terminateWhen(done: Future[Done]) = {
-    done.onComplete {
-      case Success(b) =>
-        println("Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        println(s"Flow Failure: ${e.getMessage}. About to terminate...")
-        system.terminate()
-    }
-  }
-
-
 
   case class MyEvent(timestamp: Long)
 
@@ -115,7 +104,7 @@ object WindowingExample {
         val eventWindows = Window.windowsFor(ev.timestamp)
 
         val closeCommands = openWindows.flatMap { ow =>
-          if (!eventWindows.contains(ow) && ow._2 < watermark) {
+          if (ow._2 < watermark) {
             openWindows.remove(ow)
             Some(CloseWindow(ow))
           } else None
