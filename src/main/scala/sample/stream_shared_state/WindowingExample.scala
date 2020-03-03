@@ -3,31 +3,32 @@ package sample.stream_shared_state
 import java.time.{Instant, OffsetDateTime, ZoneId}
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.Source
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Random
 
 /**
-  * Time-based sliding windows of:
-  *  - length 10 seconds
-  *  - step 1 second
-  *
   * Stolen from:
   * https://gist.github.com/adamw/3803e2361daae5bdc0ba097a60f2d554
   *
   * Doc:
   * https://softwaremill.com/windowing-data-in-akka-streams
   *
-  * Remarks:
-  *  - Note that the additional param allowClosedSubstreamRecreation on groupBy
-  *    allows reusing closed substreams and thus avoids potential memory issues
-  *  - The printSink is needed. Sink.ignore would not work
+  * Thanks to the generic implementation this example may be run as:
+  * 1) Time-based sliding windows, eg with:
+  *     - WindowLength set to: 10 seconds
+  *     - WindowStep   set to: 1 second
   *
-  * Apache Flink supports sliding windows out of the box - see:
-  * https://ci.apache.org/projects/flink/flink-docs-release-1.3/concepts/programming-model.html#windows
-  * https://flink.apache.org/news/2015/12/04/Introducing-windows.html
+  * 2) Time-based tumbling windows, eg with:
+  *     - WindowLength set to: 10 seconds
+  *     - WindowStep   set to: 10 seconds
+  *
+  * Remarks:
+  *  - 1) is documented in the blog, 2) is default here
+  *  - The additional param allowClosedSubstreamRecreation on groupBy
+  *    allows reusing closed substreams and thus avoids potential memory issues
   */
 object WindowingExample {
   implicit val system = ActorSystem("WindowingExample")
@@ -35,7 +36,8 @@ object WindowingExample {
 
   val maxSubstreams = 64
 
-  val printSink = Sink.foreach[AggregateEventData](each => println(s"Reached sink: $each"))
+  val delayFactor = 8
+  val acceptedMaxDelay = 5.seconds.toMillis
 
   def main(args: Array[String]): Unit = {
     val random = new Random()
@@ -44,8 +46,10 @@ object WindowingExample {
       .tick(0.seconds, 1.second, "")
       .map { _ =>
         val now = System.currentTimeMillis()
-        val delay = random.nextInt(8)
-        MyEvent(now - delay * 1000L)
+        val delay = random.nextInt(delayFactor)
+        val myEvent = MyEvent(now - delay * 1000L)
+        println(s"$myEvent")
+        myEvent
       }
       .statefulMapConcat { () =>
         val generator = new CommandGenerator()
@@ -53,30 +57,36 @@ object WindowingExample {
       }
       .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
       .takeWhile(!_.isInstanceOf[CloseWindow])
-      .fold(AggregateEventData((0L, 0L), 0)) {
+      .fold(AggregateEventData(Window(0L, 0L), 0)) {
         case (agg, OpenWindow(window)) => agg.copy(w = window)
         // always filtered out by takeWhile
-        case (agg, CloseWindow(_))     => agg
-        case (agg, AddToWindow(ev, _)) => agg.copy(eventCount = agg.eventCount+1)
+        case (agg, CloseWindow(_)) => agg
+        case (agg, AddToWindow(_, _)) => agg.copy(eventCount = agg.eventCount + 1)
       }
       .async
       .mergeSubstreams
-      .to(printSink)
-      .run()
+      .runForeach(println(_))
   }
 
-  case class MyEvent(timestamp: Long)
+  case class MyEvent(timestamp: Long) {
+    override def toString =
+      s"Event: ${tsToString(timestamp)}"
+  }
 
-  type Window = (Long, Long)
+  case class Window(startTs: Long, stopTs: Long) {
+    override def toString =
+      s"Window from: ${tsToString(startTs)} to: ${tsToString(stopTs)}"
+  }
+
   object Window {
-    val WindowLength    = 10.seconds.toMillis
-    val WindowStep      =  1.second .toMillis
+    val WindowLength = 10.seconds.toMillis
+    val WindowStep = 10.seconds.toMillis
     val WindowsPerEvent = (WindowLength / WindowStep).toInt
 
     def windowsFor(ts: Long): Set[Window] = {
       val firstWindowStart = ts - ts % WindowStep - WindowLength + WindowStep
       (for (i <- 0 until WindowsPerEvent) yield
-        (firstWindowStart + i * WindowStep,
+        Window(firstWindowStart + i * WindowStep,
           firstWindowStart + i * WindowStep + WindowLength)
         ).toSet
     }
@@ -87,24 +97,26 @@ object WindowingExample {
   }
 
   case class OpenWindow(w: Window) extends WindowCommand
+
   case class CloseWindow(w: Window) extends WindowCommand
+
   case class AddToWindow(ev: MyEvent, w: Window) extends WindowCommand
 
   class CommandGenerator {
-    private val MaxDelay = 5.seconds.toMillis
     private var watermark = 0L
     private val openWindows = mutable.Set[Window]()
 
     def forEvent(ev: MyEvent): List[WindowCommand] = {
-      watermark = math.max(watermark, ev.timestamp - MaxDelay)
+      watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
       if (ev.timestamp < watermark) {
-        println(s"Dropping event with timestamp: ${tsToString(ev.timestamp)}")
+        println(s"Dropping $ev, watermark is at: ${tsToString(watermark)}")
         Nil
       } else {
         val eventWindows = Window.windowsFor(ev.timestamp)
 
         val closeCommands = openWindows.flatMap { ow =>
-          if (ow._2 < watermark) {
+          if (ow.stopTs < watermark) {
+            println(s"Close $ow")
             openWindows.remove(ow)
             Some(CloseWindow(ow))
           } else None
@@ -112,6 +124,7 @@ object WindowingExample {
 
         val openCommands = eventWindows.flatMap { w =>
           if (!openWindows.contains(w)) {
+            println(s"Open new $w")
             openWindows.add(w)
             Some(OpenWindow(w))
           } else None
@@ -126,7 +139,7 @@ object WindowingExample {
 
   case class AggregateEventData(w: Window, eventCount: Int) {
     override def toString =
-      s"Between ${tsToString(w._1)} and ${tsToString(w._2)}, there were $eventCount events."
+      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were $eventCount events."
   }
 
   def tsToString(ts: Long) = OffsetDateTime
