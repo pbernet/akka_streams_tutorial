@@ -14,21 +14,22 @@ import scala.util.hashing.MurmurHash3
   * https://gist.github.com/calvinlfer/cc4ea90328834a95a89ce99aeb998a63
   *
   * Concepts:
-  * - Flow that distributes messages (according to a hashing function) across sub-flows
-  * - The idea is to have ordered processing per sub-flow but parallel processing across sub-flows
+  *  - Flow that distributes messages (according to a hashing function) across sub-flows
+  *  - The idea is to have ordered processing per sub-flow but parallel processing across sub-flows
   *
+  * Similar examples:
+  *  - https://blog.colinbreck.com/partitioning-akka-streams-to-maximize-throughput
+  *  - https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#balancing-jobs-to-a-fixed-pool-of-workers
   */
-object DistributeAndMerge {
+object DistributeAndMerge extends App {
   implicit val system = ActorSystem("DistributeAndMerge")
   implicit val ec = system.dispatcher
 
-  def main(args: Array[String]): Unit = {
-
-    def sampleAsyncCall(x: Int): Future[Int] = Future {
-      Thread.sleep((x * 100L) % 10)
-      println(s"Async call for value: $x processed by: ${Thread.currentThread().getName}")
-      x
-    }
+  def sampleAsyncCall(x: Int): Future[Int] = Future {
+    Thread.sleep((x * 100L) % 10)
+    println(s"Async call for value: $x processed by: ${Thread.currentThread().getName}")
+    x
+  }
 
     /**
       * Example based on numBuckets = 3
@@ -39,9 +40,9 @@ object DistributeAndMerge {
       *                                         --- bucket 3 flow --- ~mapAsync(parallelism)~ ---
       *
       * @param numBuckets  the number of sub-flows to create
-      * @param parallelism the mapAsync (ordered) parallelism per sub flow
+      * @param parallelism the mapAsync (ordered) parallelism per sub-flow
       * @param hash        the hashing function used to decide
-      * @param fn          is the mapping function to be used for mapAsync
+      * @param fn          the mapping function to be used for mapAsync
       * @tparam A is the input stream of elements of type A
       * @tparam B is the output streams of elements of type B
       * @return a Flow of elements from type A to type B
@@ -65,16 +66,15 @@ object DistributeAndMerge {
       })
     }
 
-    Source(1 to 10)
-      .via(
-        hashingDistribution[Int, Int](
-          numBuckets = 3,
-          parallelism = 2,
-          hash = element => MurmurHash3.stringHash(element.toString), //Hashing function: String => Int
-          fn = sampleAsyncCall
-        )
+  Source(1 to 10)
+    .via(
+      hashingDistribution[Int, Int](
+        numBuckets = 3,
+        parallelism = 2,
+        hash = element => MurmurHash3.stringHash(element.toString), //Hashing function: String => Int
+        fn = sampleAsyncCall
       )
-      .runWith(Sink.foreach(each => println(s"Outlet received value: $each")))
-      .onComplete(_ => system.terminate())
-  }
+    )
+    .runWith(Sink.foreach(each => println(s"Reached sink: $each")))
+    .onComplete(_ => system.terminate())
 }
