@@ -15,32 +15,21 @@ import scala.util.{Failure, Success, Try}
   * https://blog.redelastic.com/diving-into-akka-streams-2770b3aeabb0
   *
   * Features:
-  * * reads large file in streaming fashion
-  * * uses regular processing stages, operators (= no graph)
-  * * shows "stateful processing" with groupBy and mergeSubstreams
+  *  - reads large file in streaming fashion (here with subset)
+  *  - uses akka stream operators (= no graph)
+  *  - shows "stateful processing" with groupBy and mergeSubstreams
   *
-  *
-  * Download 689MB flight data file:
-  * http://stat-computing.org/dataexpo/2009/the-data.html
-  * and store locally, eg to src/main/resources/2008.csv
+  * Download (large) flight data files:
+  * https://www.transtats.bts.gov/DL_SelectFields.asp?Table_ID=
+  * and store locally, eg to src/main/resources/myData.csv
   */
-object FlightDelayStreaming {
+object FlightDelayStreaming extends App {
   implicit val system = ActorSystem("FlightDelayStreaming")
   implicit val executionContext = system.dispatcher
 
-  def main(args: Array[String]): Unit = {
-    val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008.csv"))
-      .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
+  val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
+    .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
-
-    val done = sourceOfLines
-      .via(csvToFlightEvent)
-      .via(filterAndConvert)
-      .via(averageCarrierDelay)
-      .runWith(sink)
-
-    terminateWhen(done)
-  }
 
   // Split csv into a string array and transform each array into a FlightEvent
   val csvToFlightEvent: Flow[String, FlightEvent, NotUsed] = Flow[String]
@@ -54,13 +43,15 @@ object FlightDelayStreaming {
     Flow[FlightEvent]
       .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
       .mapAsyncUnordered(parallelism = 2) { r =>
-      Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
-    }
+        Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
+      }
 
   // Aggregate number of delays and totalMins
   val averageCarrierDelay: Flow[FlightDelayRecord, FlightDelayAggregate, NotUsed] =
     Flow[FlightDelayRecord]
-      .groupBy(30, _.uniqueCarrier) //maxSubstreams must be larger than the number of UniqueCarrier in the file
+      // maxSubstreams must be larger than the number of UniqueCarrier in the file
+      // on large dataset you may set allowClosedSubstreamRecreation to true
+      .groupBy(30, _.uniqueCarrier, allowClosedSubstreamRecreation = false)
       .map { each => println(s"Processing FlightDelayRecord: $each"); each }
       .fold(FlightDelayAggregate("", 0, 0)) {
         (x: FlightDelayAggregate, y: FlightDelayRecord) =>
@@ -68,16 +59,25 @@ object FlightDelayStreaming {
           val totalMins = x.totalMins + Try(y.arrDelayMins.toInt).getOrElse(0)
           FlightDelayAggregate(y.uniqueCarrier, count, totalMins)
       }
+      .async  //for maximizing throughput
       .mergeSubstreams
 
   def averageSink[A](avg: A): Unit = {
     avg match {
-      case FlightDelayAggregate(a: String, b: Int, c: Int) => println(s"Delays for carrier $a: ${Try(c / b).getOrElse(0)} average mins, $b delayed flights")
+      case aggregate@FlightDelayAggregate(_,_,_) => println(aggregate)
       case x => println("no idea what " + x + "is!")
     }
   }
 
   val sink: Sink[FlightDelayAggregate, Future[Done]] = Sink.foreach(averageSink[FlightDelayAggregate])
+
+  val done = sourceOfLines
+    .via(csvToFlightEvent)
+    .via(filterAndConvert)
+    .via(averageCarrierDelay)
+    .runWith(sink)
+
+  terminateWhen(done)
 
   def terminateWhen(done: Future[Done]) = {
     done.onComplete {
@@ -132,4 +132,6 @@ case class FlightDelayRecord(
   override def toString = s"$year/$month/$dayOfMonth - $uniqueCarrier $flightNum - $arrDelayMins"
 }
 
-case class FlightDelayAggregate(uniqueCarrier: String, count: Int, totalMins: Int)
+case class FlightDelayAggregate(uniqueCarrier: String, count: Int, totalMins: Int) {
+  override def toString = s"Delays for carrier $uniqueCarrier: ${Try(totalMins / count).getOrElse(0)} average mins, $count delayed flights"
+}
