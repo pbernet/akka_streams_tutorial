@@ -7,7 +7,7 @@ import scala.collection.immutable
 import scala.concurrent.duration._
 
 /**
-  * This akka typed actor basic FSM example demonstrates how to:
+  * This akka typed actor FSM example demonstrates how to:
   *  - Model states using different behaviors
   *  - Model storing data at each state by representing the behavior as a method
   *  - Implement state timeouts
@@ -24,6 +24,7 @@ object Buncher extends App {
     buncherActor ! SetTarget(targetActor)
     buncherActor ! Queue(42)
     buncherActor ! Queue("abc")
+    Thread.sleep(2000) //Provoke flushing by Timeout
     buncherActor ! Queue(43)
     buncherActor ! Queue(44)
     buncherActor ! Flush
@@ -35,29 +36,26 @@ object Buncher extends App {
   val system = ActorSystem[Nothing](root, "Buncher")
 
 
-
-
-  // received events: FSM event become the type of the message Actor supports
+  // received events: the type of the message this Actor supports
   sealed trait Event
   final case class SetTarget(ref: ActorRef[Batch]) extends Event
   final case class Queue(obj: Any) extends Event
   case object Flush extends Event
   private case object Timeout extends Event
 
-  // sent event (to targetActor)
+  // sent event: to targetActor
   final case class Batch(obj: immutable.Seq[Any])
 
-  // internal data (= state?)
+  // internal data
   sealed trait Data
   case object Uninitialized extends Data
   final case class Todo(target: ActorRef[Batch], queue: immutable.Seq[Any]) extends Data
 
 
-
-  // states of the FSM represented as behaviors
-
   // initial state
   def apply(): Behavior[Event] = idle(Uninitialized)
+
+  // states of the FSM represented as behaviors
 
   private def idle(data: Data): Behavior[Event] = Behaviors.receiveMessage[Event] { message: Event =>
     (message, data) match {
@@ -65,17 +63,16 @@ object Buncher extends App {
         // action: add obj to queue
         // transition: to the state idle
         idle(Todo(ref, Vector.empty))
-      case (Queue(obj), t @ Todo(_, v)) =>
+      case (Queue(obj), t @ Todo(_, queue)) =>
         // action: add obj to vector
         // transition: to the state active
-        active(t.copy(queue = v :+ obj))
+        active(t.copy(queue = queue :+ obj))
       case _ =>
         Behaviors.unhandled
     }
   }
 
   private def active(data: Todo): Behavior[Event] =
-    // TODO What would happen if we don't wrap withTimers
     Behaviors.withTimers[Event] { timers =>
       // send msg Timeout after 1 sec (instead of FSM state timeout)
       timers.startSingleTimer(Timeout, 1.second)
@@ -86,7 +83,7 @@ object Buncher extends App {
           data.target ! Batch(data.queue)
           idle(data.copy(queue = Vector.empty))
         case Queue(obj) =>
-          // action: add obj to vector
+          // action: add obj to queue
           // transition: to the state active
           active(data.copy(queue = data.queue :+ obj))
       }

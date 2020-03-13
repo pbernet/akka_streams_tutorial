@@ -52,7 +52,7 @@ object FlightDelayStreaming extends App {
       // maxSubstreams must be larger than the number of UniqueCarrier in the file
       // on large dataset you may set allowClosedSubstreamRecreation to true
       .groupBy(30, _.uniqueCarrier, allowClosedSubstreamRecreation = false)
-      .map { each => println(s"Processing FlightDelayRecord: $each"); each }
+      .wireTap(each => println(s"Processing FlightDelayRecord: $each"))
       .fold(FlightDelayAggregate("", 0, 0)) {
         (x: FlightDelayAggregate, y: FlightDelayRecord) =>
           val count = x.count + 1
