@@ -22,14 +22,12 @@ import scala.util.{Failure, Success}
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-i
   *
-  * WindTurbineServer receives Measurements via Websockets from n clients
-  * Clients are started with SimulateWindTurbines
+  * WindTurbineServer receives [[Measurements]] via Websockets from n clients
+  * Clients are started with [[SimulateWindTurbines]]
   *
   */
 object WindTurbineServer {
-
   protected implicit val system = ActorSystem("WindTurbineServer")
-
   implicit def executor: ExecutionContext = system.dispatcher
   protected val log = Logging(system.eventStream, "WindTurbineServer-main")
 
@@ -72,10 +70,11 @@ object WindTurbineServer {
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
 
-            // Optional: generate Server errors at 1/6 of the time
+            // Optional: generate server errors at 1/6 of the time
             // Clients receive:
             // akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
             // and are able to recover due to the RestartSource
+
             //val time = LocalTime.now()
             //if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
 

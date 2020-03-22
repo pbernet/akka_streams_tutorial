@@ -14,7 +14,7 @@ import scala.concurrent.duration._
   * Starts n WindTurbineSimulator, which generate WindTurbineData via WebSocketClient
   * Use a BackoffSupervisor as level of indirection
   *
-  * The server is started with WindTurbineServer
+  * The server is started with [[WindTurbineServer]]
   */
 object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()

@@ -15,9 +15,9 @@ class WindTurbineData(id: String) {
 
   def getNext: String = {
     val timestamp = System.currentTimeMillis / 1000
-    val power = f"${random.nextDouble() * 10}%.2f"
-    val rotorSpeed = f"${random.nextDouble() * 10}%.2f"
-    val windSpeed = f"${random.nextDouble() * 100}%.2f"
+    val power: String = f"${random.nextDouble() * 10}%.2f".replace(",", ".")
+    val rotorSpeed = f"${random.nextDouble() * 10}%.2f".replace(",", ".")
+    val windSpeed = f"${random.nextDouble() * 100}%.2f".replace(",", ".")
 
     s"""{
        |    "id": "$id",
