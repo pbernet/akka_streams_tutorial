@@ -66,7 +66,7 @@ object KafkaServer extends App {
   println("About to start...")
   kafka.startup()
 
-  sys.addShutdownHook{
+  scala.sys.addShutdownHook{
     println("About to shutdown...")
     kafka.shutdown()
     kafka.awaitShutdown()

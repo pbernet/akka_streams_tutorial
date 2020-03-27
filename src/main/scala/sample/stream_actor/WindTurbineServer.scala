@@ -14,7 +14,7 @@ import sample.stream_actor.Total.Increment
 
 import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
@@ -104,7 +104,7 @@ object WindTurbineServer {
     bindingFuture.map { serverBinding =>
       log.info(s"Bound to: ${serverBinding.localAddress} ")
     }.onComplete {
-      case Success(value) => log.info("WindTurbineServer started successfully")
+      case Success(_) => log.info("WindTurbineServer started successfully")
       case Failure(ex) =>
         log.error(ex, "Failed to bind to {}:{}!", httpInterface, httpPort)
         Http().shutdownAllConnectionPools()
@@ -114,8 +114,8 @@ object WindTurbineServer {
     scala.sys.addShutdownHook {
       log.info("Terminating...")
       Http().shutdownAllConnectionPools()
-      system.terminate()
-      Await.result(system.whenTerminated, 30.seconds)
+      //actor system termination in 2.6.x is now implicit, see:
+      //https://github.com/akka/akka/issues/28310
       log.info("Terminated... Bye")
     }
   }

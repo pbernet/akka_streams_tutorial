@@ -63,7 +63,6 @@ object WordCountConsumerPartitionedSource extends App {
 
   sys.addShutdownHook{
     println("Got shutdown cmd from shell, about to shutdown...")
-    system.terminate()
   }
 
   createAndRunConsumerWordCount("W.1")
