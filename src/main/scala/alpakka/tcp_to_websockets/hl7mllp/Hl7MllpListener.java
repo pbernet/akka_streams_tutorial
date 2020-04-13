@@ -1,4 +1,4 @@
-package sample.stream.hl7mllp;
+package alpakka.tcp_to_websockets.hl7mllp;
 
 
 import ca.uhn.hl7v2.DefaultHapiContext;
