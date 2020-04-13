@@ -71,9 +71,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
         // Remove MLLP START_OF_BLOCK from this message,
         // because only END_OF_BLOCK + CARRIAGE_RETURN is removed by framing
-        val scrubbed = StringUtils
-          .stripStart(each, START_OF_BLOCK)
-          .stripTrailing()
+        val scrubbed = StringUtils.stripStart(each, START_OF_BLOCK)
 
         logger.info("About to parse message:\n" + printable(scrubbed))
 
