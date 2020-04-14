@@ -52,7 +52,7 @@ public class MockApp implements ReceivingApplication<Message> {
             // https://github.com/amesar/hl7-json-spark
             // https://camel.apache.org/components/latest/dataformats/hl7-dataformat.html
 
-            // throw an exception to see what the default message acknowledgement looks like
+            // throw an exception to see what the NAK messages looks like
             //if (true) throw new RuntimeException("BOOM! This will be returned in the ERR segment of the message response");
 
             response = in.generateACK();
