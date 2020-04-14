@@ -49,6 +49,7 @@ public class Hl7MllpListener {
             ourHl7Server.registerApplication(adtRouter, new MockApp());
             ourHl7Server.registerApplication(ormRouter, new MockApp());
 
+            ourHl7Server.setExceptionHandler(new ExceptionHandler());
             ourHl7Server.startAndWait();
 
 

@@ -39,18 +39,21 @@ public class MockApp implements ReceivingApplication<Message> {
 
             System.out.println("Incoming message version: " + in.getVersion() + " size: " + strippedMessage.length() + " payload: " + strippedMessage);
             
-            // TODO How to convert this gracefully to JSON like structure?
-            // 1)
+            // TODO How to convert this gracefully to a JSON like structure?
+            // 1) Use Terser, when retrieving only specific nested parts of a HL7 message in "xpath like fashion"
             Terser tersed = new Terser(in);
             Segment msh = tersed.getSegment("MSH");
             System.out.println("Tersed MSH: " + msh.getName() + "\n\n");
 
-            // 2) Possible to cast
+            // 2) Since we are behind a router it's possible to cast
             // ADT_A01 adtMessage = (ADT_A01) in;
 
-            // 3)
+            // 3) Other ways to convert
             // https://github.com/amesar/hl7-json-spark
             // https://camel.apache.org/components/latest/dataformats/hl7-dataformat.html
+
+            // throw an exception to see what the default message acknowledgement looks like
+            //if (true) throw new RuntimeException("BOOM! This will be returned in the ERR segment of the message response");
 
             response = in.generateACK();
         } catch (HL7Exception | IOException e) {

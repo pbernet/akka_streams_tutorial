@@ -32,7 +32,7 @@ public class Hl7MllpSender {
 
         try {
 
-            FileReader reader = new FileReader("/Users/Shared/projects/akka_streams_tutorial/src/main/resources/ADT_ORM_Hl7Messages.txt");
+            FileReader reader = new FileReader("src/main/resources/ADT_ORM_Hl7Messages.txt");
             Hl7InputStreamMessageIterator messageIterator = new Hl7InputStreamMessageIterator(reader);
 
             while (messageIterator.hasNext()) {
