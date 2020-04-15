@@ -4,8 +4,8 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.stream.{ActorAttributes, Supervision}
 import akka.util.ByteString
-import ca.uhn.hl7v2.DefaultHapiContext
 import ca.uhn.hl7v2.validation.impl.ValidationContextFactory
+import ca.uhn.hl7v2.{DefaultHapiContext, HL7Exception}
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
@@ -16,10 +16,10 @@ import scala.util.{Failure, Success}
 
 /**
   * PoC of a akka streams HL7 MLLP listener with the same behaviour as [[Hl7MllpListener]]:
-  *  - Receive HL7  messages over tcp
+  *  - Receive HL7 messages over tcp
   *  - Frame according to MLLP
   *  - Parse using HAPI parser (all validation switched off)
-  *  - Reply with ACK/NACK (if everything fails)
+  *  - Reply with ACK or NACK (if everything fails)
   *
   * Works with:
   *  - built in local client
@@ -90,16 +90,24 @@ object Hl7MllpListenerAkkaStreams extends App {
         try {
           logger.info("About to parse message:\n" + printable(scrubbed))
           val message = parser.parse(scrubbed)
-          logger.info(s"Successfully parsed: $message")
+          logger.info("Successfully parsed")
 
          val ack = parser.encode(message.generateACK())
           encodeMllp(ack)
         } catch {
+          case e@(_: HL7Exception) =>
+            // TODO Why is rootCause not printed in string interpolated log msg?
+            //val rootCause = ExceptionUtils.getRootCause(e).getMessage
+            //logger.error(s"Error during parsing. Problem with message structure. Answer with NACK. Cause: $rootCause")
+            logger.error("Error during parsing. Problem with message structure. Answer with NACK")
+            //TODO Find a sensible format with the values we have
+            val nack = "NACK"
+            encodeMllp(nack)
           case e@(_: Throwable) =>
-            val rootCause = ExceptionUtils.getRootCause(e)
-            logger.error(s"Error during parsing: $rootCause, answer with default NACK")
-            //TODO Find a sensible format
-            val nack = ""
+            val rootCause = ExceptionUtils.getRootCause(e).getMessage
+            logger.error("Error during parsing. This should not happen. Answer with default NACK")
+            //TODO Find a sensible default format
+            val nack = "NACK"
             encodeMllp(nack)
         }
       })
