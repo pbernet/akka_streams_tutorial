@@ -5,7 +5,9 @@ import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.stream.{ActorAttributes, Supervision}
 import akka.util.ByteString
 import ca.uhn.hl7v2.DefaultHapiContext
+import ca.uhn.hl7v2.validation.impl.ValidationContextFactory
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
@@ -16,8 +18,8 @@ import scala.util.{Failure, Success}
   * PoC of a akka streams HL7 MLLP listener with the same behaviour as [[Hl7MllpListener]]:
   *  - Receive HL7  messages over tcp
   *  - Frame according to MLLP
-  *  - Validate and parse using HAPI parser
-  *  - Reply with ACK/NAK
+  *  - Parse using HAPI parser (all validation switched off)
+  *  - Reply with ACK/NACK (if everything fails)
   *
   * Works with:
   *  - built in local client
@@ -27,8 +29,8 @@ import scala.util.{Failure, Success}
   * http://hl7.ihelse.net/hl7v3/infrastructure/transport/transport_mllp.html
   *
   */
-// TODO Handle case when exception is thrown on server during parsing: Create a basic NAK
-// Optional: Add HL7 over HTTP: https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
+// TODO Add TLS
+// TODO Add HL7 over HTTP: https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
 object Hl7MllpListenerAkkaStreams extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7MllpListenerAkkaStreams")
@@ -68,11 +70,17 @@ object Hl7MllpListenerAkkaStreams extends App {
       case _ => Supervision.Stop
     }
 
-    // Validate/Parse the hairy HL7 message beast
+    // Parse/Validate the hairy HL7 message beast
     val hl7Parser = Flow[String]
       .map(each => {
         val context = new DefaultHapiContext
-        context.getParserConfiguration.setValidating(true)
+        // The ValidationContext is used during parsing and well as during
+        // validation using {@link ca.uhn.hl7v2.validation.Validator} objects.
+        // Set to false to do parsing without validation
+        context.getParserConfiguration.setValidating(false)
+        // Set to false, because there is currently no separate validation step
+        context.setValidationContext(ValidationContextFactory.noValidation)
+
         val parser = context.getPipeParser
 
         // Remove MLLP START_OF_BLOCK from this message,
@@ -80,15 +88,19 @@ object Hl7MllpListenerAkkaStreams extends App {
         val scrubbed = StringUtils.stripStart(each, START_OF_BLOCK)
 
         try {
-        logger.info("About to parse message:\n" + printable(scrubbed))
+          logger.info("About to parse message:\n" + printable(scrubbed))
           val message = parser.parse(scrubbed)
-          logger.info(s"Parsed: $message")
+          logger.info(s"Successfully parsed: $message")
 
-          //TODO create a basic NAK also an HL7 parsing exceptions
-          //if (true) throw new RuntimeException("BOOM! This will be returned in the ERR segment of the message response");
-
-          val ack = parser.encode(message.generateACK())
+         val ack = parser.encode(message.generateACK())
           encodeMllp(ack)
+        } catch {
+          case e@(_: Throwable) =>
+            val rootCause = ExceptionUtils.getRootCause(e)
+            logger.error(s"Error during parsing: $rootCause, answer with default NACK")
+            //TODO Find a sensible format
+            val nack = ""
+            encodeMllp(nack)
         }
       })
 

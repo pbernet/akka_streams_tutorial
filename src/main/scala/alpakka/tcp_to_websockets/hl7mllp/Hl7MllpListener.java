@@ -1,6 +1,5 @@
 package alpakka.tcp_to_websockets.hl7mllp;
 
-
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.HapiContext;
@@ -28,10 +27,13 @@ public class Hl7MllpListener {
         try {
             boolean useSecureConnection = false; // are you using TLS/SSL?
 
-            // Possible to disable validation
-            // https://saravanansubramanian.com/hl72xhapivalidation/
+            // The ValidationContext is used during parsing and well as during
+            // validation using {@link ca.uhn.hl7v2.validation.Validator} objects.
+            // Set to false to do parsing without validation
             //context.getParserConfiguration().setValidating(false);
 
+            // Set to false if there is a separate validation step
+            //context.setValidationContext(ValidationContextFactory.noValidation());
 
             // HL7 server
 
