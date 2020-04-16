@@ -34,30 +34,17 @@ import scala.util.{Failure, Success}
 object Hl7MllpListenerAkkaStreams extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7MllpListenerAkkaStreams")
-  var serverBinding: Future[Tcp.ServerBinding] = _
 
   //MLLP: messages begin after hex "0x0B" and continue until "0x1C|0x0D"
   //Reference: ca.uhn.hl7v2.llp.MllpConstants
   val START_OF_BLOCK = "\u000b" //0x0B
-  val END_OF_BLOCK =  "\u001c"  //0x1C
-  val CARRIAGE_RETURN = "\r"    //0x0D
+  val END_OF_BLOCK = "\u001c" //0x1C
+  val CARRIAGE_RETURN = "\r" //0x0D
 
-  if (args.isEmpty) {
-    val (address, port) = ("127.0.0.1", 6160)
-    serverBinding = server(system, address, port)
-    (1 to 1).par.foreach(each => client(each, system, address, port))
-  } else {
-    val (address, port) =
-      if (args.length == 3) (args(1), args(2).toInt)
-      else ("127.0.0.1", 6160)
-    if (args(0) == "server") {
-      val system = ActorSystem("Server")
-      serverBinding = server(system, address, port)
-    } else if (args(0) == "client") {
-      val system = ActorSystem("Client")
-      client(1, system, address, port)
-    }
-  }
+  val (address, port) = ("127.0.0.1", 6160)
+  val serverBinding = server(system, address, port)
+  (1 to 1).par.foreach(each => client(each, system, address, port))
+
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
     implicit val sys = system
@@ -92,20 +79,18 @@ object Hl7MllpListenerAkkaStreams extends App {
           val message = parser.parse(scrubbed)
           logger.info("Successfully parsed")
 
-         val ack = parser.encode(message.generateACK())
+          val ack = parser.encode(message.generateACK())
           encodeMllp(ack)
         } catch {
-          case e@(_: HL7Exception) =>
-            // TODO Why is rootCause not printed in string interpolated log msg?
-            //val rootCause = ExceptionUtils.getRootCause(e).getMessage
-            //logger.error(s"Error during parsing. Problem with message structure. Answer with NACK. Cause: $rootCause")
-            logger.error("Error during parsing. Problem with message structure. Answer with NACK")
+          case ex: HL7Exception =>
+            val rootCause = printable(ExceptionUtils.getRootCause(ex).getMessage)
+            logger.error(s"Error during parsing. Problem with message structure. Answer with NACK. Cause: $rootCause")
             //TODO Find a sensible format with the values we have
             val nack = "NACK"
             encodeMllp(nack)
-          case e@(_: Throwable) =>
-            val rootCause = ExceptionUtils.getRootCause(e).getMessage
-            logger.error("Error during parsing. This should not happen. Answer with default NACK")
+          case ex: Throwable =>
+            val rootCause = ExceptionUtils.getRootCause(ex).getMessage
+            logger.error(s"Error during parsing. This should not happen. Answer with default NACK. Cause: $rootCause")
             //TODO Find a sensible default format
             val nack = "NACK"
             encodeMllp(nack)
@@ -167,7 +152,7 @@ object Hl7MllpListenerAkkaStreams extends App {
     message ++= CARRIAGE_RETURN
 
     val hl7MllpMessages = List(ByteString(encodeMllp(message.toString())), ByteString(encodeMllp(message.toString())))
-    val source =  Source(hl7MllpMessages).via(connection)
+    val source = Source(hl7MllpMessages).via(connection)
     val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
