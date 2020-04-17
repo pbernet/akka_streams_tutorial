@@ -8,7 +8,8 @@ import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
+import akka.stream.{OverflowStrategy, QueueOfferResult}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
@@ -29,7 +30,7 @@ trait ClientCommon {
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
 
-  //see https://doc.akka.io/docs/akka-http/10.1.8/client-side/websocket-support.html?language=scala#half-closed-websockets
+  //see https://doc.akka.io/docs/akka-http/current/client-side/websocket-support.html?language=scala#half-closed-websockets
   def namedSource(clientname: String) = {
     Source
       .tick(1.second, 1.second, "tick")
@@ -50,6 +51,8 @@ trait ClientCommon {
 /**
   * Websocket echo example with different client types
   * Each client instance produces it's own echoFlow on the server
+  * Clients do not close due to http.server.websocket.periodic-keep-alive-max-idle,
+  * see application.conf for details
   *
   * Please note that this basic example has no life cycle management nor fault-tolerance
   * The "Windturbine Example" does show this
@@ -63,6 +66,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   val maxClients = 2
   (1 to maxClients).par.foreach(each => singleWebSocketRequestClient(each, address, port))
   (1 to maxClients).par.foreach(each => webSocketClientFlowClient(each, address, port))
+  (1 to maxClients).par.foreach(each => singleWebSocketRequestSourceQueueClient(each, address, port))
 
   def server(address: String, port: Int) = {
 
@@ -106,21 +110,57 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         printSink,
         namedSource(id.toString))(Keep.right)
 
-    val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Promise[Option[Message]]) =
+    val (upgradeResponse, sourceClosed) =
       Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketNonReusableFlow)
 
     val connected = handleUpgrade(upgradeResponse)
 
     connected.onComplete(done => println(s"Client: $id singleWebSocketRequestClient connected: $done"))
-    //Does not close anymore due to new configurable "automatic keep-alive Ping support" - see application.conf
-    closed.future.onComplete(closed => println(s"Client: $id singleWebSocketRequestClient closed: $closed"))
+    sourceClosed.future.onComplete(closed => println(s"Client: $id singleWebSocketRequestClient closed: $closed"))
+  }
+
+
+  def singleWebSocketRequestSourceQueueClient(id: Int, address: String, port: Int) = {
+
+    val (source, sourceQueue) = {
+      val p = Promise[SourceQueue[Message]]
+      val s = Source.queue[Message](100, OverflowStrategy.backpressure).mapMaterializedValue(m => {
+        p.trySuccess(m)
+        m
+      })
+      (s, p.future)
+    }
+
+    val webSocketNonReusableFlow = Flow.fromSinkAndSourceMat(printSink, source)(Keep.right)
+
+    val (upgradeResponse, sourceQueueWithComplete) =
+      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketNonReusableFlow)
+
+    val connected = handleUpgrade(upgradeResponse)
+
+    connected.onComplete(done => println(s"Client: $id singleWebSocketRequestSourceQueueClient connected: $done"))
+    sourceQueueWithComplete.watchCompletion().onComplete(closed => println(s"Client: $id singleWebSocketRequestSourceQueueClient closed: $closed"))
+
+    def send(messageText: String) = {
+      val message = TextMessage.Strict(messageText)
+      sourceQueue.flatMap { queue =>
+        queue.offer(message: Message).map {
+          case QueueOfferResult.Enqueued => println(s"enqueued $message")
+          case QueueOfferResult.Dropped => println(s"dropped $message")
+          case QueueOfferResult.Failure(ex) => println(s"Offer failed: $ex")
+          case QueueOfferResult.QueueClosed => println("Source Queue closed")
+        }
+      }
+    }
+    send(s"$id-1 SourceQueue")
+    send(s"$id-2 SourceQueue")
   }
 
   def webSocketClientFlowClient(id: Int, address: String, port: Int) = {
 
     val webSocketNonReusableFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
 
-    val (upgradeResponse: Future[WebSocketUpgradeResponse], closed: Future[Done]) =
+    val (upgradeResponse, closed) =
       namedSource(id.toString)
         .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
         .toMat(printSink)(Keep.both) // also keep the Future[Done]
@@ -129,7 +169,6 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     val connected = handleUpgrade(upgradeResponse)
 
     connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
-    //Does not close anymore due to new configurable "automatic keep-alive Ping support" - see application.conf
     closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
   }
 
