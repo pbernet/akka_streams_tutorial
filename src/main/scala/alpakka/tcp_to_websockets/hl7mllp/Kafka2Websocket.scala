@@ -118,7 +118,7 @@ object Kafka2Websocket extends App {
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
       case TextMessage.Strict(text) => println(s"Client received TextMessage.Strict: $text")
-      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${value.get}"))
+      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${printableShort(value.get)}"))
       case BinaryMessage.Strict(binary) => //do nothing
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
