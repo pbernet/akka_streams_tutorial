@@ -40,7 +40,7 @@ object KafkaServer extends App {
     FileUtils.forceDelete(kafkaRootPath.toFile)
   }
 
-  //removeDataDirs()
+  removeDataDirs()
 
   val quorumConfiguration = new QuorumPeerConfig {
     override def getDataDir: File = Files.createDirectories(zooKeeperRootPath.resolve("zookeeper")).toFile

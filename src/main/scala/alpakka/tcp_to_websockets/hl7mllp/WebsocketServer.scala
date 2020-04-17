@@ -31,7 +31,7 @@ object WebsocketServer extends App with WebSocketDirectives {
       Flow[Message].mapConcat {
         case tm: TextMessage =>
           println(s"Server received: $tm")
-          TextMessage(Source.single("Hello ") ++ tm.textStream ++ Source.single("!")) :: Nil
+          TextMessage(Source.single("Echo: ") ++ tm.textStream) :: Nil
         case bm: BinaryMessage =>
           // ignore binary messages but drain content to avoid the stream being clogged
           bm.dataStream.runWith(Sink.ignore)
