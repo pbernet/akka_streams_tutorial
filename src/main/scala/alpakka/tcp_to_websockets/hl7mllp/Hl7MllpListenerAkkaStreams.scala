@@ -1,6 +1,7 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
 import akka.actor.ActorSystem
+import akka.kafka.ProducerSettings
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.stream.{ActorAttributes, Supervision}
 import akka.util.ByteString
@@ -8,6 +9,8 @@ import ca.uhn.hl7v2.validation.impl.ValidationContextFactory
 import ca.uhn.hl7v2.{DefaultHapiContext, HL7Exception}
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
+import org.apache.kafka.clients.producer.{Producer, ProducerRecord}
+import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
@@ -35,6 +38,18 @@ object Hl7MllpListenerAkkaStreams extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7MllpListenerAkkaStreams")
 
+  // Bootstrap Kafka client
+
+  val bootstrapServers = "localhost:9092"
+  val topic = "hl7-input"
+  //initial msg in topic, required to create the topic before any consumer subscribes to it
+  val InitialMsg = "InitialMsg"
+  val partition0 = 0
+  val producerSettings = ProducerSettings(system, new StringSerializer, new StringSerializer)
+    .withBootstrapServers(bootstrapServers)
+  val producer = initializeTopic(topic)
+
+
   //MLLP: messages begin after hex "0x0B" and continue until "0x1C|0x0D"
   //Reference: ca.uhn.hl7v2.llp.MllpConstants
   val START_OF_BLOCK = "\u000b" //0x0B
@@ -57,6 +72,17 @@ object Hl7MllpListenerAkkaStreams extends App {
       case _ => Supervision.Stop
     }
 
+    // Remove MLLP START_OF_BLOCK from this message,
+    // because only END_OF_BLOCK + CARRIAGE_RETURN is removed by framing
+    val scrubber = Flow[String]
+      .map(each => StringUtils.stripStart(each, START_OF_BLOCK))
+
+    val kafkaProducer = Flow[String]
+      .map(each => {
+        producer.send(new ProducerRecord(topic, partition0, null: String, each))
+        each
+      })
+
     // Parse/Validate the hairy HL7 message beast
     val hl7Parser = Flow[String]
       .map(each => {
@@ -70,13 +96,9 @@ object Hl7MllpListenerAkkaStreams extends App {
 
         val parser = context.getPipeParser
 
-        // Remove MLLP START_OF_BLOCK from this message,
-        // because only END_OF_BLOCK + CARRIAGE_RETURN is removed by framing
-        val scrubbed = StringUtils.stripStart(each, START_OF_BLOCK)
-
         try {
-          logger.info("About to parse message:\n" + printable(scrubbed))
-          val message = parser.parse(scrubbed)
+          logger.info("About to parse message:\n" + printable(each))
+          val message = parser.parse(each)
           logger.info("Successfully parsed")
 
           val ack = parser.encode(message.generateACK())
@@ -109,6 +131,8 @@ object Hl7MllpListenerAkkaStreams extends App {
           allowTruncation = true))
         .wireTap(each => logger.info("Size after framing: " + each.size))
         .map(_.utf8String)
+        .via(scrubber)
+        .via(kafkaProducer)
         .via(hl7Parser)
         .map(ByteString(_))
         .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
@@ -164,5 +188,14 @@ object Hl7MllpListenerAkkaStreams extends App {
   // The HAPI parser needs /r as segment terminator, but this is not printable
   private def printable(message: String): String = {
     message.replace("\r", "\n")
+  }
+
+  def initializeTopic(topic: String): Producer[String, String] = {
+    //TODO Add transactional and restart behaviour
+    //see: https://doc.akka.io/docs/alpakka-kafka/current/transactions.html
+    //see: https://discuss.lightbend.com/t/prevent-loss-of-first-message-on-restartsource-onfailureswithbackoff-with-transactional-source-connected-to-transaction-flow/6276
+    val producer = producerSettings.createKafkaProducer()
+    producer.send(new ProducerRecord(topic, partition0, null: String, InitialMsg))
+    producer
   }
 }
