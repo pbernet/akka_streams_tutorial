@@ -14,6 +14,7 @@ import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -58,7 +59,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
   val (address, port) = ("127.0.0.1", 6160)
   val serverBinding = server(system, address, port)
-  (1 to 1).par.foreach(each => client(each, system, address, port))
+  (1 to 1).par.foreach(each => client(each, 100, system, address, port))
 
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
@@ -157,14 +158,22 @@ object Hl7MllpListenerAkkaStreams extends App {
   }
 
 
-  def client(id: Int, system: ActorSystem, address: String, port: Int): Unit = {
+  def client(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
     val connection = Tcp().outgoingConnection(address, port)
 
+    val hl7MllpMessages=  (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString)) ))
+    val source = Source(hl7MllpMessages).throttle(1, 1.second).via(connection)
+    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
+    closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
+  }
+
+  private def generateTestMessage(senderTraceID: String) = {
+    //For now put the senderTraceID into the "sender lab" field to follow the messages
     val message = new StringBuilder
-    message ++= "MSH|^~\\&|REGADT|MCM|LABADT|MCM|198808181126|SECURITY|ADT^A01|NIST-IZ-007.00|P|2.5.1|"
+    message ++= s"MSH|^~\\&|$senderTraceID|MCM|LABADT|MCM|198808181126|SECURITY|ADT^A01|1234|P|2.5.1|"
     message ++= CARRIAGE_RETURN
     message ++= "EVN|A01|198808181123||"
     message ++= CARRIAGE_RETURN
@@ -174,11 +183,7 @@ object Hl7MllpListenerAkkaStreams extends App {
     message ++= CARRIAGE_RETURN
     message ++= "PV1|1|I|2000^2012^01||||004777^LEBAUER^SIDNEY^J.|||SUR||||9|A0|"
     message ++= CARRIAGE_RETURN
-
-    val hl7MllpMessages = List(ByteString(encodeMllp(message.toString())), ByteString(encodeMllp(message.toString())))
-    val source = Source(hl7MllpMessages).via(connection)
-    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
-    closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
+    message.toString()
   }
 
   private def encodeMllp(message: String) = {
