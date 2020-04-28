@@ -23,7 +23,7 @@ object WebsocketServer extends App with WebSocketDirectives {
 
   val (address, port) = ("127.0.0.1", 6002)
   server(address, port)
-  browserClient()
+  //browserClient()
 
   def server(address: String, port: Int) = {
 
