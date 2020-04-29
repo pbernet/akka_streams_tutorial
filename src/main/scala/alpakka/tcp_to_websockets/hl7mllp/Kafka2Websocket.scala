@@ -1,32 +1,36 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
-import akka.Done
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws._
-import akka.kafka.scaladsl.Consumer.DrainingControl
-import akka.kafka.scaladsl.{Committer, Consumer}
-import akka.kafka.{CommitterSettings, ConsumerSettings, Subscriptions}
+import akka.kafka.scaladsl.Consumer.Control
+import akka.kafka.scaladsl.{Consumer, Transactional}
+import akka.kafka._
 import akka.pattern.{BackoffOpts, BackoffSupervisor}
-import akka.stream.scaladsl.{Keep, Sink}
+import akka.stream.scaladsl.{RestartSource, Sink}
 import akka.util.Timeout
 import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor.SendMessage
 import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatus.ConnectionStatus
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.requests.IsolationLevel
+import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 /**
-  * Consumer M is a single consumer for all the partitions in the hl7-input consumer group
+  * Tries to deliver all messages from the "hl7-input" topic to the [[WebsocketServer]]
   *
-  * Use the offset storage in Kafka:
-  * https://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka-committing
+  * Uses the recovery from failure approach:
+  * https://doc.akka.io/docs/alpakka-kafka/current/transactions.html#recovery-from-failure
+  * to restart the kafka consumer after a websocket connection issue.
   *
-  * TODO Add transactional and restart behaviour
-  *
-  * TODO Add websocket protocol eg. STOMP https://github.com/akka/alpakka/issues/514
+  * TODO Add websocket STOMP protocol as discussed in
+  * https://github.com/akka/alpakka/issues/514
+  * https://github.com/akka/alpakka/pull/856
   *
   */
 object Kafka2Websocket extends App {
@@ -37,12 +41,11 @@ object Kafka2Websocket extends App {
   val committerSettings = CommitterSettings(system)
   val bootstrapServers = "localhost:9092"
 
-  val printSink = createEchoPrintSink()
   val (address, port) = ("127.0.0.1", 6002)
 
   val (websocketClientActor, websocketConnectionStatus) = websocketClient()
 
-  createAndRunConsumerMessageCount("M")
+  val streamControl = createAndRunConsumer("123")
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
@@ -50,68 +53,87 @@ object Kafka2Websocket extends App {
       .withGroupId(group)
       //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+      .withProperty(ConsumerConfig.ISOLATION_LEVEL_CONFIG, IsolationLevel.READ_COMMITTED.toString.toLowerCase(Locale.ENGLISH))
   }
+
+  def createProducerSettings = {
+    ProducerSettings(system, new StringSerializer, new StringSerializer)
+      .withBootstrapServers("localhost:9092")
+  }
+
+  def initializeTopic(topic: String): Unit = {
+    val producer = createProducerSettings.createKafkaProducer()
+    producer.send(new ProducerRecord(topic, 0, null: String, "InitialMsg"))
+    logger.info(s"Topic: $topic initialized")
+  }
+
+  val transactionalProducerTopic = "transactionalProducerTopic"
+  initializeTopic(transactionalProducerTopic)
 
 
   def websocketClient() = {
 
     val endpoint = "ws://127.0.0.1:6002/echo"
-    val id =  "anID"
+    val clientID = "1"
 
-    val websocketConnectionStatusActor = system.actorOf(WebsocketConnectionStatus.props(id, endpoint), name = "WebsocketConnectionStatus")
+    val websocketConnectionStatusActor = system.actorOf(WebsocketConnectionStatus.props(clientID, endpoint), name = "WebsocketConnectionStatus")
 
     val supervisor = BackoffSupervisor.props(
       BackoffOpts.onFailure(
-        WebsocketClientActor.props(id, endpoint, websocketConnectionStatusActor),
-        childName = id,
+        WebsocketClientActor.props(clientID, endpoint, websocketConnectionStatusActor),
+        childName = clientID,
         minBackoff = 1.second,
         maxBackoff = 60.seconds,
         randomFactor = 0.2
       ))
 
-    val websocketClientActor = system.actorOf(supervisor, name = s"$id-backoff-supervisor")
+    val websocketClientActor = system.actorOf(supervisor, name = s"$clientID-backoff-supervisor")
     (websocketClientActor, websocketConnectionStatusActor)
   }
 
+  private def createAndRunConsumer(transactionalId: String) = {
 
+    val innerControl = new AtomicReference[Control](Consumer.NoopControl)
 
-
-
-
-  private def createAndRunConsumerMessageCount(id: String) = {
-
-    // For at least-once delivery
-    // https://doc.akka.io/docs/alpakka-kafka/current/consumer.html#offset-storage-in-kafka-committing
-    val control =
-      Consumer
-        .committableSource(createConsumerSettings("hl7-input consumer group"), Subscriptions.topics("hl7-input"))
+    val stream = RestartSource.onFailuresWithBackoff(
+      minBackoff = 1.seconds,
+      maxBackoff = 60.seconds,
+      randomFactor = 0.2
+    ) { () =>
+      Transactional
+        .source(createConsumerSettings("hl7-input consumer group"), Subscriptions.topics("hl7-input"))
         .mapAsync(1) { msg =>
-          //        println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")
-
+          logger.info(s"TransactionalID: $transactionalId - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")
 
           import akka.pattern.ask
           implicit val askTimeout: Timeout = Timeout(10.seconds)
 
-          val isConnected = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]
-          val isConnectedResult = Await.result(isConnected, 10.seconds)
+          // With this blocking behaviour we avoid loosing messages when the websocket connection is down.
+          // However, the current in-flight message will be lost.
+          // To not loose any messages we need to manually check the ACK from the websocket server
+          // or use the STOMP protocol
+          val isConnectedFuture = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]
+          val isConnected = Await.result(isConnectedFuture, 10.seconds)
 
-          if (isConnectedResult) {
-            // TODO Change to ask with "Done"
+          if (isConnected) {
             websocketClientActor ! SendMessage(printableShort(msg.record.value()))
-            Future(msg).map(_ => msg.committableOffset)
+            Future(msg)
           } else {
-            //TODO Add Retry logic, so we are not loosing messages. Can we add a decider to restart?
-            logger.warn("Not connected")
-            throw new RuntimeException("BOOM")
-            //Future(msg).map(_ => msg.committableOffset)
+            logger.warn("WebSocket connection failure, going to restart Kafka consumer")
+            throw new RuntimeException("WebSocket connection failure")
           }
         }
-        .via(Committer.flow(committerSettings.withMaxBatch(1)))
-        .toMat(Sink.seq)(Keep.both)
-        .mapMaterializedValue(DrainingControl.apply)
-        .run()
+        .map { msg =>
+          ProducerMessage.single(new ProducerRecord(transactionalProducerTopic, msg.record.key, msg.record.value), msg.partitionOffset)
+        }
+        // side effect out the `Control` materialized value because it can't be propagated through the `RestartSource`
+        .mapMaterializedValue(c => innerControl.set(c))
+        .via(Transactional.flow(createProducerSettings, transactionalId))
   }
 
+    stream.runWith(Sink.ignore)
+    innerControl
+  }
 
   // The HAPI parser needs /r as segment terminator, but this is not printable
   private def printable(message: String): String = {
@@ -122,17 +144,8 @@ object Kafka2Websocket extends App {
     printable(message).take(20).concat("...")
   }
 
-  private def createEchoPrintSink(): Sink[Message, Future[Done]] = {
-    Sink.foreach {
-      //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text) => println(s"Client received TextMessage.Strict: $text")
-      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${printableShort(value.get)}"))
-      case BinaryMessage.Strict(binary) => //do nothing
-      case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
-    }
-  }
   sys.addShutdownHook{
-    //TODO Do graceful shutdown
     println("Got control-c cmd from shell, about to shutdown...")
+    Await.result(streamControl.get.shutdown(), 10.seconds)
   }
 }

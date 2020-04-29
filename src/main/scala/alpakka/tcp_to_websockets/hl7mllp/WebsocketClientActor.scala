@@ -33,17 +33,17 @@ class WebsocketClientActor(id: String, endpoint: String, websocketConnectionStat
 
   private def startup: Receive = {
     case Upgraded =>
-      log.info(s"$id : WebSocket upgraded")
+      log.info(s"Client$id: WebSocket upgraded")
     case FailedUpgrade(statusCode) =>
-      log.error(s"$id : Failed to upgrade WebSocket connection: $statusCode")
+      log.error(s"Client$id: Failed to upgrade WebSocket connection: $statusCode")
       websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
       throw ConnectionException(id)
     case ConnectionFailure(ex) =>
-      log.error(s"$id : Failed to establish WebSocket connection: $ex")
+      log.error(s"Client $id: Failed to establish WebSocket connection: $ex")
       websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
       throw ConnectionException(id)
     case Connected =>
-      log.info(s"$id : WebSocket connected")
+      log.info(s"Client $id: WebSocket connected")
       websocketConnectionStatusActor ! WebsocketConnectionStatus.Connected
       context.become(running)
     case SendMessage(msg) =>
@@ -53,14 +53,14 @@ class WebsocketClientActor(id: String, endpoint: String, websocketConnectionStat
 
   private def running: Receive = {
     case SendMessage(msg) =>
-      log.info(s"Running and connected: About to send message to websocket: $msg")
+      log.info(s"About to send message to WebSocket: $msg")
       webSocketClient.sendToWebsocket(msg)
     case Terminated =>
-      log.error(s"$id : WebSocket connection terminated")
+      log.error(s"Client $id: WebSocket connection terminated")
       websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
       throw ConnectionException(id)
     case ConnectionFailure(ex) =>
-      log.error(s"$id : ConnectionFailure occurred: $ex")
+      log.error(s"Client $id: ConnectionFailure occurred: $ex")
       websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
       throw ConnectionException(id)
   }

@@ -24,11 +24,11 @@ class WebsocketConnectionStatus(id: String, endpoint: String)
   override def receive: Receive = {
     case Connected =>
       isConnected = true
-      log.info(s"$id : ConnectionStatus connected to: $endpoint")
+      log.info(s"Client $id: connected to: $endpoint")
 
     case Terminated =>
       isConnected = false
-      log.info(s"$id : ConnectionStatus terminated from: $endpoint")
+      log.info(s"Client $id: terminated from: $endpoint")
 
     case ConnectionStatus =>
       sender() ! isConnected

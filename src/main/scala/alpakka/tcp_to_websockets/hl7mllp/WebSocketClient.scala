@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.ws._
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor.{Connected, ConnectionFailure}
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
@@ -25,13 +26,13 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
                      (implicit
                       system: ActorSystem,
                       executionContext: ExecutionContext) {
-
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val printSink = createEchoPrintSink()
-  val sourceQueue = singleWebSocketRequestSourceQueueClient(1, endpoint)
+  val sourceQueue = singleWebSocketRequestSourceQueueClient(id, endpoint)
 
 
-  def singleWebSocketRequestSourceQueueClient(id: Int, endpoint: String) = {
+  def singleWebSocketRequestSourceQueueClient(id: String, endpoint: String) = {
 
     val (source, sourceQueue) = {
       val p = Promise[SourceQueue[Message]]
@@ -52,7 +53,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
     connected.onComplete((done: Try[Done.type]) => {
       done match {
         case Success(_) =>
-          println(s"Client: $id singleWebSocketRequestSourceQueueClient connected: $done")
+          logger.info(s"Client $id: connected: $done")
           websocketClientActor ! Connected
         case Failure(ex) =>
           websocketClientActor ! ConnectionFailure(ex)
@@ -61,15 +62,14 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
     sourceQueueWithComplete.watchCompletion().onComplete((closed: Try[Done]) => {
       closed match {
         case Success(_) =>
-          println(s"Client: $id singleWebSocketRequestSourceQueueClient closed: $closed")
+          logger.info(s"Client $id: closed: $closed")
           websocketClientActor ! ConnectionFailure(new RuntimeException("Closed!"))
         case Failure(ex) =>
-          println(s"Client: $id singleWebSocketRequestSourceQueueClient closed: $closed")
+          logger.info(s"Client $id: closed: $closed")
           websocketClientActor ! ConnectionFailure(ex)
       }
     })
     sourceQueue
-
   }
 
 
@@ -88,10 +88,10 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
     val message = TextMessage.Strict(messageText)
     sourceQueue.flatMap { queue =>
       queue.offer(message: Message).map {
-        case QueueOfferResult.Enqueued => println(s"enqueued: ${printableShort(message.text)}")
-        case QueueOfferResult.Dropped => println(s"dropped: ${printableShort(message.text)}")
-        case QueueOfferResult.Failure(ex) => println(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => println("Source queue closed")
+        case QueueOfferResult.Enqueued => logger.info(s"Enqueued: ${printableShort(message.text)}")
+        case QueueOfferResult.Dropped => logger.info(s"Dropped: ${printableShort(message.text)}")
+        case QueueOfferResult.Failure(ex) => logger.info(s"Offer failed: $ex")
+        case QueueOfferResult.QueueClosed => logger.info("Source queue closed")
       }
     }
   }
@@ -100,9 +100,9 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
   private def createEchoPrintSink(): Sink[Message, Future[Done]] = {
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text) => println(s"Client received TextMessage.Strict: ${printableShort(text)}")
+      case TextMessage.Strict(text) => logger.info(s"Echo client received TextMessage.Strict: ${printableShort(text)}")
       case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete { value =>
-        println(s"Client received TextMessage.Streamed: ${printableShort(value.get)}")
+        logger.info(s"Echo client received TextMessage.Streamed: ${printableShort(value.get)}")
       }
       case BinaryMessage.Strict(binary) => //do nothing
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
