@@ -11,40 +11,47 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig
 import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
 
 /**
-  * Kafka which embedded Zookeeper, inspired by:
+  * KafkaServer which embedded Zookeeper, inspired by:
   * https://github.com/jamesward/koober/blob/master/kafka-server/src/main/scala/KafkaServer.scala
   *
   * Remarks:
-  *  - Shut down gracefully via exit (so that shutdown hook runs)
   *  - Zookeeper starts an admin server on http://localhost:8080/commands
+  *  - Shut down gracefully via exit (so that shutdown hook runs)
   *
   * Alternatives:
-  *  - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
-  *  - "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
+  *  - Use "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
   *  - Run Kafka in docker
   *    see: https://github.com/wurstmeister/kafka-docker
   *    or together with kafdrop admin console: https://towardsdatascience.com/kafdrop-e869e5490d62
+  *  - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
   *  - Use Confluent Cloud, see: https://www.confluent.io/confluent-cloud/#view-pricing
   */
 object KafkaServer extends App {
 
   val zookeeperPort = 2181
 
-  val zooKeeperRoot =  "/tmp/zookeeper"
-  val zooKeeperRootPath =  Paths.get(zooKeeperRoot) //Resolves to "C:\tmp" on windows
-  val kafkaRoot = "/tmp/kafka-logs"
-  val kafkaRootPath = Paths.get(kafkaRoot)
+  val kafkaLogs = "/tmp/kafka-logs"
+  val kafkaLogsPath = Paths.get(kafkaLogs)
 
-  def removeDataDirs(): Unit = {
-    if(zooKeeperRootPath.toFile.exists()) FileUtils.forceDelete(zooKeeperRootPath.toFile)
-    if(kafkaRootPath.toFile.exists()) FileUtils.forceDelete(kafkaRootPath.toFile)
+  // See: https://stackoverflow.com/questions/59592518/kafka-broker-doesnt-find-cluster-id-and-creates-new-one-after-docker-restart/60864763#comment108382967_60864763
+  def fix25Behaviour() = {
+    val fileWithConflictingContent = kafkaLogsPath.resolve("meta.properties").toFile
+    if (fileWithConflictingContent.exists())  FileUtils.forceDelete(fileWithConflictingContent)
   }
 
-  //removeDataDirs()
+  def removeKafkaLogs(): Unit = {
+    if (kafkaLogsPath.toFile.exists()) FileUtils.forceDelete(kafkaLogsPath.toFile)
+  }
+
+  // Keeps the persistent data
+  fix25Behaviour()
+  // If everything fails
+  //removeKafkaLogs()
 
   val quorumConfiguration = new QuorumPeerConfig {
-    override def getDataDir: File = Files.createDirectories(zooKeeperRootPath.resolve("zookeeper")).toFile
-    override def getDataLogDir: File = Files.createDirectories(zooKeeperRootPath.resolve("zookeeper-logs")).toFile
+    // Since we do not run a cluster, we are not interested in zookeeper data
+    override def getDataDir: File = Files.createTempDirectory("zookeeper").toFile
+    override def getDataLogDir: File = Files.createTempDirectory("zookeeper-logs").toFile
     override def getClientPortAddress: InetSocketAddress = new InetSocketAddress(zookeeperPort)
   }
 
@@ -63,12 +70,11 @@ object KafkaServer extends App {
 
   zooKeeperThread.start()
 
-  // Maybe not all the properties below are needed, they were copied from a working standalone Kafka installation
   val kafkaProperties = new Properties()
   kafkaProperties.put("zookeeper.connect", s"localhost:$zookeeperPort")
   kafkaProperties.put("broker.id", "0")
   kafkaProperties.put("offsets.topic.replication.factor", "1")
-  kafkaProperties.put("log.dirs", kafkaRoot)
+  kafkaProperties.put("log.dirs", kafkaLogs)
   kafkaProperties.put("delete.topic.enable", "true")
   kafkaProperties.put("group.initial.rebalance.delay.ms", "0")
   kafkaProperties.put("transaction.state.log.min.isr", "1")
