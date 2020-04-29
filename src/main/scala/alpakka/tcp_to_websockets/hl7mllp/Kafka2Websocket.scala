@@ -4,9 +4,9 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.ActorSystem
+import akka.kafka._
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.scaladsl.{Consumer, Transactional}
-import akka.kafka._
 import akka.pattern.{BackoffOpts, BackoffSupervisor}
 import akka.stream.scaladsl.{RestartSource, Sink}
 import akka.util.Timeout
@@ -38,14 +38,13 @@ object Kafka2Websocket extends App {
   implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val committerSettings = CommitterSettings(system)
-  val bootstrapServers = "localhost:9092"
+  val bootstrapServers = "127.0.0.1:9092"
 
-  val (address, port) = ("127.0.0.1", 6002)
+  val clientID = "1"
+  val webSocketEndpoint = "ws://127.0.0.1:6002/echo"
+  val (websocketClientActor, websocketConnectionStatus) = websocketClient(clientID, webSocketEndpoint)
 
-  val (websocketClientActor, websocketConnectionStatus) = websocketClient()
-
-  val streamControl = createAndRunConsumer("123")
+  val streamControl = createAndRunConsumer(clientID)
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
@@ -71,11 +70,7 @@ object Kafka2Websocket extends App {
   initializeTopic(transactionalProducerTopic)
 
 
-  def websocketClient() = {
-
-    val endpoint = "ws://127.0.0.1:6002/echo"
-    val clientID = "1"
-
+  def websocketClient(clientID: String, endpoint: String) = {
     val websocketConnectionStatusActor = system.actorOf(WebsocketConnectionStatus.props(clientID, endpoint), name = "WebsocketConnectionStatus")
 
     val supervisor = BackoffSupervisor.props(
