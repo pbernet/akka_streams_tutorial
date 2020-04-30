@@ -10,7 +10,7 @@ val alpakkaVersion = "2.0.0-M2"
 val akkaStreamKafkaVersion = "2.0.1"
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.15.11"
-val streamzVersion = "0.11-RC1"
+val streamzVersion = "0.13-RC1"
 val camelVersion = "2.25.0"
 val testContainersVersion = "1.12.5"
 
