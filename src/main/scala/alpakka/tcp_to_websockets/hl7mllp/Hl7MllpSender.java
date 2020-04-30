@@ -13,29 +13,32 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.stream.IntStream;
 
 
 /**
- * Basic sender, which reads ML7 messages from file
- * Is responsible for closing tcp connection at the end
+ * Basic sender, which loops through ML7 messages read from file
+ *
  */
 public class Hl7MllpSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(Hl7MllpSender.class);
     private static HapiContext context = new DefaultHapiContext();
 
-    // TODO make configurable
     private static final int PORT_NUMBER = 6160;
 
     public static void main(String[] args) {
+        IntStream.range(0, 100).forEach(each -> processMessages());
+    }
 
+    private static void processMessages() {
         Connection connectionWithServer = null;
-
         try {
-
             FileReader reader = new FileReader("src/main/resources/ADT_ORM_Hl7Messages.txt");
             Hl7InputStreamMessageIterator messageIterator = new Hl7InputStreamMessageIterator(reader);
 
             while (messageIterator.hasNext()) {
+
+                Thread.sleep(1000);
 
                 if (connectionWithServer == null) {
                     boolean useSecureTlsConnection = false;
@@ -44,25 +47,26 @@ public class Hl7MllpSender {
 
                 try {
                     Message nextMessage = messageIterator.next();
+
+                    LOGGER.info("About to send message: " + stripMessage(nextMessage.encode()));
                     Message messageResponse = connectionWithServer.getInitiator().sendAndReceive(nextMessage);
 
-                    String strippedMessage = stripMessage(messageResponse.encode());
-                    LOGGER.info("Response: " + strippedMessage);
+                    // TODO Check for NACK response and maybe retry
+                    LOGGER.info("Response: " + stripMessage(messageResponse.encode()));
                 } catch (IOException e) {
-                    // TODO handle exceptions and retry, currently faulty message will be lost
-                    e.printStackTrace();
-                    // At least a new connection is used for the next message
+                    // TODO handle connection exceptions and retry, currently in-flight message is lost
+                    LOGGER.error("Inner Ex during message processing:",  e);
+                    // At least a new tcp connection will used for the next message
                     connectionWithServer.close();
                     connectionWithServer = null;
                 }
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.error("Outer Ex during message processing:",  e);
         } finally {
             if (connectionWithServer != null) connectionWithServer.close();
         }
-
     }
 
     private static String stripMessage(String message) {

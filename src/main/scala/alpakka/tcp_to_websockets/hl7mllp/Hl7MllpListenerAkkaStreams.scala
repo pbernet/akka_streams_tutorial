@@ -19,22 +19,27 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * PoC of a akka streams HL7 MLLP listener with the same behaviour as [[Hl7MllpListener]]:
+  * PoC of an akka streams based HL7 MLLP listener with the same behaviour as [[Hl7MllpListener]]:
   *  - Receive HL7 messages over tcp
   *  - Frame according to MLLP
   *  - Parse using HAPI parser (all validation switched off)
   *  - Reply with ACK or NACK (if everything fails)
   *
   * Works with:
-  *  - built in local client
+  *  - built in localClient
   *  - external client: [[Hl7MllpSender]]
   *
   * Doc:
   * http://hl7.ihelse.net/hl7v3/infrastructure/transport/transport_mllp.html
+  * and [[ca.uhn.hl7v2.llp.MllpConstants]]
+  *
+  * TODO Add HL7 over HTTP:
+  * https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
+  *
+  * TODO Avoid loosing messages when Kafka is down
+  * https://github.com/akka/alpakka-kafka/issues/1101
   *
   */
-// TODO Add TLS
-// TODO Add HL7 over HTTP: https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
 object Hl7MllpListenerAkkaStreams extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7MllpListenerAkkaStreams")
@@ -52,14 +57,13 @@ object Hl7MllpListenerAkkaStreams extends App {
 
 
   //MLLP: messages begin after hex "0x0B" and continue until "0x1C|0x0D"
-  //Reference: ca.uhn.hl7v2.llp.MllpConstants
   val START_OF_BLOCK = "\u000b" //0x0B
   val END_OF_BLOCK = "\u001c" //0x1C
   val CARRIAGE_RETURN = "\r" //0x0D
 
   val (address, port) = ("127.0.0.1", 6160)
   val serverBinding = server(system, address, port)
-  (1 to 1).par.foreach(each => client(each, 100, system, address, port))
+  (1 to 1).par.foreach(each => localClient(each, 100, system, address, port))
 
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
@@ -84,12 +88,14 @@ object Hl7MllpListenerAkkaStreams extends App {
         each
       })
 
-    // Parse/Validate the hairy HL7 message beast
+    // Parse the hairy HL7 message beast
     val hl7Parser = Flow[String]
       .map(each => {
         val context = new DefaultHapiContext
-        // The ValidationContext is used during parsing and well as during
+
+        // The ValidationContext is used during parsing as well as during
         // validation using {@link ca.uhn.hl7v2.validation.Validator} objects.
+
         // Set to false to do parsing without validation
         context.getParserConfiguration.setValidating(false)
         // Set to false, because there is currently no separate validation step
@@ -98,7 +104,7 @@ object Hl7MllpListenerAkkaStreams extends App {
         val parser = context.getPipeParser
 
         try {
-          logger.info("About to parse message:\n" + printable(each))
+          logger.info("About to parse message: " + printableShort(each))
           val message = parser.parse(each)
           logger.info("Successfully parsed")
 
@@ -108,7 +114,7 @@ object Hl7MllpListenerAkkaStreams extends App {
           case ex: HL7Exception =>
             val rootCause = printable(ExceptionUtils.getRootCause(ex).getMessage)
             logger.error(s"Error during parsing. Problem with message structure. Answer with NACK. Cause: $rootCause")
-            //TODO Find a sensible format with the values we have
+            //TODO Build NACK from message. Note that there is a piggyback ex.getResponseMessage which could be used
             val nack = "NACK"
             encodeMllp(nack)
           case ex: Throwable =>
@@ -123,14 +129,14 @@ object Hl7MllpListenerAkkaStreams extends App {
 
     val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
       val serverEchoFlow = Flow[ByteString]
-        .wireTap(_ => logger.info(s"Got message from client: ${connection.remoteAddress}"))
-        .wireTap(each => logger.info("Size before framing: " + each.size))
-        // frame input stream up to MLLP terminator "END_OF_BLOCK + CARRIAGE_RETURN"
+        .wireTap(_ => logger.debug(s"Got message from client: ${connection.remoteAddress}"))
+        .wireTap(each => logger.debug("Size before framing: " + each.size))
+        // frame input stream up to MLLP terminator: "END_OF_BLOCK + CARRIAGE_RETURN"
         .via(Framing.delimiter(
           ByteString(END_OF_BLOCK + CARRIAGE_RETURN),
           maximumFrameLength = 2048,
           allowTruncation = true))
-        .wireTap(each => logger.info("Size after framing: " + each.size))
+        .wireTap(each => logger.debug("Size after framing: " + each.size))
         .map(_.utf8String)
         .via(scrubber)
         .via(kafkaProducer)
@@ -158,7 +164,7 @@ object Hl7MllpListenerAkkaStreams extends App {
   }
 
 
-  def client(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
+  def localClient(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
@@ -166,7 +172,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
     val hl7MllpMessages=  (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString)) ))
     val source = Source(hl7MllpMessages).throttle(1, 1.second).via(connection)
-    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
+    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printableShort(each.utf8String)}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 
@@ -195,11 +201,12 @@ object Hl7MllpListenerAkkaStreams extends App {
     message.replace("\r", "\n")
   }
 
+  private def printableShort(message: String): String = {
+    printable(message).take(20).concat("...")
+  }
+
   def initializeTopic(topic: String): Producer[String, String] = {
-    //TODO Add transactional and restart behaviour
-    //see: https://doc.akka.io/docs/alpakka-kafka/current/transactions.html
-    //see: https://discuss.lightbend.com/t/prevent-loss-of-first-message-on-restartsource-onfailureswithbackoff-with-transactional-source-connected-to-transaction-flow/6276
-    val producer = producerSettings.createKafkaProducer()
+   val producer = producerSettings.createKafkaProducer()
     producer.send(new ProducerRecord(topic, partition0, null: String, InitialMsg))
     producer
   }

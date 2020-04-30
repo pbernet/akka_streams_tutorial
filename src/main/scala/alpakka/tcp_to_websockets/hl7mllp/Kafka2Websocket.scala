@@ -11,7 +11,7 @@ import akka.pattern.{BackoffOpts, BackoffSupervisor}
 import akka.stream.scaladsl.{RestartSource, Sink}
 import akka.util.Timeout
 import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor.SendMessage
-import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatus.ConnectionStatus
+import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatusActor.ConnectionStatus
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.requests.IsolationLevel
@@ -22,13 +22,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 /**
-  * Tries to deliver all messages from the "hl7-input" topic to the [[WebsocketServer]]
+  * Tries to deliver all messages from the Kafka "hl7-input" topic to the [[WebsocketServer]]
   *
   * Uses the recovery from failure approach:
   * https://doc.akka.io/docs/alpakka-kafka/current/transactions.html#recovery-from-failure
   * to restart the kafka consumer after a websocket connection issue.
   *
-  * TODO Add websocket STOMP protocol as discussed in
+  * Alpakka does currently not support the STOMP protocol, see:
   * https://github.com/akka/alpakka/issues/514
   * https://github.com/akka/alpakka/pull/856
   *
@@ -71,7 +71,7 @@ object Kafka2Websocket extends App {
 
 
   def websocketClient(clientID: String, endpoint: String) = {
-    val websocketConnectionStatusActor = system.actorOf(WebsocketConnectionStatus.props(clientID, endpoint), name = "WebsocketConnectionStatus")
+    val websocketConnectionStatusActor = system.actorOf(WebsocketConnectionStatusActor.props(clientID, endpoint), name = "WebsocketConnectionStatus")
 
     val supervisor = BackoffSupervisor.props(
       BackoffOpts.onFailure(
@@ -105,8 +105,9 @@ object Kafka2Websocket extends App {
 
           // With this blocking behaviour we avoid loosing messages when the websocket connection is down.
           // However, the current in-flight message will be lost.
-          // To not loose any messages we need to manually check the ACK from the websocket server
-          // or use the STOMP protocol
+          // To not loose any messages, we may:
+          //  - In WebSocketClient check the async ACK before the commit below
+          //  - use the STOMP protocol, see: stomp.github.io
           val isConnectedFuture = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]
           val isConnected = Await.result(isConnectedFuture, 10.seconds)
 

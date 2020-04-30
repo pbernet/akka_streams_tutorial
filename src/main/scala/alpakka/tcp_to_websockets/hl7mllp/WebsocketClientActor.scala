@@ -3,11 +3,12 @@ package alpakka.tcp_to_websockets.hl7mllp
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.http.scaladsl.model.StatusCode
 import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor._
+import org.apache.commons.lang3.exception.ExceptionUtils
 
 import scala.concurrent.duration._
 
 
-case class ConnectionException(id: String) extends RuntimeException
+case class ConnectionException(cause: String) extends RuntimeException
 
 object WebsocketClientActor {
   def props(id: String, endpoint: String, websocketConnectionStatusActor: ActorRef) =
@@ -35,16 +36,16 @@ class WebsocketClientActor(id: String, endpoint: String, websocketConnectionStat
     case Upgraded =>
       log.info(s"Client$id: WebSocket upgraded")
     case FailedUpgrade(statusCode) =>
-      log.error(s"Client$id: Failed to upgrade WebSocket connection: $statusCode")
-      websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
-      throw ConnectionException(id)
+      log.error(s"Client$id: failed to upgrade WebSocket connection: $statusCode")
+      websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Terminated
+      throw ConnectionException(statusCode.toString())
     case ConnectionFailure(ex) =>
-      log.error(s"Client $id: Failed to establish WebSocket connection: $ex")
-      websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
-      throw ConnectionException(id)
+      log.error(s"Client $id: failed to establish WebSocket connection: $ex")
+      websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Terminated
+      throw ConnectionException(ExceptionUtils.getRootCause(ex).getMessage)
     case Connected =>
       log.info(s"Client $id: WebSocket connected")
-      websocketConnectionStatusActor ! WebsocketConnectionStatus.Connected
+      websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Connected
       context.become(running)
     case SendMessage(msg) =>
       log.warning(s"In state startup. Can not receive message: $msg. Resend after 2 seconds")
@@ -57,15 +58,15 @@ class WebsocketClientActor(id: String, endpoint: String, websocketConnectionStat
       webSocketClient.sendToWebsocket(msg)
     case Terminated =>
       log.error(s"Client $id: WebSocket connection terminated")
-      websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
-      throw ConnectionException(id)
+      websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Terminated
+      throw ConnectionException(s"Client $id: WebSocket connection terminated")
     case ConnectionFailure(ex) =>
       log.error(s"Client $id: ConnectionFailure occurred: $ex")
-      websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
-      throw ConnectionException(id)
+      websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Terminated
+      throw ConnectionException(ExceptionUtils.getRootCause(ex).getMessage)
   }
 
   override def postStop(): Unit = {
-    websocketConnectionStatusActor ! WebsocketConnectionStatus.Terminated
+    websocketConnectionStatusActor ! WebsocketConnectionStatusActor.Terminated
   }
 }

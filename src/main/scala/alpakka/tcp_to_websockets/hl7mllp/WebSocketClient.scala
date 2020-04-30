@@ -53,7 +53,6 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
     connected.onComplete((done: Try[Done.type]) => {
       done match {
         case Success(_) =>
-          logger.info(s"Client $id: connected: $done")
           websocketClientActor ! Connected
         case Failure(ex) =>
           websocketClientActor ! ConnectionFailure(ex)
@@ -100,9 +99,9 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
   private def createEchoPrintSink(): Sink[Message, Future[Done]] = {
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text) => logger.info(s"Echo client received TextMessage.Strict: ${printableShort(text)}")
+      case TextMessage.Strict(text) => logger.info(s"WebSocket client received TextMessage.Strict: ${printableShort(text)}")
       case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete { value =>
-        logger.info(s"Echo client received TextMessage.Streamed: ${printableShort(value.get)}")
+        logger.info(s"WebSocket client received TextMessage.Streamed: ${printableShort(value.get)}")
       }
       case BinaryMessage.Strict(binary) => //do nothing
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)

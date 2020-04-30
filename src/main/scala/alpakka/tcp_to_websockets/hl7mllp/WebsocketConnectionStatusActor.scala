@@ -1,12 +1,12 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
 import akka.actor.{Actor, ActorLogging, Props}
-import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatus.{Connected, ConnectionStatus, Terminated}
+import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatusActor.{Connected, ConnectionStatus, Terminated}
 
 
-object WebsocketConnectionStatus {
+object WebsocketConnectionStatusActor {
   def props(id: String, endpoint: String) =
-    Props(new WebsocketConnectionStatus(id, endpoint))
+    Props(new WebsocketConnectionStatusActor(id, endpoint))
 
   final case object Connected
   final case object Terminated
@@ -14,7 +14,7 @@ object WebsocketConnectionStatus {
 
 }
 
-class WebsocketConnectionStatus(id: String, endpoint: String)
+class WebsocketConnectionStatusActor(id: String, endpoint: String)
   extends Actor with ActorLogging {
   implicit private val system = context.system
   implicit private val executionContext = system.dispatcher
