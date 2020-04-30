@@ -14,7 +14,7 @@ import sample.stream_actor.Total.Increment
 
 import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
@@ -22,14 +22,12 @@ import scala.util.{Failure, Success}
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-i
   *
-  * WindTurbineServer receives Measurements via Websockets from n clients
-  * Clients are started with SimulateWindTurbines
+  * WindTurbineServer receives [[Measurements]] via Websockets from n clients
+  * Clients are started with [[SimulateWindTurbines]]
   *
   */
 object WindTurbineServer {
-
   protected implicit val system = ActorSystem("WindTurbineServer")
-
   implicit def executor: ExecutionContext = system.dispatcher
   protected val log = Logging(system.eventStream, "WindTurbineServer-main")
 
@@ -72,10 +70,11 @@ object WindTurbineServer {
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
 
-            // Optional: generate Server errors at 1/6 of the time
+            // Optional: generate server errors at 1/6 of the time
             // Clients receive:
             // akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
             // and are able to recover due to the RestartSource
+
             //val time = LocalTime.now()
             //if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
 
@@ -105,7 +104,7 @@ object WindTurbineServer {
     bindingFuture.map { serverBinding =>
       log.info(s"Bound to: ${serverBinding.localAddress} ")
     }.onComplete {
-      case Success(value) => log.info("WindTurbineServer started successfully")
+      case Success(_) => log.info("WindTurbineServer started successfully")
       case Failure(ex) =>
         log.error(ex, "Failed to bind to {}:{}!", httpInterface, httpPort)
         Http().shutdownAllConnectionPools()
@@ -115,8 +114,8 @@ object WindTurbineServer {
     scala.sys.addShutdownHook {
       log.info("Terminating...")
       Http().shutdownAllConnectionPools()
-      system.terminate()
-      Await.result(system.whenTerminated, 30.seconds)
+      //actor system termination in 2.6.x is now implicit, see:
+      //https://github.com/akka/akka/issues/28310
       log.info("Terminated... Bye")
     }
   }
