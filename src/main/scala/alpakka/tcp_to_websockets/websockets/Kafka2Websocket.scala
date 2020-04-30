@@ -1,4 +1,4 @@
-package alpakka.tcp_to_websockets.hl7mllp
+package alpakka.tcp_to_websockets.websockets
 
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
@@ -10,8 +10,8 @@ import akka.kafka.scaladsl.{Consumer, Transactional}
 import akka.pattern.{BackoffOpts, BackoffSupervisor}
 import akka.stream.scaladsl.{RestartSource, Sink}
 import akka.util.Timeout
-import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor.SendMessage
-import alpakka.tcp_to_websockets.hl7mllp.WebsocketConnectionStatusActor.ConnectionStatus
+import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.SendMessage
+import alpakka.tcp_to_websockets.websockets.WebsocketConnectionStatusActor.ConnectionStatus
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.requests.IsolationLevel

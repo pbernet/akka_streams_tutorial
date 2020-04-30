@@ -1,4 +1,4 @@
-package alpakka.tcp_to_websockets.hl7mllp
+package alpakka.tcp_to_websockets.websockets
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http

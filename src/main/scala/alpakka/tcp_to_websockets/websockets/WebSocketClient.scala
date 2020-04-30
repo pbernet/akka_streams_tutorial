@@ -1,4 +1,4 @@
-package alpakka.tcp_to_websockets.hl7mllp
+package alpakka.tcp_to_websockets.websockets
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
-import alpakka.tcp_to_websockets.hl7mllp.WebsocketClientActor.{Connected, ConnectionFailure}
+import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.{Connected, ConnectionFailure}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
