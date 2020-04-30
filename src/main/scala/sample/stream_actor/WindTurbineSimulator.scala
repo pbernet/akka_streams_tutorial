@@ -7,13 +7,14 @@ import sample.stream_actor.WindTurbineSimulator._
 case class WindTurbineSimulatorException(id: String) extends RuntimeException
 
 /**
-  * WindTurbineSimulator wraps the WebSocketClient and coordinates issues during:
-  * - startup
-  * - running
+  * WindTurbineSimulator starts the [[WebSocketClient]] and coordinates
+  * issues during:
+  *  - startup
+  *  - running
   */
 object WindTurbineSimulator {
   def props(id: String, endpoint: String) =
-    Props(classOf[WindTurbineSimulator], id, endpoint)
+    Props(new WindTurbineSimulator(id, endpoint))
 
   final case object Upgraded
   final case object Connected
@@ -27,7 +28,7 @@ class WindTurbineSimulator(id: String, endpoint: String)
   implicit private val system = context.system
   implicit private val executionContext = system.dispatcher
 
-  val webSocket = WebSocketClient(id, endpoint, self)
+  val webSocketClient = WebSocketClient(id, endpoint, self)
 
   override def receive: Receive = startup //initial state
 

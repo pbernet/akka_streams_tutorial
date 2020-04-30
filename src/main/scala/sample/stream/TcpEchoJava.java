@@ -12,7 +12,6 @@ import akka.stream.javadsl.Tcp.IncomingConnection;
 import akka.stream.javadsl.Tcp.ServerBinding;
 import akka.util.ByteString;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,16 +30,16 @@ public class TcpEchoJava {
      * on 127.0.0.1:6001.
      *
      */
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length == 0) {
-            ActorSystem system = ActorSystem.create("ClientAndServer");
+            ActorSystem system = ActorSystem.create("TcpEchoJava");
             InetSocketAddress serverAddress = new InetSocketAddress("127.0.0.1", 6000);
             server(system, serverAddress);
             IntStream.range(1, 10).parallel().forEach(each -> client(system, serverAddress));
         } else {
             InetSocketAddress serverAddress;
             if (args.length == 3) {
-                serverAddress = new InetSocketAddress(args[1], Integer.valueOf(args[2]));
+                serverAddress = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
             } else {
                 serverAddress = new InetSocketAddress("127.0.0.1", 6000);
             }
@@ -59,7 +58,7 @@ public class TcpEchoJava {
 
         final Sink<IncomingConnection, CompletionStage<Done>> handler = Sink.foreach(conn -> {
             System.out.println("Client connected from: " + conn.remoteAddress());
-            conn.handleWith(Flow.<ByteString>create(), materializer);
+            conn.handleWith(Flow.create(), materializer);
         });
 
 

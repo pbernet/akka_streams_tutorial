@@ -11,10 +11,10 @@ import scala.concurrent.duration._
   * Sample Implementation of:
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-ii
   *
-  * Starts n WindTurbineSimulator, which generate WindTurbineData via WebSocketClient
-  * Use a BackoffSupervisor as level of indirection
+  * Starts n [[WindTurbineSimulator]], which generate [[WindTurbineData]]
+  * Uses a [[BackoffSupervisor]] as level of indirection
   *
-  * The server is started with WindTurbineServer
+  * The server is started with [[WindTurbineServer]]
   */
 object SimulateWindTurbines extends App {
   implicit val system = ActorSystem()
@@ -25,7 +25,7 @@ object SimulateWindTurbines extends App {
     .throttle(
       elements = 100, //number of elements to be taken from bucket
       per = 1.second,
-      maximumBurst = 100,  //capacity of bucket
+      maximumBurst = 100, //capacity of bucket
       mode = ThrottleMode.shaping
     )
     .map { _ =>

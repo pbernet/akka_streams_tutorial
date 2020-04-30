@@ -4,13 +4,12 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
 
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
   * Inspired by:
-  * https://doc.akka.io/docs/akka/2.5.9/scala/stream/stream-io.html
+  * https://doc.akka.io/docs/akka/current/stream/stream-io.html?language=scala
   *
   * Use without parameters to start server and 10 parallel clients.
   *
@@ -19,35 +18,30 @@ import scala.util.{Failure, Success}
   * Use parameters `client 127.0.0.1 6001` to start client connecting to
   * server on 127.0.0.1:6001.
   *
+  * Start cmd line client:
+  * echo -n "Hello World" | nc 127.0.0.1 6000
+  *
   */
 object TcpEcho extends App {
-  val system = ActorSystem("TcpEcho")
+  val systemServer = ActorSystem("TcpEchoServer")
+  val systemClient = ActorSystem("TcpEchoClient")
+
   var serverBinding: Future[Tcp.ServerBinding] = _
 
     if (args.isEmpty) {
       val (address, port) = ("127.0.0.1", 6000)
-      serverBinding = server(system, address, port)
-      (1 to 10).par.foreach(each => client(each, system, address, port))
+      serverBinding = server(systemServer, address, port)
+      (1 to 10).par.foreach(each => client(each, systemClient, address, port))
     } else {
       val (address, port) =
         if (args.length == 3) (args(1), args(2).toInt)
         else ("127.0.0.1", 6000)
       if (args(0) == "server") {
-        val system = ActorSystem("Server")
-        serverBinding = server(system, address, port)
+        serverBinding = server(systemServer, address, port)
       } else if (args(0) == "client") {
-        val system = ActorSystem("Client")
-        client(1, system, address, port)
+        client(1, systemClient, address, port)
       }
     }
-
-  sys.addShutdownHook{
-    import scala.concurrent.ExecutionContext.Implicits.global
-    serverBinding.map(b => b.unbind().onComplete(_ => println("Unbound server, about to terminate...")))
-    system.terminate()
-    Await.result(system.whenTerminated, 30.seconds)
-    println("Terminated... Bye")
-  }
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
     implicit val sys = system
@@ -89,6 +83,7 @@ object TcpEcho extends App {
         println(s"Server could not bind to: $address:$port: ${e.getMessage}")
         system.terminate()
     }
+
     binding
   }
 

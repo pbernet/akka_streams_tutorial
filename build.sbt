@@ -8,10 +8,10 @@ val akkaVersion = "2.6.1"
 val akkaHTTPVersion = "10.1.11"
 val alpakkaVersion = "2.0.0-M2"
 val akkaStreamKafkaVersion = "2.0.1"
-val kafkaVersion = "2.4.0"
-val activemqVersion =  "5.15.12"
+val kafkaVersion = "2.4.1"
+val activemqVersion =  "5.15.11"
 val streamzVersion = "0.11-RC1"
-val camelVersion = "2.24.2"
+val camelVersion = "2.25.0"
 val testContainersVersion = "1.12.5"
 
 libraryDependencies ++= Seq(
@@ -44,7 +44,15 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-jetty" % camelVersion,
   "org.apache.camel" % "camel-core" % camelVersion,
   "org.apache.camel" % "camel-stream" % camelVersion,
+  "org.apache.camel" % "camel-mllp" % camelVersion,
 
+  // TODO test https://camel.apache.org/components/latest/dataformats/hl7-dataformat.html
+  "org.apache.camel" % "camel-hl7" % camelVersion,
+
+  "ca.uhn.hapi" % "hapi-base" % "2.3",
+  // TODO Switch to latest v28
+  "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
+  
   "com.typesafe.play" %% "play" % "2.8.0",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
