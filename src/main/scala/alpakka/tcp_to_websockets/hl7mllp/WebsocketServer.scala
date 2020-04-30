@@ -9,12 +9,11 @@ import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.language.postfixOps
-import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 
 /**
-  * Websocket echo server with client browser client for testing
+  * Websocket echo server
   *
   */
 object WebsocketServer extends App with WebSocketDirectives {
@@ -23,7 +22,6 @@ object WebsocketServer extends App with WebSocketDirectives {
 
   val (address, port) = ("127.0.0.1", 6002)
   server(address, port)
-  //browserClient()
 
   def server(address: String, port: Int) = {
 
@@ -51,10 +49,5 @@ object WebsocketServer extends App with WebSocketDirectives {
         println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
-  }
-
-  def browserClient() = {
-    val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/WebsocketEcho.html").!
   }
 }
