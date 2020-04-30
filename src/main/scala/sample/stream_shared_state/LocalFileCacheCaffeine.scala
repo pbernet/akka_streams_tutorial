@@ -1,7 +1,8 @@
 package sample.stream_shared_state
 
 import java.net.URI
-import java.nio.file.{Path, Paths}
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{Files, Path, Paths}
 import java.util
 import java.util.concurrent.ThreadLocalRandom
 
@@ -17,7 +18,6 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.http.client.HttpResponseException
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
@@ -26,19 +26,21 @@ import scala.util.control.NonFatal
 /**
   * Use case:
   *  - Process a stream of messages with reoccurring TRACE_ID
-  *  - For the first TRACE_ID download a .zip file from the FileServer and add the Path to the cache
+  *  - For the first TRACE_ID download a .zip file from the FileServer and add the path to the cache
   *  - For subsequent TRACE_IDs try to fetch from the cache to avoid duplicate downloads per TRACE_ID
   *  - On downstream error: the file needs to be kept longer in the cache
-  *  - On system restart: read all files from filesystem to cache
+  *  - On restart: read all files from filesystem to cache
   *
-  * Before running this class: start [[FileServer]] to simulate non idempotent responses
+  * Before running this class: start [[alpakka.env.FileServer]] to simulate non idempotent responses
   * Monitor localFileCache dir with:  watch ls -ltr
   *
-  * Remarks:
+  * Doc:
   *  - Caffeine: https://github.com/ben-manes/caffeine
   *  - Scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
   */
 object LocalFileCacheCaffeine {
+  implicit val system = ActorSystem("LocalFileCacheCaffeine")
+  implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val deciderFlow: Supervision.Decider = {
@@ -50,14 +52,15 @@ object LocalFileCacheCaffeine {
     case _ => Supervision.Stop
   }
 
-  val scaleFactor = 1 //Raise to stress more
+  val scaleFactor = 1 //Raise to widen range of IDs and thus have more traffic
   val evictionTime: Duration = 5.minutes //Lower eg to 1.seconds to see cache and file system deletes
   val evictionTimeOnError: Duration = 10.minutes
   val localFileCache: Path = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   logger.info(s"Starting with localFileCache dir: $localFileCache")
   FileUtils.forceMkdir(localFileCache.toFile)
-  //Comment out to start with empty local file storage on restart
+  // Comment out to start with empty local file storage
+  // Note that this may provoke "CACHE miss" cases, when we try to scavenge during recoverWith
   //FileUtils.cleanDirectory(localFileCache.toFile)
 
 
@@ -85,18 +88,16 @@ object LocalFileCacheCaffeine {
   //see: https://stackoverflow.com/questions/48356731/caffeine-cant-provide-cachewriter-to-asyncloadingcache/48361538#48361538
   val loadedResults: util.List[Path] = new FileLister().run(localFileCache.toFile)
   loadedResults.forEach { path: Path =>
-    logger.debug(s"Add file: ${path.toFile.getName} with lastModified: ${path.toFile.lastModified()}")
+    val lastAccessTime = Files.readAttributes(path, classOf[BasicFileAttributes]).lastAccessTime
+    logger.debug(s"Add file: ${path.toFile.getName} with lastAccessTime: $lastAccessTime}")
     cache.put(path.toFile.getName.dropRight(4).toInt, path)
   }
 
   def main(args: Array[String]): Unit = {
-    implicit val system: ActorSystem = ActorSystem("LocalFileCacheCaffeine")
-
     case class Message(group: Int, id: Int, file: Path)
 
     val downloadFlow: Flow[Message, Message, NotUsed] = Flow[Message]
       .mapAsyncUnordered(5) { message =>
-
         def processNext(message: Message): Message = {
           val key = message.id
           val url = new URI("http://127.0.0.1:6001/downloadni/" + key.toString)
@@ -108,26 +109,31 @@ object LocalFileCacheCaffeine {
           logger.info(s"TRACE_ID: ${message.id} successfully read from cache")
           Message(message.group, message.id, downloadedFile)
         }
-        //If (for whatever reason) we get a 404 from the server, use this "optimistic approach" to retry
+
+        //If we get a 404 from the server, use this "optimistic approach" to retry
+        def attemptToRecover(message: Message, e: RuntimeException) = {
+          val rootCause = ExceptionUtils.getRootCause(e)
+          val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
+          val resultPromise = Promise[Message]()
+
+          if (status == 404) {
+            logger.info(s"TRACE_ID: ${message.id} Request failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
+            Thread.sleep(10000)
+            if (cache.getIfPresent(message.id).isDefined) {
+              val value = cache.getIfPresent(message.id).get
+              logger.info(s"TRACE_ID: ${message.id} CACHE hit")
+              resultPromise.success(Message(message.group, message.id, value))
+            } else {
+              logger.info(s"TRACE_ID: ${message.id} CACHE miss")
+              resultPromise.failure(e)
+            }
+          }
+          resultPromise.future
+        }
+
         Future(processNext(message)).recoverWith {
           case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] => {
-            val rootCause = ExceptionUtils.getRootCause(e)
-            val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
-            val resultPromise = Promise[Message]()
-
-            if (status == 404) {
-              logger.info(s"TRACE_ID: ${message.id} Request failed with 404, wait for the file to appear in the local cache (from a concurrent download)")
-              Thread.sleep(10000) //TODO Do poll, instead of single attempt
-              if (cache.getIfPresent(message.id).isDefined) {
-                val value = cache.getIfPresent(message.id).get
-                logger.info(s"TRACE_ID: ${message.id} CACHE hit")
-                resultPromise.success(Message(message.group, message.id, value))
-              } else {
-                logger.info(s"TRACE_ID: ${message.id} CACHE miss")
-                resultPromise.failure(e)
-              }
-            }
-            resultPromise.future
+            attemptToRecover(message, e)
           }
           case e: Throwable => Future.failed(e)
         }
@@ -145,7 +151,7 @@ object LocalFileCacheCaffeine {
       }
 
     //Generate random messages with IDs between 0/50 note that after a while we will have only cache hits
-    //Done like this to have a higher chance of producing messages with the same ID
+    //Done like this to have a higher chance of producing messages with the same ID within the same time
     val messagesGroupZero = List.fill(10000)(Message(0, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupOne = List.fill(10000)(Message(1, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
     val messagesGroupTwo = List.fill(10000)(Message(2, ThreadLocalRandom.current.nextInt(0, 50 * scaleFactor), null))
@@ -153,10 +159,11 @@ object LocalFileCacheCaffeine {
     val combinedMessages = Source.combine(Source(messagesGroupZero), Source(messagesGroupOne), Source(messagesGroupTwo))(numInputs => MergePrioritized(List(1, 1, 1)))
     combinedMessages
       .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
-      //Go parallel on the TRACE_ID and thus have n substreams
-      .groupBy(2, _.id % 2)
+      //Go parallel on the last digit of the TRACE_ID and thus have 10 substreams
+      .groupBy(10, _.id % 10)
       .via(downloadFlow)
       //.via(faultyDownstreamFlow)
+      .async
       .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)

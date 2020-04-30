@@ -69,7 +69,6 @@ object WordCountProducer extends App {
 
   sys.addShutdownHook{
     println("Got control-c cmd from shell, about to shutdown...")
-    system.terminate()
   }
 
   initializeTopic(topic)

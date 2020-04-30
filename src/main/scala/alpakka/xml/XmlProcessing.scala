@@ -14,13 +14,12 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Parse XML and extract embedded base64 application/pdf docs and
-  * stream result to file
+  * Parse XML and extract embedded base64 application/jpg
+  * and stream results to file
   *
   * Remarks:
-  * - All result files are saved with the same resultFileName
-  * - A case class could be used inside statefulMapConcat, to keep the state
-  * - The payload could be streamed directly to the result file
+  * - A case class could be used inside statefulMapConcat, to model the state
+  * - The payload could be streamed directly to the result file to avoid memory overhead
   *
   */
 
@@ -30,29 +29,32 @@ object XmlProcessing extends App {
 
   val resultFileName = "testfile_result.jpg"
 
-
   val done = FileIO.fromPath(Paths.get("./src/main/resources/xml_with_base64_embedded.xml"))
     .via(XmlParsing.parser)
     .statefulMapConcat(() => {
+
       // state
-      val textBuffer = StringBuilder.newBuilder
+      val stringBuilder: StringBuilder = StringBuilder.newBuilder
+      var counter: Int = 0
+
       // aggregation function
       parseEvent: ParseEvent =>
         parseEvent match {
           case s: StartElement if s.attributes.contains("mediaType") =>
-            textBuffer.clear()
+            stringBuilder.clear()
             val mediaType = s.attributes.head._2
-            println("Add mediaType: " + mediaType)
+            println("mediaType: " + mediaType)
             immutable.Seq(mediaType)
           case s: EndElement if s.localName == "embeddedDoc" =>
-            val text = textBuffer.toString
-            println("Add payload: " + text) //large embedded PDFs are read into memory
+            val text = stringBuilder.toString
+            println("File content: " + text) //large embedded files are read into memory
             Source.single(ByteString(text))
               .map(each => ByteString(Base64.getMimeDecoder.decode(each.toByteBuffer)))
-              .runWith(FileIO.toPath(Paths.get(resultFileName)))
+              .runWith(FileIO.toPath(Paths.get(s"$counter-$resultFileName")))
+            counter = counter + 1
             immutable.Seq(text)
           case t: TextEvent =>
-            textBuffer.append(t.text)
+            stringBuilder.append(t.text)
             immutable.Seq.empty
           case _ =>
             immutable.Seq.empty

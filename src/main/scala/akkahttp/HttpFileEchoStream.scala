@@ -24,18 +24,18 @@ import scala.util.{Failure, Success}
 
 /**
   * Differences to [[HttpFileEcho]]:
-  *  * The client sends a Stream of FileHandle instead of a Single requests
-  *  * The client downloads using the host-level API with a SourceQueue
-  *  * Retries via are set via config param max-retries in application.conf
+  *  - The upload client is processing a stream of FileHandle
+  *  - The download client is using the host-level API with a SourceQueue
+  *  - Number of retries set via config param max-retries in application.conf
   *
   * Doc:
   * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
   *
   *
   * TODOs
-  *  * When ex is thrown on server during download: The download retry does not seem to work as expected
-  *  * When ex is thrown on server during download: The responseFuture is always a Success
-  *  * Cleanup on pool shutdown
+  *  - When ex is thrown on server during download: The download retry does not seem to work as expected
+  *  - When ex is thrown on server during download: The responseFuture is always a Success
+  *  - Cleanup on pool shutdown
   *
   */
 object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {

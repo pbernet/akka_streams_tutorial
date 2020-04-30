@@ -11,35 +11,22 @@ import scala.concurrent.duration._
 import scala.util.Failure
 
 case class SourceEvent(id: Integer)
+
 case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
 
 
 /**
   * Inspired by:
-  * https://doc.akka.io/docs/akka/2.5/stream/stream-cookbook.html#dropping-elements
   * https://github.com/DimaD/akka-streams-slow-consumer/blob/master/src/main/scala/Example.scala
   *
+  * Doc:
+  * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/conflate.html
+  * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dropping-elements
+  *
   */
-object SlowConsumerDropsElementsOnFastProducer {
+object SlowConsumerDropsElementsOnFastProducer extends App {
   implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
   implicit val ec = system.dispatcher
-
-  def main(args: Array[String]): Unit = {
-    fastSource
-      .via(droppyStream)
-      .via(enrichWithTimestamp)
-      .watchTermination(){(_, done) => done.onComplete {
-        case Failure(err) => println(s"Flow failed: $err")
-        case _ => system.terminate(); println(s"Flow terminated")
-      }}
-      .runWith(slowSink)
-  }
-
-  val slowSink: Sink[DomainEvent, NotUsed] =
-    Flow[DomainEvent]
-      //.buffer(100, OverflowStrategy.backpressure)
-      .delay(10.seconds, DelayOverflowStrategy.backpressure)
-      .to(Sink.foreach(e => println(s"Reached Sink: $e")))
 
   val fastSource: Source[SourceEvent, NotUsed] =
     Source(1 to 500)
@@ -49,6 +36,12 @@ object SlowConsumerDropsElementsOnFastProducer {
         SourceEvent(i)
       }
 
+  val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
+  //Conflate is "rate aware", it combines/aggregates elements from upstream while downstream backpressures
+  //The reducer function here takes the freshest element. This in a simple dropping operation.
+    Flow[SourceEvent]
+      .conflate((lastEvent, newEvent) => newEvent)
+
   val enrichWithTimestamp: Flow[SourceEvent, DomainEvent, NotUsed] =
     Flow[SourceEvent]
       .map { e =>
@@ -57,9 +50,23 @@ object SlowConsumerDropsElementsOnFastProducer {
         DomainEvent(e.id, zonedDateTimeUTC)
       }
 
-  val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
-    //Conflate is "rate aware", it combines elements from upstream while downstream backpressures
-    //The reducer function takes the freshest element. This in a simple dropping operation.
-    Flow[SourceEvent]
-      .conflate((lastEvent, newEvent) => newEvent)
+  val terminationHook: Flow[DomainEvent, DomainEvent, Unit] = Flow[DomainEvent]
+    .watchTermination() { (_, done) =>
+      done.onComplete {
+        case Failure(err) => println(s"Flow failed: $err")
+        case _ => system.terminate(); println(s"Flow terminated")
+      }
+    }
+
+  val slowSink: Sink[DomainEvent, NotUsed] =
+    Flow[DomainEvent]
+      //.buffer(100, OverflowStrategy.backpressure)
+      .delay(10.seconds, DelayOverflowStrategy.backpressure)
+      .to(Sink.foreach(e => println(s"Reached Sink: $e")))
+
+  fastSource
+    .via(droppyStream)
+    .via(enrichWithTimestamp)
+    .via(terminationHook)
+    .runWith(slowSink)
 }
