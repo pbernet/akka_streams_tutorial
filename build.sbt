@@ -2,17 +2,17 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.10"
+scalaVersion := "2.12.11"
 
-val akkaVersion = "2.6.1"
+val akkaVersion = "2.6.5"
 val akkaHTTPVersion = "10.1.11"
-val alpakkaVersion = "2.0.0-M2"
-val akkaStreamKafkaVersion = "2.0.1"
+val alpakkaVersion = "2.0.0"
+val akkaStreamKafkaVersion = "2.0.2"
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.15.11"
-val streamzVersion = "0.11-RC1"
-val camelVersion = "2.25.0"
-val testContainersVersion = "1.12.5"
+val streamzVersion = "0.13-RC1"
+val camelVersion = "2.25.1"
+val testContainersVersion = "1.14.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
