@@ -33,7 +33,7 @@ import scala.util.{Failure, Success}
   *    eg by cmd line: docker-compose up -d atmoz_sftp
   *
   * Reproducer to show this issue:
-  *  - Method [[SftpEcho.processAndMove]] hangs after 30 elements.
+  *  - Method [[SftpEcho.processAndMove]] hangs
   *    Alternative implementation: [[SftpEcho.processAndMoveVerbose]]
   *
   * Remarks:
@@ -129,15 +129,14 @@ object SftpEcho extends App {
   private def fetchAndMoveVerbose(ftpFile: FtpFile) = {
 
     val localFile = File.createTempFile(ftpFile.name, ".tmp.client")
-    //localFile.deleteOnExit()
     val localPath = localFile.toPath
     logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
 
     val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
       .runWith(FileIO.toPath(localPath))
     fetchFile.map { ioResult =>
-      //Fails silently
-      //Sftp.move((ftpFile) => s"$sftpDirName/$processedDirName/", sftpSettings)
+      //TODO This fails silently: the file is not moved
+      //Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
 
       moveFileNative(ftpFile)
       (ftpFile.path, ioResult)
@@ -146,7 +145,7 @@ object SftpEcho extends App {
 
 
 
-  //TODO This hangs after 30 elements
+  //TODO This hangs after n elements
   def processAndMove(sourcePath: String,
                      destinationPath: FtpFile => String,
                      sftpSettings: SftpSettings): RunnableGraph[NotUsed] =
