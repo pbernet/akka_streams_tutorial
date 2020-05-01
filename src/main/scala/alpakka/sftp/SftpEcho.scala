@@ -32,13 +32,13 @@ import scala.util.{Failure, Success}
   *  - Start the docker SFTP server from: /docker/docker-compose.yml
   *    eg by cmd line: docker-compose up -d atmoz_sftp
   *
-  * Reproducer to show these issues:
-  *  - Method [[SftpEcho.createFolders]] does not work. Workaround: [[SftpEcho.createFoldersNative]]
-  *  - Method [[SftpEcho.processAndMove]] hangs after 30 elements. [[SftpEcho.processAndMoveVerbose]]
+  * Reproducer to show this issue:
+  *  - Method [[SftpEcho.processAndMove]] hangs after 30 elements.
+  *    Alternative implementation: [[SftpEcho.processAndMoveVerbose]]
   *
   * Remarks:
   *  - Log noise from sshj lib is turned down in logback.xml
-  *  - Implement failure scenarios during upload/download
+  *  - Add failure scenarios during upload/download
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/ftp.html
@@ -71,11 +71,12 @@ object SftpEcho extends App {
   removeAll().onComplete {
     case Success(_) =>
       logger.info("Successfully cleaned...")
-      createFoldersNative()
+      createFolder()
+      logger.info("Successfully created folder...")
       uploadClient()
       downloadClient()
     case Failure(e) =>
-      logger.info(s"Failure while cleaning: ${e.getMessage}. About to terminate...")
+      logger.info(s"Failure: ${e.getMessage}. About to terminate...")
       system.terminate()
   }
 
@@ -170,23 +171,8 @@ object SftpEcho extends App {
   private def retrieveFromPath(path: String): Source[ByteString, Future[IOResult]] =
     Sftp.fromPath(path, sftpSettings)
 
-  private def createFolders() = {
+  private def createFolder() = {
     mkdir(s"/$sftpRootDir", s"/$sftpRootDir/$processedDir")
-  }
-
-  //works
-  private def createFoldersNative() = {
-    val sftpClient = newSftpClient()
-
-    try {
-      if (sftpClient.statExistence(s"$sftpRootDir/$processedDir") == null) {
-        sftpClient.mkdir(s"$sftpRootDir/$processedDir")
-      } else {
-        sftpClient.rmdir(s"$sftpRootDir/$processedDir")
-        sftpClient.mkdir(s"$sftpRootDir/$processedDir")
-      }
-    } finally
-      sftpClient.close()
   }
 
   //works
