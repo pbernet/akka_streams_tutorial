@@ -8,6 +8,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
@@ -27,7 +29,9 @@ object SampleRoutes extends App {
     val dirToBrowse = File.separator + "tmp"
 
     // pathPrefix allows loading dirs and files recursively
-    pathPrefix("entries") { getFromBrowseableDirectory(dirToBrowse) }
+    pathPrefix("entries") {
+      getFromBrowseableDirectory(dirToBrowse)
+    }
   }
 
   def parseFormData: Route = path("post") {
@@ -37,10 +41,11 @@ object SampleRoutes extends App {
   }
 
   def routes: Route = {
-  getFromBrowsableDir ~ parseFormData
-}
+    getFromBrowsableDir ~ parseFormData
+  }
 
   val bindingFuture = Http().bindAndHandle(routes, "127.0.0.1", 8000)
+
   bindingFuture.onComplete {
     case Success(b) =>
       println("Server started, listening on: " + b.localAddress)
@@ -55,4 +60,14 @@ object SampleRoutes extends App {
   }
 
   browserClient()
+
+  sys.addShutdownHook {
+    println("About to shutdown...")
+    val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+    println("Waiting for connections to terminate...")
+    val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+    println("Connections terminated")
+    onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+    }
+  }
 }

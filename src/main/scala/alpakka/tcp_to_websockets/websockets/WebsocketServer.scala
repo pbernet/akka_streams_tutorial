@@ -8,9 +8,10 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
-
 
 /**
   * Websocket echo server
@@ -41,13 +42,23 @@ object WebsocketServer extends App with WebSocketDirectives {
         handleWebSocketMessages(echoFlow)
       }
 
-    val serverBinding = Http().bindAndHandle(websocketRoute, address, port)
-    serverBinding.onComplete {
+    val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
+    bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
         println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
+    }
+
+    sys.addShutdownHook {
+      println("About to shutdown...")
+      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+      println("Waiting for connections to terminate...")
+      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+      println("Connections terminated")
+      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+      }
     }
   }
 }
