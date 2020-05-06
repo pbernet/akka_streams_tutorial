@@ -84,6 +84,15 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
+    sys.addShutdownHook {
+      println("About to shutdown...")
+      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+      println("Waiting for connections to terminate...")
+      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+      println("Connections terminated")
+      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+      }
+    }
   }
 
   def filesToUpload(): Source[FileHandle, NotUsed] =
@@ -127,7 +136,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       val queueSize = 1
       val poolClientFlowDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
       val queue =
-        Source.queue[(HttpRequest, Promise[HttpResponse])](queueSize, OverflowStrategy.backpressure)
+        Source.queue[(HttpRequest, Promise[HttpResponse])](queueSize, OverflowStrategy.backpressure, 10)
           .via(poolClientFlowDownload)
           .toMat(Sink.foreach({
             case (Success(resp), p) => p.success(resp)
