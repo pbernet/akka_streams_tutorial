@@ -127,7 +127,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val (source, sourceQueue) = {
       val p = Promise[SourceQueue[Message]]
-      val s = Source.queue[Message](100, OverflowStrategy.backpressure).mapMaterializedValue(m => {
+      val s = Source.queue[Message](100, OverflowStrategy.backpressure, 100).mapMaterializedValue(m => {
         p.trySuccess(m)
         m
       })
