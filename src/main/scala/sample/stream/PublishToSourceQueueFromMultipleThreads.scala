@@ -20,16 +20,18 @@ import scala.util.{Failure, Success}
   * Doc buffers:
   * https://doc.akka.io/docs/akka/current/stream/stream-rate.html#buffers-in-akka-streams
   *
+  * Open issue:
+  * https://github.com/akka/akka/issues/26696
   */
-object PublishToSourceQueueFromStream extends App {
+object PublishToSourceQueueFromMultipleThreads extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("PublishToSourceQueueFromStream")
   implicit val ec = system.dispatcher
 
-  // Currently a large enough buffer size is crucial for this example to work as expected
-  // There are still open issues: https://github.com/akka/akka/issues/26696
   val bufferSize = 100
-  val parallelism = 10
+  // As of akka 2.6.x there is a thread safe implementation for SourceQueue
+  val maxConcurrentOffers = 1000
+  val numberOfPublishingClients = 1000
 
   val slowSink: Sink[Seq[Int], NotUsed] =
     Flow[Seq[Int]]
@@ -37,24 +39,22 @@ object PublishToSourceQueueFromStream extends App {
       .to(Sink.foreach(e => logger.info(s"Reached sink: $e")))
 
   val sourceQueue: SourceQueueWithComplete[Int] = Source
-    .queue[Int](bufferSize, OverflowStrategy.backpressure)
+    .queue[Int](bufferSize, OverflowStrategy.backpressure, maxConcurrentOffers)
     .groupedWithin(10, 1.seconds)
     .to(slowSink)
     .run
 
   val doneConsuming: Future[Done] = sourceQueue.watchCompletion()
-  signalWhen(doneConsuming, "consuming") //never completes...
+  signalWhen(doneConsuming, "consuming") //never completes
 
+  simulatePublishingFromMulitpleThreads()
 
-  simulatePublishingClientsFromStream()
+  // Before 2.6.x a stream had to be used to throttle and control the backpressure
+  //simulatePublishingClientsFromStream()
 
-  //Works as well, but OverflowStrategy.dropNew should be used
-  //simulatePublishingFromMulitpleThreads()
-
-  // We need to decide on the stream level, because the OverflowStrategy.backpressure
+  // Decide on the stream level, because the OverflowStrategy.backpressure
   // on the sourceQueue causes an IllegalStateException
   // Handling this on the stream level allows to restart the stream
-  // However, with these params there are still 5 "unreported" items (= not enqueued, not dropped, failed)
   private def simulatePublishingClientsFromStream() = {
 
     val decider: Decider = {
@@ -62,14 +62,14 @@ object PublishToSourceQueueFromStream extends App {
       case _ => Supervision.Stop
     }
 
-    val donePublishing: Future[Done] = Source(1 to 1000)
-      .mapAsync(parallelism)(offerToSourceQueue)
+    val donePublishing: Future[Done] = Source(1 to numberOfPublishingClients)
+      .mapAsync(10)(offerToSourceQueue) //throttle
       .withAttributes(ActorAttributes.supervisionStrategy(decider))
       .runWith(Sink.ignore)
     signalWhen(donePublishing, "publishing")
   }
 
-  private def simulatePublishingFromMulitpleThreads() = (1 to 1000).par.foreach(offerToSourceQueue)
+  private def simulatePublishingFromMulitpleThreads() = (1 to numberOfPublishingClients).par.foreach(offerToSourceQueue)
 
   private def offerToSourceQueue(each: Int) = {
     sourceQueue.offer(each).map {
