@@ -25,7 +25,7 @@ import scala.util.{Failure, Success}
   */
 object PublishToSourceQueueFromMultipleThreads extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("PublishToSourceQueueFromStream")
+  implicit val system = ActorSystem("PublishToSourceQueueFromMultipleThreads")
   implicit val ec = system.dispatcher
 
   val bufferSize = 100
