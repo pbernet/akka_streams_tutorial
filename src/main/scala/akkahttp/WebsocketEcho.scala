@@ -86,8 +86,8 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         handleWebSocketMessages(echoFlow)
       }
 
-    val serverBinding = Http().bindAndHandle(websocketRoute, address, port)
-    serverBinding.onComplete {
+    val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
+    bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
@@ -96,10 +96,13 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     }
 
     sys.addShutdownHook {
-      serverBinding.map(b => b.unbind().onComplete(_ => println("Unbound server, about to terminate...")))
-      system.terminate()
-      Await.result(system.whenTerminated, 30.seconds)
-      println("Terminated... Bye")
+      println("About to shutdown...")
+      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+      println("Waiting for connections to terminate...")
+      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+      println("Connections terminated")
+      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+      }
     }
   }
 
