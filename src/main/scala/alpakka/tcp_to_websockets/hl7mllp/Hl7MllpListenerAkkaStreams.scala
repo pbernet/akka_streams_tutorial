@@ -24,6 +24,7 @@ import scala.util.{Failure, Success}
   *  - Frame according to MLLP
   *  - Parse using HAPI parser (all validation switched off)
   *  - Reply with ACK or NACK (if everything fails)
+  *  - Send to Kafka
   *
   * Works with:
   *  - built in localClient
@@ -37,6 +38,9 @@ import scala.util.{Failure, Success}
   * https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
   *
   * TODO Avoid loosing messages when Kafka is down
+  * Switch to:
+  * https://doc.akka.io/docs/alpakka-kafka/current/producer.html#producer-as-a-flow
+  * even better
   * https://github.com/akka/alpakka-kafka/issues/1101
   *
   */
@@ -63,7 +67,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
   val (address, port) = ("127.0.0.1", 6160)
   val serverBinding = server(system, address, port)
-  (1 to 1).par.foreach(each => localClient(each, 100, system, address, port))
+  (1 to 1).par.foreach(each => localClient(each, 1000, system, address, port))
 
 
   def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
@@ -73,7 +77,7 @@ object Hl7MllpListenerAkkaStreams extends App {
     val deciderFlow: Supervision.Decider = {
       case NonFatal(e) =>
         logger.info(s"Stream failed with: ${e.getMessage}, going to restart")
-        Supervision.Resume
+        Supervision.Restart
       case _ => Supervision.Stop
     }
 
@@ -171,8 +175,8 @@ object Hl7MllpListenerAkkaStreams extends App {
     val connection = Tcp().outgoingConnection(address, port)
 
     val hl7MllpMessages=  (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString)) ))
-    val source = Source(hl7MllpMessages).throttle(1, 1.second).via(connection)
-    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printableShort(each.utf8String)}"))
+    val source = Source(hl7MllpMessages).throttle(10, 1.second).via(connection)
+    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 
