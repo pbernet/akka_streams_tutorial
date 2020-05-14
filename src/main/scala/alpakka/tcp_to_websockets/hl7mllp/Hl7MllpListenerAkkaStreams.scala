@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.stream.{ActorAttributes, Supervision}
 import akka.util.ByteString
 import ca.uhn.hl7v2.validation.impl.ValidationContextFactory
-import ca.uhn.hl7v2.{DefaultHapiContext, HL7Exception}
+import ca.uhn.hl7v2.{AcknowledgmentCode, DefaultHapiContext, HL7Exception}
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.kafka.clients.admin.AdminClient
@@ -99,7 +99,7 @@ object Hl7MllpListenerAkkaStreams extends App {
           producer.send(new ProducerRecord(topic, partition0, null: String, each))
           Left(Valid(each))
         } else {
-          logger.error("Topic " + topic + " does not exist or no connection to Kafka. Sending NACK to client")
+          logger.error(s"Topic $topic does not exist or there is no connection to Kafka. Sending NACK to client for element ${printableShort(each)}")
           Right(Invalid(each, Some(new RuntimeException("Kafka connection problem. Sending NACK to client"))))
         }
       })
@@ -110,41 +110,26 @@ object Hl7MllpListenerAkkaStreams extends App {
         case left@Left(_) => {
           val each = left.value.payload
 
-          val context = new DefaultHapiContext
-
-          // The ValidationContext is used during parsing as well as during
-          // validation using {@link ca.uhn.hl7v2.validation.Validator} objects.
-
-          // Set to false to do parsing without validation
-          context.getParserConfiguration.setValidating(false)
-          // Set to false, because there is currently no separate validation step
-          context.setValidationContext(ValidationContextFactory.noValidation)
-
-          val parser = context.getPipeParser
-
           try {
             logger.info("About to parse message: " + printableShort(each))
+            val parser = getPipeParser(true)
             val message = parser.parse(each)
             logger.info("Successfully parsed")
-
             val ack = parser.encode(message.generateACK())
             encodeMllp(ack)
           } catch {
             case ex: HL7Exception =>
-              val rootCause = printable(ExceptionUtils.getRootCause(ex).getMessage)
+              val rootCause = ExceptionUtils.getRootCause(ex).getMessage
               logger.error(s"Error during parsing. Problem with message structure. Answer with NACK. Cause: $rootCause")
-              //TODO Build NACK from message. Note that there is a piggyback ex.getResponseMessage which could be used
-              val nack = "NACK"
-              encodeMllp(nack)
+              encodeMllp(generateNACK(each))
             case ex: Throwable =>
               val rootCause = ExceptionUtils.getRootCause(ex).getMessage
               logger.error(s"Error during parsing. This should not happen. Answer with default NACK. Cause: $rootCause")
-              //TODO Find a sensible default format
-              val nack = "NACK"
-              encodeMllp(nack)
+              encodeMllp(generateNACK(each))
           }
         }
-        case _@Right(_) => encodeMllp("NACK")
+        case _@Right(Invalid(each, _)) =>
+          encodeMllp(generateNACK(each))
       }
 
 
@@ -185,6 +170,25 @@ object Hl7MllpListenerAkkaStreams extends App {
   }
 
 
+  private def generateNACK(each: String) = {
+    val nackString = getPipeParser().parse(each).generateACK(AcknowledgmentCode.AE, null).encode()
+    nackString
+  }
+
+  private def getPipeParser(withValidation: Boolean = false) = {
+    val context = new DefaultHapiContext
+
+    // The ValidationContext is used during parsing as well as during
+    // validation using {@link ca.uhn.hl7v2.validation.Validator} objects.
+
+    // Set to false to do parsing without validation
+    context.getParserConfiguration.setValidating(withValidation)
+    // Set to false, because there is currently no separate validation step
+    context.setValidationContext(ValidationContextFactory.noValidation)
+
+    context.getPipeParser
+  }
+
   def localStreamingMessageClient(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
@@ -197,7 +201,7 @@ object Hl7MllpListenerAkkaStreams extends App {
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 
-  //TODO Add retry meccano, when NACK is received
+  // TODO add lean retry meccano when NACK is received
   def localSingleMessageClient(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
@@ -208,7 +212,13 @@ object Hl7MllpListenerAkkaStreams extends App {
       .throttle(1, 1.second)
       .mapAsync(1){ each =>
       val source = Source.single(ByteString(encodeMllp(generateTestMessage(each.toString)))).via(connection)
-      val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
+      val closed = source.runForeach(each =>
+        if (isNACK(each)) {
+          logger.info(s"Client: $id received NACK: ${printable(each.utf8String)}")
+        } else {
+          logger.info(s"Client: $id received ACK: ${printable(each.utf8String)}")
+        }
+      )
       closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
       Future(each)
     }.runWith(Sink.ignore)
@@ -241,6 +251,13 @@ object Hl7MllpListenerAkkaStreams extends App {
 
   private def printableShort(message: String): String = {
     printable(message).take(20).concat("...")
+  }
+
+  private def isNACK(message: ByteString): Boolean = {
+    message.utf8String.contains(AcknowledgmentCode.AE.name()) ||
+    message.utf8String.contains(AcknowledgmentCode.AR.name()) ||
+    message.utf8String.contains(AcknowledgmentCode.CE.name()) ||
+    message.utf8String.contains(AcknowledgmentCode.CR.name())
   }
 
   def initializeTopic(topic: String): Producer[String, String] = {
