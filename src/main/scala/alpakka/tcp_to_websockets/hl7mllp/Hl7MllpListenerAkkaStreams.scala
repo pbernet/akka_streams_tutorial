@@ -27,32 +27,30 @@ import scala.util.{Failure, Success}
   *  - Receive HL7 messages over tcp
   *  - Frame according to MLLP
   *  - Parse using HAPI parser (all validation switched off)
-  *  - Reply with ACK or NACK (if everything fails)
   *  - Send to Kafka
+  *  - Reply to client with ACK or NACK (eg on connection problems)
   *
   * Works with:
-  *  - built in localClient
+  *  - local clients
   *  - external client: [[Hl7MllpSender]]
   *
-  * Doc:
+  * Doc MLLP:
   * http://hl7.ihelse.net/hl7v3/infrastructure/transport/transport_mllp.html
   * and [[ca.uhn.hl7v2.llp.MllpConstants]]
   *
-  * TODO Add HL7 over HTTP:
+  * TODO Add HL7 over HTTP channel:
   * https://hapifhir.github.io/hapi-hl7v2/hapi-hl7overhttp/index.html
   *
-  * TODO Avoid loosing messages in kafkaProducer when Kafka is down in a more graceful fashion
+  * TODO Avoid loosing messages in kafkaProducer (when Kafka is down) in a more graceful fashion
   * Switch to:
   * https://doc.akka.io/docs/alpakka-kafka/current/producer.html#producer-as-a-flow
-  * when it includes:
+  * when done:
   * https://github.com/akka/alpakka-kafka/issues/1101
   *
   */
 object Hl7MllpListenerAkkaStreams extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7MllpListenerAkkaStreams")
-
-  // Bootstrap Kafka client
 
   val bootstrapServers = "localhost:9092"
   val topic = "hl7-input"
@@ -201,27 +199,36 @@ object Hl7MllpListenerAkkaStreams extends App {
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 
-  // TODO add lean retry meccano when NACK is received
   def localSingleMessageClient(clientname: Int, numberOfMessages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
     val connection = Tcp().outgoingConnection(address, port)
 
-    Source(1 to numberOfMessages)
-      .throttle(1, 1.second)
-      .mapAsync(1){ i =>
+    def sendAndReceive(i: Int): Future[Int] = {
       val source = Source.single(ByteString(encodeMllp(generateTestMessage(i.toString)))).via(connection)
       val closed = source.runForeach(each =>
         if (isNACK(each)) {
           logger.info(s"Client: $clientname-$i received NACK: ${printable(each.utf8String)}")
+          throw new RuntimeException("NACK")
         } else {
           logger.info(s"Client: $clientname-$i received ACK: ${printable(each.utf8String)}")
         }
-      )
+      ).recoverWith {
+        case _: RuntimeException => {
+          logger.info(s"About to retry for: $clientname-$i...")
+          sendAndReceive(i)
+        }
+        case e: Throwable => Future.failed(e)
+      }
       closed.onComplete(each => logger.debug(s"Client: $clientname-$i closed: $each"))
       Future(i)
-    }.runWith(Sink.ignore)
+    }
+
+    Source(1 to numberOfMessages)
+      .throttle(1, 1.second)
+      .mapAsync(1)(i => sendAndReceive(i))
+      .runWith(Sink.ignore)
   }
 
   private def generateTestMessage(senderTraceID: String) = {
