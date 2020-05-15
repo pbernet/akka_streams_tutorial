@@ -15,7 +15,8 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
-import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 
@@ -30,10 +31,11 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * This HTTP file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
-  * It's possible to upload/download files up to 60MB, see settings in application.conf
-  * - Replace testfile.jpg with a large file
-  * - Run FileEcho with limited Heap eg -Xms256m -Xmx256m
-  * - Monitor the heap with visualvm.github.io
+  * It's possible to upload/download files up to 60MB:
+  *  - Check settings in application.conf
+  *  - Replace testfile.jpg with a large file
+  *  - Run with limited Heap, eg with -Xms256m -Xmx256m
+  *  - Monitor Heap, eg with visualvm.github.io
   */
 object HttpFileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("HttpFileEcho")
@@ -41,6 +43,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
+
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
 
@@ -74,6 +77,16 @@ object HttpFileEcho extends App with JsonProtocol {
       case Failure(e) =>
         println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
+    }
+
+    sys.addShutdownHook {
+      println("About to shutdown...")
+      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+      println("Waiting for connections to terminate...")
+      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+      println("Connections terminated")
+      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+      }
     }
   }
 
@@ -130,12 +143,16 @@ object HttpFileEcho extends App with JsonProtocol {
     val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
     val httpClient = Http(system).outgoingConnection(address, port)
 
+    def saveResponseToFile(response: HttpResponse, localFile: File) = {
+      response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+    }
+
     def download(remoteFileHandle: FileHandle, localFile: File): Future[Unit] = {
 
       val result = for {
         reqEntity <- Marshal(remoteFileHandle).to[RequestEntity]
         response <- Source.single(HttpRequest(HttpMethods.GET, uri = target, entity = reqEntity)).via(httpClient).runWith(Sink.head)
-        downloaded <- response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+        downloaded <- saveResponseToFile(response, localFile)
       } yield downloaded
 
       result.map {
@@ -146,7 +163,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
-    println(s"Download client with id: $id will store file to: ${localFile.getAbsolutePath}")
+    println(s"Download client with id: $id going to store file to: ${localFile.getAbsolutePath}")
     Future(localFile)
   }
 }
