@@ -94,7 +94,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
     val kafkaProducer: Flow[String, Either[Valid[String], Invalid[String]], NotUsed] = Flow[String]
       .map(each => {
-        val topicExists = adminClient.listTopics.names.get.stream.anyMatch((topicName: String) => topicName.equalsIgnoreCase(topic))
+        val topicExists = adminClient.listTopics.names.get.contains(topic)
         if (topicExists) {
           producer.send(new ProducerRecord(topic, partition0, null: String, each))
           Left(Valid(each))
@@ -111,10 +111,10 @@ object Hl7MllpListenerAkkaStreams extends App {
           val each = left.value.payload
 
           try {
-            logger.info("About to parse message: " + printableShort(each))
+            logger.info("Server: About to parse message: " + printableShort(each))
             val parser = getPipeParser(true)
             val message = parser.parse(each)
-            logger.info("Successfully parsed")
+            logger.info("Server: Successfully parsed")
             val ack = parser.encode(message.generateACK())
             encodeMllp(ack)
           } catch {
@@ -135,7 +135,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
     val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
       val serverEchoFlow = Flow[ByteString]
-        .wireTap(_ => logger.info(s"Got message from client: ${connection.remoteAddress}"))
+        .wireTap(_ => logger.debug(s"Got message from client: ${connection.remoteAddress}"))
         .wireTap(each => logger.debug("Size before framing: " + each.size))
         // frame input stream up to MLLP terminator: "END_OF_BLOCK + CARRIAGE_RETURN"
         .via(Framing.delimiter(
@@ -150,8 +150,8 @@ object Hl7MllpListenerAkkaStreams extends App {
         .map(ByteString(_))
         .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
         .watchTermination()((_, done) => done.onComplete {
-          case Failure(err) => logger.info(s"Server flow failed: $err")
-          case _ => logger.info(s"Server flow terminated for client: ${connection.remoteAddress}")
+          case Failure(err) => logger.error(s"Server flow failed: $err")
+          case _ => logger.debug(s"Server flow terminated for client: ${connection.remoteAddress}")
         })
       connection.handleWith(serverEchoFlow)
     }
@@ -161,7 +161,7 @@ object Hl7MllpListenerAkkaStreams extends App {
 
     binding.onComplete {
       case Success(b) =>
-        logger.info("Server started, listening on: " + b.localAddress)
+        logger.info(s"Server started, listening on: ${b.localAddress}")
       case Failure(e) =>
         logger.info(s"Server could not bind to: $address:$port: ${e.getMessage}")
         system.terminate()
@@ -202,30 +202,30 @@ object Hl7MllpListenerAkkaStreams extends App {
   }
 
   // TODO add lean retry meccano when NACK is received
-  def localSingleMessageClient(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
+  def localSingleMessageClient(clientname: Int, numberOfMessages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
     val connection = Tcp().outgoingConnection(address, port)
 
-    Source(1 to numberOfMesssages)
+    Source(1 to numberOfMessages)
       .throttle(1, 1.second)
-      .mapAsync(1){ each =>
-      val source = Source.single(ByteString(encodeMllp(generateTestMessage(each.toString)))).via(connection)
+      .mapAsync(1){ i =>
+      val source = Source.single(ByteString(encodeMllp(generateTestMessage(i.toString)))).via(connection)
       val closed = source.runForeach(each =>
         if (isNACK(each)) {
-          logger.info(s"Client: $id received NACK: ${printable(each.utf8String)}")
+          logger.info(s"Client: $clientname-$i received NACK: ${printable(each.utf8String)}")
         } else {
-          logger.info(s"Client: $id received ACK: ${printable(each.utf8String)}")
+          logger.info(s"Client: $clientname-$i received ACK: ${printable(each.utf8String)}")
         }
       )
-      closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
-      Future(each)
+      closed.onComplete(each => logger.debug(s"Client: $clientname-$i closed: $each"))
+      Future(i)
     }.runWith(Sink.ignore)
   }
 
   private def generateTestMessage(senderTraceID: String) = {
-    //For now put the senderTraceID into the "sender lab" field to follow the messages
+    //For now put the senderTraceID into the "sender lab" field to follow the messages accross the workflow
     val message = new StringBuilder
     message ++= s"MSH|^~\\&|$senderTraceID|MCM|LABADT|MCM|198808181126|SECURITY|ADT^A01|1234|P|2.5.1|"
     message ++= CARRIAGE_RETURN
