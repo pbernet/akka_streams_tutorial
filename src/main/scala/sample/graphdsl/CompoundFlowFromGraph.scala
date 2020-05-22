@@ -6,10 +6,11 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
 import akka.stream.{FlowShape, UniformFanInShape, UniformFanOutShape}
 
 /**
-  * A GraphDSL example, which shows the possibility to inject operations (= processorFlow)
+  * A GraphDSL example, which shows the possibility to inject parallel operations (= processorFlow)
   * on a compound flow.
-  * Going parallel this may be more flexible than trying to go parallel with operators,
-  * eg with groupBy / mergeSubstreams as in [[sample.stream.FlightDelayStreaming]]
+  * However, this pattern can be used to run just one processorFlow in parallel as well.
+  * Doing it this may may be more flexible than trying to go parallel
+  * with operators, eg with groupBy / mergeSubstreams as in [[sample.stream.FlightDelayStreaming]]
   *
   * Inspired by:
   * https://groups.google.com/forum/#!topic/akka-user/Dh8q7TcP2SI
