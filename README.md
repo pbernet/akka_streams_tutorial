@@ -2,7 +2,7 @@
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of runnable and self contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
+This repo contains a collection of runnable and self-contained examples from various akka streams docs, tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * HTTP file download with local cache
 * Windturbine Example
@@ -11,7 +11,7 @@ See the class comment on how to run each example. These more complex examples ar
 
 These examples all deal with some kind of shared state. 
 
-Another group of examples are the `*Echo` classes, which implement roundtrips eg in [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) a HTTP file upload/download roundtrip.
+Another group of examples are the `*Echo` classes, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
 
 Remarks:
 * Most examples are throttled so you can see from the console output what is happening.
@@ -19,7 +19,7 @@ Remarks:
 * No unit tests and quirky package names.
 
 ## HTTP file download with local cache ##
-The example in pkg `sample.stream_shared_state` support this Use case:
+Use case with shared state:
   * Process a stream of incoming messages with reoccurring TRACE_ID
   * For the first message: download a .zip file from a `FileServer` and add TRACE_ID&rarr;Path to the local cache
   * For subsequent messages with the same TRACE_ID: fetch file from cache to avoid duplicate downloads per TRACE_ID
@@ -60,12 +60,6 @@ Start the classes in the order below and watch the console output.
 | [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
 
 `WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
-
-After restarting `KafkaServer`:
-* `WordCountProducer` resumes feeding words
-* `WordCountKStreams` resumes at the stored offset
-* `WordCountConsumer` resumes at the stored offset
-
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
 This PoC in package `alpakka.tcp_to_websockets` is some kind of Alpakka-Trophy with these stages:
