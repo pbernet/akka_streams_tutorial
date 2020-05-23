@@ -38,8 +38,7 @@ public class MockApp implements ReceivingApplication<Message> {
             String strippedMessage = stripMessage(receivedEncodedMessage);
 
             System.out.println("Incoming message version: " + in.getVersion() + " size: " + strippedMessage.length() + " payload: " + strippedMessage);
-            
-            // TODO How to convert this gracefully to a JSON like structure?
+
             // 1) Use Terser, when retrieving only specific nested parts of a HL7 message in "xpath like fashion"
             Terser tersed = new Terser(in);
             Segment msh = tersed.getSegment("MSH");

@@ -68,8 +68,8 @@ After restarting `KafkaServer`:
 
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-PoC in package `alpakka.tcp_to_websockets` to demonstrate this path:
+This PoC in package `alpakka.tcp_to_websockets` is some kind of Alpakka-Trophy with these stages:
 
-(`Hl7MllpSender` &rarr;) `Hl7MllpListenerAkkaStreams` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
+`Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
-Supports the restart of all parts, however in-flight messages will be lost.
+The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost. 
