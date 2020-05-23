@@ -1,4 +1,4 @@
-package kafka.avro;
+package alpakka.kafka.avro;
 
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;

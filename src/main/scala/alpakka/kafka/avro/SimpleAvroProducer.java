@@ -1,4 +1,4 @@
-package kafka.avro;
+package alpakka.kafka.avro;
 
 import com.twitter.bijection.Injection;
 import com.twitter.bijection.avro.GenericAvroCodecs;

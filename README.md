@@ -53,11 +53,11 @@ Start the classes in the order below and watch the console output.
 
 | Class               | Description      |
 | ------------------- |-----------------|
-| [KafkaServer.scala](src/main/scala/kafka/KafkaServer.scala)| Standalone Kafka/Zookeeper.  
-| [WordCountProducer.scala](src/main/scala/kafka/WordCountProducer.scala)| Client which feeds words to topic `wordcount-input`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
-| [WordCountKStreams.java](src/main/java/kafka/WordCountKStreams.java)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
-| [WordCountConsumer.scala](src/main/scala/kafka/WordCountConsumer.scala)| Client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
-| [DeleteTopicUtil.scala](src/main/scala/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
+| [KafkaServer.scala](src/main/scala/env/KafkaServer.scala)| Standalone Kafka/Zookeeper.  
+| [WordCountProducer.scala](src/main/scala/alpakka/kafka/WordCountProducer.scala)| Client which feeds words to topic `wordcount-input`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
+| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
+| [WordCountConsumer.scala](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| Client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
+| [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
 
 `WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
 

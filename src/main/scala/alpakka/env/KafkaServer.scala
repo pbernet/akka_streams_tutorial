@@ -1,4 +1,4 @@
-package kafka
+package alpakka.env
 
 import java.io.File
 import java.net.InetSocketAddress

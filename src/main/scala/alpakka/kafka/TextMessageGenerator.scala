@@ -1,4 +1,4 @@
-package kafka
+package alpakka.kafka
 
 import java.util.concurrent.ThreadLocalRandom
 
