@@ -12,33 +12,33 @@ import scala.concurrent.duration._
   * https://discuss.lightbend.com/t/the-idiomatic-way-to-manage-shared-state-with-akka-streams/2552
   *
   * Shows a different way to inject shared state (eg Blacklist) from outside the flow execution
+  *
+  * Similar to [[ParametrizedFlow]]
+  *
   */
 
-object Blacklist {
+object Blacklist extends App {
   implicit val system = ActorSystem("Blacklist")
 
-  def main(args: Array[String]): Unit = {
+  val initBlacklist = Set.empty[String]
 
-    val initBlacklist = Set.empty[String]
+  val service: StateService[Set[String]] =
+    Source.repeat("yes")
+      .throttle(1, 1.second, 10, ThrottleMode.shaping)
+      .viaMat(new ZipWithState(initBlacklist))(Keep.right)
+      .filterNot { case (blacklist: Set[String], elem: String) => blacklist(elem) }
+      .to(Sink.foreach(each => println(each._2)))
+      .run()
 
-    val service: StateService[Set[String]] =
-      Source.repeat("yes")
-        .throttle(1, 1.second, 10, ThrottleMode.shaping)
-        .viaMat(new ZipWithState(initBlacklist))(Keep.right)
-        .filterNot { case (blacklist: Set[String], elem: String) => blacklist(elem) }
-        .to(Sink.foreach(each => println(each._2)))
-        .run()
+  println("Starting with empty blacklist on a list of 'yes' elements -> elements are passing")
 
-    println("Starting with empty blacklist on a list of 'yes' elements - elements are passing")
+  Thread.sleep(2000)
+  println("Inject new blacklist with value: 'yes' -> elements are filtered")
+  service.update(Set("yes"))
 
-    Thread.sleep(2000)
-    println("Inject new blacklist with value: 'yes' - elements are filtered")
-    service.update(Set("yes"))
-
-    Thread.sleep(5000)
-    println("Inject new blacklist with value: 'no' - elements are passing")
-    service.update(Set("no"))
-  }
+  Thread.sleep(5000)
+  println("Inject new blacklist with value: 'no' -> elements are passing again")
+  service.update(Set("no"))
 }
 
 
@@ -60,7 +60,9 @@ class ZipWithState[S, I](initState: S) extends GraphStageWithMaterializedValue[F
     val logic = new GraphStageLogic(shape) {
       private[this] var state: S = initState
       val updateStateCallback: AsyncCallback[S] =
-        getAsyncCallback[S] { state = _ }
+        getAsyncCallback[S] {
+          state = _
+        }
 
       setHandler(in, new InHandler {
         override def onPush(): Unit = {

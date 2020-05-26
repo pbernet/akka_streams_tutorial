@@ -12,7 +12,7 @@ import scala.util.Random
   * Inspired by:
   * https://discuss.lightbend.com/t/mutable-state-in-conflatewithseed-functions/5933/3
   *
-  * conflateWithSeed here acts as a stateful collector/aggregator of reoccuring values
+  * conflateWithSeed here acts as a stateful collector/aggregator of reoccurring values
   * on slow downstream sinks
   *
   */
