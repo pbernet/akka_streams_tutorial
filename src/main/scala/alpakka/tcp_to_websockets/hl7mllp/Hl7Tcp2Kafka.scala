@@ -68,6 +68,13 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
       case _ => Supervision.Stop
     }
 
+    val frameUpToMllpTerminator = {
+      Framing.delimiter(
+        ByteString(END_OF_BLOCK + CARRIAGE_RETURN),
+        maximumFrameLength = 2048,
+        allowTruncation = true)
+    }
+
     // Remove MLLP START_OF_BLOCK from this message,
     // because only END_OF_BLOCK + CARRIAGE_RETURN is removed by framing
     val scrubber = Flow[String]
@@ -78,9 +85,10 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
         val topicExists = adminClient.listTopics.names.get.contains(topic)
         if (topicExists) {
           producer.send(new ProducerRecord(topic, partition0, null: String, each))
+          logger.info(s"Successfully sent to Kafka: ${printableShort(each)}.")
           Left(Valid(each))
         } else {
-          logger.error(s"Topic $topic does not exist or there is no connection to Kafka. Sending NACK to client for element ${printableShort(each)}")
+          logger.error(s"Topic $topic does not exist or there is no connection to Kafka broker. Sending NACK to client for element ${printableShort(each)}")
           Right(Invalid(each, Some(new RuntimeException("Kafka connection problem. Sending NACK to client"))))
         }
       })
@@ -88,14 +96,14 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
     // Parse the hairy HL7 message beast
     val hl7Parser = Flow[Either[Valid[String], Invalid[String]]]
       .map {
-        case left@Left(_) => {
+        case left@Left(_) =>
           val each = left.value.payload
 
           try {
-            logger.info("Server: About to parse message: " + printableShort(each))
+            logger.info("About to parse message: " + printableShort(each))
             val parser = getPipeParser(true)
             val message = parser.parse(each)
-            logger.info("Server: Successfully parsed")
+            logger.debug("Successfully parsed")
             val ack = parser.encode(message.generateACK())
             encodeMllp(ack)
           } catch {
@@ -108,7 +116,6 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
               logger.error(s"Error during parsing. This should not happen. Answer with default NACK. Cause: $rootCause")
               encodeMllp(generateNACK(each))
           }
-        }
         case _@Right(Invalid(each, _)) =>
           encodeMllp(generateNACK(each))
       }
@@ -116,13 +123,8 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
 
     val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
       val serverEchoFlow = Flow[ByteString]
-        .wireTap(_ => logger.debug(s"Got message from client: ${connection.remoteAddress}"))
-        .wireTap(each => logger.debug("Size before framing: " + each.size))
-        // frame input stream up to MLLP terminator: "END_OF_BLOCK + CARRIAGE_RETURN"
-        .via(Framing.delimiter(
-          ByteString(END_OF_BLOCK + CARRIAGE_RETURN),
-          maximumFrameLength = 2048,
-          allowTruncation = true))
+        .wireTap(each => logger.debug(s"Got message from client: ${connection.remoteAddress}. Size before framing: " + each.size))
+        .via(frameUpToMllpTerminator)
         .wireTap(each => logger.debug("Size after framing: " + each.size))
         .map(_.utf8String)
         .via(scrubber)
@@ -171,7 +173,7 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
   }
 
   def initializeTopic(topic: String): Producer[String, String] = {
-   val producer = producerSettings.createKafkaProducer()
+    val producer = producerSettings.createKafkaProducer()
     producer.send(new ProducerRecord(topic, partition0, null: String, InitialMsg))
     producer
   }
@@ -184,4 +186,5 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
 }
 
 case class Valid[T](payload: T)
+
 case class Invalid[T](payload: T, cause: Option[Throwable])
