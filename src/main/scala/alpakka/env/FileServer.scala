@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
   *  - Normal response: /download/[id]
   *  - Flaky response:  /downloadflaky/[id]
   *  - Non-idempotent response: /downloadni/[id]
-  *    Allow each id only once, answer with 404 on consecutive requests
+  *    Allow only one download per id, answer with 404 on subsequent requests
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -46,7 +46,6 @@ object FileServer extends App {
       case ex: RuntimeException =>
         extractUri { uri: Uri =>
           logger.error(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
-          //TODO read the id from the URI?
           //cache.invalidate(id)
           complete(HttpResponse(InternalServerError, entity = "Runtime ex occurred"))
         }
