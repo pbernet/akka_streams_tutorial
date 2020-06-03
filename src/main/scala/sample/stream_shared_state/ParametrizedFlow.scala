@@ -1,5 +1,6 @@
 package sample.stream_shared_state
 
+import akka.Done
 import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source, SourceQueueWithComplete, Zip}
 import akka.stream.{FlowShape, OverflowStrategy}
@@ -7,13 +8,15 @@ import akka.stream.{FlowShape, OverflowStrategy}
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 /**
   * Source -> Flow(parameter) -> Sink
-  *
   * Inject parameter from outside the flow execution.
-  * Interesting also the use of the extrapolate operator.
+  *
+  * Implementation is done with GraphDSL, Doc:
+  * https://doc.akka.io/docs/akka/current/stream/stream-graphs.html
   *
   * Similar to [[Blacklist]]
   *
@@ -22,22 +25,29 @@ import scala.concurrent.duration._
   *
   */
 object ParametrizedFlow extends App {
-  implicit val as = ActorSystem("ParametrizedFlow")
+  val service = ParameterizedFlowService
 
-  def createUserParamedFlow[A, P, O](bufferSize: Int, overflowStrategy: OverflowStrategy, initialParam: P)(fun: (A, P) => O) =
-    Flow.fromGraph(GraphDSL.create(Source.queue[P](bufferSize, overflowStrategy)) { implicit builder =>
-      queue =>
-        import GraphDSL.Implicits._
-        val zip = builder.add(Zip[A, P]())
-        //based on https://doc.akka.io/docs/akka/current/stream/stream-rate.html#understanding-extrapolate-and-expand
-        val extra = builder.add(Flow[P].extrapolate(Iterator.continually(_), Some(initialParam)))
-        val map = builder.add(Flow[(A, P)].map(r => fun(r._1, r._2)))
+  Thread.sleep(5000)
+  service.update(1.0)
 
-        queue ~> extra ~> zip.in1
-        zip.out ~> map
-        FlowShape(zip.in0, map.out)
-    })
+  Thread.sleep(2000)
+  service.update(1.5)
+  Thread.sleep(2000)
+  service.cancel()
+  Thread.sleep(2000)
 
+  println(service.result())
+}
+
+object ParameterizedFlowService {
+  implicit val system = ActorSystem("ParameterizedFlowService")
+  implicit val executionContext = system.dispatcher
+
+  def update(element: Double): Unit = flow._1._2.offer(element)
+
+  def cancel(): Boolean = flow._1._1.cancel()
+
+  def result(): Future[Seq[Double]] = flow._2
 
   val fun = (a: Int, b: Double) => a * b
   val flow: ((Cancellable, SourceQueueWithComplete[Double]), Future[immutable.Seq[Double]]) =
@@ -47,12 +57,32 @@ object ParametrizedFlow extends App {
       .toMat(Sink.seq)(Keep.both)
       .run()
 
-  Thread.sleep(5000)
-  flow._1._2.offer(1.0) //this is how you set params
-  Thread.sleep(2000)
-  flow._1._2.offer(1.5)
-  Thread.sleep(2000)
-  flow._1._1.cancel() //stop the "test"
-  Thread.sleep(1000)
-  println(flow._2) //whole output
+  val done: Future[Done] = flow._1._2.watchCompletion()
+  terminateWhen(done)
+
+  private def createUserParamedFlow[A, P, O](bufferSize: Int, overflowStrategy: OverflowStrategy, initialParam: P)(fun: (A, P) => O) =
+    Flow.fromGraph(GraphDSL.create(Source.queue[P](bufferSize, overflowStrategy)) { implicit builder =>
+      queue =>
+        import GraphDSL.Implicits._
+        val zip = builder.add(Zip[A, P]())
+        //Interesting use of the extrapolate operator
+        //based on https://doc.akka.io/docs/akka/current/stream/stream-rate.html#understanding-extrapolate-and-expand
+        val extra = builder.add(Flow[P].extrapolate(Iterator.continually(_), Some(initialParam)))
+        val map = builder.add(Flow[(A, P)].map(r => fun(r._1, r._2)))
+
+        queue ~> extra ~> zip.in1
+        zip.out ~> map
+        FlowShape(zip.in0, map.out)
+    })
+
+  private def terminateWhen(done: Future[_]) = {
+    done.onComplete {
+      case Success(_) =>
+        println("Flow Success. About to terminate...")
+        system.terminate()
+      case Failure(e) =>
+        println(s"Flow Failure: $e. About to terminate...")
+        system.terminate()
+    }
+  }
 }

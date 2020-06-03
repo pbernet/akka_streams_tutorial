@@ -8,13 +8,16 @@ import akka.stream.stage._
 import scala.concurrent.duration._
 
 /**
-  * Sample Implementation of discussion:
-  * https://discuss.lightbend.com/t/the-idiomatic-way-to-manage-shared-state-with-akka-streams/2552
+  * Source -> Flow(Blacklist) -> Sink
+  * Inject shared state (eg Blacklist) from outside the flow execution
   *
-  * Shows a different way to inject shared state (eg Blacklist) from outside the flow execution
+  * Implementation doc:
+  * https://doc.akka.io/docs/akka/current/stream/stream-customize.html#custom-materialized-values
   *
   * Similar to [[ParametrizedFlow]]
   *
+  * Sample Implementation of discussion:
+  * https://discuss.lightbend.com/t/the-idiomatic-way-to-manage-shared-state-with-akka-streams/2552
   */
 
 object Blacklist extends App {
