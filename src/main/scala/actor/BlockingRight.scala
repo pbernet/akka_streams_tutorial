@@ -5,11 +5,13 @@ import akka.actor.typed.{ActorSystem, DispatcherSelector}
 
 /**
   * If blocking (eg by an external resource) is required,
-  * a custom dispatcher (in application.conf) avoids
+  * a custom dispatcher (see application.conf) avoids
   * thread starvation of the default dispatcher
   *
   * Stolen from:
   * https://github.com/raboof/akka-blocking-dispatcher
+  *
+  * See [[sample.stream.WaitForThreeFlowsToComplete]] for use of custom dispatcher in a stream
   *
   */
 object BlockingRight extends App {
