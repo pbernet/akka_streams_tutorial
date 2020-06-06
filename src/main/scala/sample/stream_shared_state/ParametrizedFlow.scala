@@ -13,7 +13,10 @@ import scala.util.{Failure, Success}
 
 /**
   * Source -> Flow(parameter) -> Sink
-  * Inject parameter from outside the flow execution.
+  * Inject parameter from outside the flow execution
+  *
+  * The basic idea is to Zip this parameter with the periodic (extrapolated) flow values
+  * and then apply a user function
   *
   * Implementation is done with GraphDSL, Doc:
   * https://doc.akka.io/docs/akka/current/stream/stream-graphs.html
@@ -49,10 +52,10 @@ object ParameterizedFlowService {
 
   def result(): Future[Seq[Double]] = flow._2
 
-  val fun = (a: Int, b: Double) => a * b
+  val fun = (flowValue: Int, paramValue: Double) => flowValue * paramValue
   val flow: ((Cancellable, SourceQueueWithComplete[Double]), Future[immutable.Seq[Double]]) =
     Source.tick(0.seconds, 500.millis, 10)
-      .viaMat(createUserParamedFlow(1, OverflowStrategy.dropBuffer, 0.5)(fun))(Keep.both)
+      .viaMat(createParamFlow(1, OverflowStrategy.dropBuffer, 0.5)(fun))(Keep.both)
       .wireTap(x => println(x))
       .toMat(Sink.seq)(Keep.both)
       .run()
@@ -60,7 +63,7 @@ object ParameterizedFlowService {
   val done: Future[Done] = flow._1._2.watchCompletion()
   terminateWhen(done)
 
-  private def createUserParamedFlow[A, P, O](bufferSize: Int, overflowStrategy: OverflowStrategy, initialParam: P)(fun: (A, P) => O) =
+  private def createParamFlow[A, P, O](bufferSize: Int, overflowStrategy: OverflowStrategy, initialParam: P)(fun: (A, P) => O) =
     Flow.fromGraph(GraphDSL.create(Source.queue[P](bufferSize, overflowStrategy)) { implicit builder =>
       queue =>
         import GraphDSL.Implicits._
