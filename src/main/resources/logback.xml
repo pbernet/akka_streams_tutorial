@@ -13,15 +13,21 @@
             <charset>utf8</charset>
         </encoder>
     </appender>
+    <!-- Doc: https://doc.akka.io/docs/akka/current/typed/logging.html#slf4j-backend -->
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <neverBlock>true</neverBlock>
+        <!-- Can only point to one ref, for now just STDOUT -->
+        <appender-ref ref="STDOUT"/>
+    </appender>
 
     <!-- Turn down Kafka noise -->
-    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="kafka" level="WARN"/>
     <!-- Turn down sshj noise in sftp -->
     <logger name="net.schmizz.sshj" level="ERROR"/>
     <logger name="com.hierynomus.sshj" level="ERROR"/>
 
     <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-        <!-- <appender-ref ref="FILE" /> -->
+        <appender-ref ref="ASYNC"/>
     </root>
 </configuration>

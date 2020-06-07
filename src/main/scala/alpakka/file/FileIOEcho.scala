@@ -12,7 +12,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Alpakka file echo flow with sth to process:
+  * FileIO echo flow with base64 encoding/decoding to give the CPU sth to do:
   * testfile.jpg -> base64 encoding -> test.enc -> base64 decoding -> test_result.jpg
   *
   * Remark:
@@ -37,7 +37,7 @@ object FileIOEcho extends App {
     .runWith(sinkEnc)
 
   doneEnc.onComplete {
-    case Success(_) => {
+    case Success(_) =>
       val sourceEnc = FileIO.fromPath(Paths.get(encFileName))
       val sinkDec = FileIO.toPath(Paths.get(resultFileName))
 
@@ -46,7 +46,6 @@ object FileIOEcho extends App {
         .map(each => ByteString(Base64.getDecoder.decode(each.toByteBuffer)))
         .runWith(sinkDec)
       terminateWhen(doneDec)
-    }
     case Failure(ex) => println(s"Exception: $ex")
   }
 

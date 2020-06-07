@@ -1,4 +1,4 @@
-package kafka
+package alpakka.kafka
 
 import _root_.kafka.admin.TopicCommand
 

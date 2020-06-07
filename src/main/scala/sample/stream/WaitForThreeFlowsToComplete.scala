@@ -6,46 +6,52 @@ import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import akka.{Done, NotUsed}
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent._
 import scala.concurrent.duration._
 
-object WaitForThreeFlowsToComplete {
+/**
+  *  Run a fast and two slow flows with the same data and wait for all of them to complete.
+  *  Use custom dispatcher for slow FileIO flows.
+  *
+  *  See [[actor.BlockingRight]] for use of custom dispatcher in typed Actor
+  */
+object WaitForThreeFlowsToComplete extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system = ActorSystem("WaitForThreeFlowsToComplete")
+  implicit val ec = system.dispatcher
 
-  def main(args: Array[String]) = {
+  def lineSink(filename: String): Sink[String, Future[IOResult]] =
+    Flow[String]
+      .map(s => ByteString(s + "\n"))
+      .wireTap(_ => logger.info(s"Add line to file: $filename"))
+      .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right) //retain to the Future[IOResult]
+      .withAttributes(ActorAttributes.dispatcher("custom-dispatcher-for-blocking"))
 
-    implicit val system = ActorSystem("WaitForThreeFlowsToComplete")
-    implicit val ec = system.dispatcher
+  val origSource = Source(1 to 10)
+  //scan (= transform) the source
+  val factorialsSource = origSource.scan(BigInt(1))((acc, next) => acc * next)
 
-    def reusableLineSink(filename: String): Sink[String, Future[IOResult]] =
-      Flow[String]
-        .map(s => ByteString(s + "\n"))
-        //Keep.right means: we want to retain what the FileIO.toPath sink has to offer
-        .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right)
+  val fastFlow = origSource.runForeach(i => logger.info(s"Reached sink: $i"))
 
+  val slowFlow1 = factorialsSource
+    .map(_.toString)
+    .runWith(lineSink("factorial1.txt"))
 
-    val source: Source[Int, NotUsed] = Source(1 to 100)
+  val slowFlow2 = factorialsSource
+    .zipWith(Source(0 to 10))((num, idx) => s"$idx! = $num")
+    .throttle(1, 1.second, 1, ThrottleMode.shaping)
+    .runWith(lineSink("factorial2.txt"))
 
-    val f1Fut: Future[Done] = source.runForeach(i => println(i))
+  val allDone = for {
+    fastFlowDone <- fastFlow
+    slowFlow1Done <- slowFlow1
+    slowFlow2Done <- slowFlow2
+  } yield (fastFlowDone, slowFlow1Done, slowFlow2Done)
 
-    //declaration of what happens when we scan (= transform) the source
-    val factorials = source.scan(BigInt(1))((acc, next) => acc * next)
-    val f2fut: Future[IOResult] = factorials.map(_.toString).runWith(reusableLineSink("factorial2.txt"))
-
-    val f3fut = factorials
-      .zipWith(Source(0 to 10))((num, idx) => s"$idx! = $num")
-      .throttle(1, 1.second, 1, ThrottleMode.shaping)
-      .runWith(reusableLineSink("factorial3.txt"))
-
-    val aggFut = for {
-      f1Result <- f1Fut
-      f2Result <- f2fut
-      f3Result <- f3fut
-    } yield (f1Result, f2Result, f3Result)
-
-    aggFut.onComplete{  results =>
-      println("Resulting Futures from Flows completed with results: " + results + " - about to terminate")
-      system.terminate()
-    }}
+  allDone.onComplete { results =>
+    logger.info(s"Resulting futures from flows: $results - about to terminate")
+    system.terminate()
+  }
 }

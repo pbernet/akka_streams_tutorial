@@ -6,7 +6,7 @@ import akka.actor.typed.scaladsl.Behaviors
 object PrintActor {
   def apply(): Behavior[Integer] =
     Behaviors.receive { (ctx, i) =>
-      ctx.log.info(i.toString)
+      ctx.log.info(s"Finished: $i by ${Thread.currentThread().getName}")
       Behaviors.same
     }
 }

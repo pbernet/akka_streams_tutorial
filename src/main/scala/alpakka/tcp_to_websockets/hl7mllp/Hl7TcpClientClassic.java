@@ -20,8 +20,8 @@ import java.util.stream.IntStream;
  * Basic sender, which loops through ML7 messages read from file
  *
  */
-public class Hl7MllpSender {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Hl7MllpSender.class);
+public class Hl7TcpClientClassic {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Hl7TcpClientClassic.class);
     private static HapiContext context = new DefaultHapiContext();
 
     private static final int PORT_NUMBER = 6160;

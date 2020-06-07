@@ -1,13 +1,13 @@
-package kafka
+package alpakka.kafka
 
 import akka.Done
 import akka.actor.{ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.kafka.scaladsl.{Committer, Consumer}
 import akka.kafka.{CommitterSettings, ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.Keep
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
-import kafka.TotalFake.{IncrementMessage, IncrementWord}
+import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
 
@@ -16,6 +16,8 @@ import scala.concurrent.duration._
 
 /**
   * Consumers W.1 and W.2 consume half of the partitions each within the wordcount consumer group
+  * Only one consumer will consume the "fakeNews" partition
+  *
   * Consumer M is a single consumer for all the partitions in the messagecount consumer group
   *
   * Use the offset storage in Kafka:
@@ -28,7 +30,7 @@ object WordCountConsumer extends App {
 
   val total = system.actorOf(Props[TotalFake], "totalFake")
 
-  val committerSettings = CommitterSettings(system)
+  val committerSettings = CommitterSettings(system).withMaxBatch(1)
 
   def createConsumerSettings(group: String): ConsumerSettings[String, java.lang.Long] = {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
@@ -42,7 +44,7 @@ object WordCountConsumer extends App {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
         //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
-        if (msg.record.key().equalsIgnoreCase("fakeNews")) { //WTF WordCountProducer.fakeNewsKeyword does not work
+        if (msg.record.key().equalsIgnoreCase("fakeNews")) { //hardcoded because WordCountProducer.fakeNewsKeyword does not work
           import akka.pattern.ask
           implicit val askTimeout: Timeout = Timeout(3.seconds)
           (total ? IncrementWord(msg.record.value.toInt, id))
@@ -52,8 +54,8 @@ object WordCountConsumer extends App {
           Future(msg).map(_ => msg.committableOffset)
         }
       }
-      .toMat(Committer.sink(committerSettings))(Keep.both)
-      .mapMaterializedValue(DrainingControl.apply)
+      .via(Committer.flow(committerSettings))
+      .toMat(Sink.seq)(DrainingControl.apply)
       .run()
   }
 
@@ -67,10 +69,9 @@ object WordCountConsumer extends App {
           .mapTo[Done]
           .map(_ => msg.committableOffset)
       }
-      .toMat(Committer.sink(committerSettings))(Keep.both)
-      .mapMaterializedValue(DrainingControl.apply)
+      .via(Committer.flow(committerSettings))
+      .toMat(Sink.seq)(DrainingControl.apply)
       .run()
-
   }
 
   val drainingControlW1 = createAndRunConsumerWordCount("W.1")

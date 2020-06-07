@@ -22,7 +22,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 
-
 /**
   * Use case:
   *  - Process a stream of messages with reoccurring TRACE_ID
@@ -84,7 +83,7 @@ object LocalFileCacheCaffeine {
       .writer(writer)
       .build[Int, Path]()
 
-  //Doc sync loading, because AsyncLoadingCache does not work with CacheWriter
+  //Sync loading, because AsyncLoadingCache does not work with CacheWriter
   //see: https://stackoverflow.com/questions/48356731/caffeine-cant-provide-cachewriter-to-asyncloadingcache/48361538#48361538
   val loadedResults: util.List[Path] = new FileLister().run(localFileCache.toFile)
   loadedResults.forEach { path: Path =>
@@ -159,12 +158,8 @@ object LocalFileCacheCaffeine {
     val combinedMessages = Source.combine(Source(messagesGroupZero), Source(messagesGroupOne), Source(messagesGroupTwo))(numInputs => MergePrioritized(List(1, 1, 1)))
     combinedMessages
       .throttle(2 * scaleFactor, 1.second, 2 * scaleFactor, ThrottleMode.shaping)
-      //Go parallel on the last digit of the TRACE_ID and thus have 10 substreams
-      .groupBy(10, _.id % 10)
       .via(downloadFlow)
       //.via(faultyDownstreamFlow)
-      .async
-      .mergeSubstreams
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.ignore)
   }
