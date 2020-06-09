@@ -1,19 +1,17 @@
 package alpakka.file
 
 import java.nio.file.Paths
-import java.util.Base64
 
 import akka.actor.ActorSystem
 import akka.stream.IOResult
 import akka.stream.scaladsl.FileIO
-import akka.util.ByteString
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
   * FileIO echo flow with base64 encoding/decoding to give the CPU sth to do:
-  * testfile.jpg -> base64 encoding -> test.enc -> base64 decoding -> test_result.jpg
+  * testfile.jpg -> base64 encoding -> testfile.enc -> base64 decoding -> testfile_result.jpg
   *
   * Remark:
   * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
@@ -33,7 +31,7 @@ object FileIOEcho extends App {
 
   val doneEnc = sourceOrig
     //.wireTap(each => println(s"Chunk enc: $each"))
-    .map(each => ByteString(Base64.getEncoder.encode(each.toByteBuffer)))
+    .map(each => each.encodeBase64)
     .runWith(sinkEnc)
 
   doneEnc.onComplete {
@@ -43,7 +41,7 @@ object FileIOEcho extends App {
 
       val doneDec = sourceEnc
         //.wireTap(each => println(s"Chunk dec: $each"))
-        .map(each => ByteString(Base64.getDecoder.decode(each.toByteBuffer)))
+        .map(each => each.decodeBase64)
         .runWith(sinkDec)
       terminateWhen(doneDec)
     case Failure(ex) => println(s"Exception: $ex")
