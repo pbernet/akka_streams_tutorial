@@ -1,4 +1,4 @@
-package alpakka.tcp_to_websockets.websockets
+package alpakka.env
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http

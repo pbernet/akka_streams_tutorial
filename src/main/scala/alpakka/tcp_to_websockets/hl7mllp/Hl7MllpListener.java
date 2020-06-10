@@ -15,9 +15,13 @@ import ca.uhn.hl7v2.protocol.impl.AppRoutingDataImpl;
 
 import java.io.IOException;
 
+
+/**
+ * Classic HL7 MLLP tcp listener, used as a reference
+ *
+ */
 public class Hl7MllpListener {
 
-    // TODO make configurable
     private static final int PORT_NUMBER = 6160;
 
     private static HapiContext context = new DefaultHapiContext();

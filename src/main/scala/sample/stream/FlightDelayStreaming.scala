@@ -16,8 +16,11 @@ import scala.util.{Failure, Success, Try}
   *
   * Features:
   *  - reads large file in streaming fashion (here with subset)
-  *  - uses akka stream operators (= no graph)
-  *  - shows "stateful processing" with groupBy and mergeSubstreams
+  *  - uses akka stream operators (no graph)
+  *  - shows "stateful processing" with reduce-by-key
+  *
+  * Doc reduce-by-key:
+  * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#implementing-reduce-by-key
   *
   * Download (large) flight data files:
   * https://www.transtats.bts.gov/DL_SelectFields.asp?Table_ID=

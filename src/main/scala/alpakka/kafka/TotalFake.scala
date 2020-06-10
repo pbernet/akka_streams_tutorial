@@ -1,8 +1,8 @@
-package kafka
+package alpakka.kafka
 
 import akka.Done
 import akka.actor.Actor
-import kafka.TotalFake.{IncrementMessage, IncrementWord}
+import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
 
 /**
   * Keep the state of:

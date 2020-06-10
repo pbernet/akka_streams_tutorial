@@ -28,8 +28,8 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
                       executionContext: ExecutionContext) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val printSink = createEchoPrintSink()
-  val sourceQueue = singleWebSocketRequestSourceQueueClient(id, endpoint)
+  val printSink: Sink[Message, Future[Done]] = createEchoPrintSink()
+  val sourceQueue: Future[SourceQueue[Message]] = singleWebSocketRequestSourceQueueClient(id, endpoint)
 
 
   def singleWebSocketRequestSourceQueueClient(id: String, endpoint: String) = {
@@ -83,7 +83,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
     }
   }
 
-  def sendToWebsocket(messageText: String) = {
+  def sendToWebsocket(messageText: String): Future[Unit] = {
     val message = TextMessage.Strict(messageText)
     sourceQueue.flatMap { queue =>
       queue.offer(message: Message).map {

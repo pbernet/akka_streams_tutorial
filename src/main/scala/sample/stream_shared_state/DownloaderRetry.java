@@ -25,8 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * A simple sync http file downloader with retry
- * For local testing use dummy file server: alpakka.env.FileServer
+ * A simple sync http file downloader with internal retry.
  *
  * Exponential backoff could be added:
  * https://stackoverflow.com/questions/35391005/how-to-use-an-exponential-backoff-strategy-with-apache-httpclient

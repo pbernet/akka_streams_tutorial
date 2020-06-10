@@ -1,4 +1,4 @@
-package kafka
+package alpakka.kafka
 
 import java.util
 import java.util.concurrent.ThreadLocalRandom
@@ -39,7 +39,7 @@ object WordCountProducer extends App {
 
   val producerSettings = ProducerSettings(system, new StringSerializer, new StringSerializer)
     .withBootstrapServers(bootstrapServers)
-    .withProperty("partitioner.class", "kafka.CustomPartitioner")
+    .withProperty("partitioner.class", "alpakka.kafka.CustomPartitioner")
 
   def initializeTopic(topic: String): Unit = {
     val producer = producerSettings.createKafkaProducer()
