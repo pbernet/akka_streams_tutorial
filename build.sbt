@@ -4,9 +4,9 @@ version := "1.0"
 
 scalaVersion := "2.12.11"
 
-val akkaVersion = "2.6.5"
+val akkaVersion = "2.6.6"
 val akkaHTTPVersion = "10.1.11"
-val alpakkaVersion = "2.0.0"
+val alpakkaVersion = "2.0.1"
 val akkaStreamKafkaVersion = "2.0.3"
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.15.11"
@@ -35,7 +35,6 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
-  //"com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
 
@@ -45,9 +44,6 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-core" % camelVersion,
   "org.apache.camel" % "camel-stream" % camelVersion,
   "org.apache.camel" % "camel-mllp" % camelVersion,
-
-  // TODO test https://camel.apache.org/components/latest/dataformats/hl7-dataformat.html
-  "org.apache.camel" % "camel-hl7" % camelVersion,
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   // TODO Switch to latest v28
