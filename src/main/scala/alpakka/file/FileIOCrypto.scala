@@ -19,6 +19,8 @@ import scala.util.{Failure, Success}
   * FileIO echo flow with AES 256 encryption/decryption to give the CPU sth to do:
   * testfile.jpg -> AES 256 encryption -> testfile.encrypted -> AES 256 decryption -> testfile_result.jpg
   *
+  * Make sure to run with a recent openjdk or with graalvm
+  *
   * Inspired by:
   * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
   *
