@@ -19,6 +19,25 @@ import scala.util.{Failure, Success}
   * FileIO echo flow with AES 256 encryption/decryption to give the CPU sth to do:
   * testfile.jpg -> AES 256 encryption -> testfile.encrypted -> AES 256 decryption -> testfile_result.jpg
   *
+  * Enhancements:
+  *
+  * 1)
+  * Compression
+  * https://doc.akka.io/api/akka/current/akka/stream/scaladsl/Compression$.html
+  *
+  * operates *on a stream* (on a file semantics would be lost):
+  * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html
+  * https://github.com/akka/akka/blob/master/akka-stream-tests/src/test/scala/akka/stream/io/compression/GzipSpec.scala
+  *
+  * 2)
+  * Additional Stage in Poc
+  * Alpakka File "Archive": writing multiple File-Streams to on zip FIle
+  *
+  * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
+  * https://github.com/akka/alpakka/blob/master/file/src/main/scala/akka/stream/alpakka/file/scaladsl/Archive.scala
+  *
+  *
+  *
   * Inspired by:
   * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
   *
