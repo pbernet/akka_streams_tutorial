@@ -16,8 +16,8 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * FileIO echo flow with AES 256 encryption/decryption to give the CPU sth to do:
-  * testfile.jpg -> AES 256 encryption -> testfile.encrypted -> AES 256 decryption -> testfile_result.jpg
+  * FileIO echo flow with AES 128 encryption/decryption to give the CPU sth to do:
+  * testfile.jpg -> AES 128 encryption -> testfile.encrypted -> AES 128 decryption -> testfile_result.jpg
   *
   * Make sure to run with a recent openjdk or with graalvm
   *
@@ -62,7 +62,6 @@ import scala.util.{Failure, Success}
 
     val aesKeySize = 256
     val aesKey = generateAesKey()
-    val rand = new SecureRandom()
     val initialisationVector = generateIv()
 
     val sourceFileName = "./src/main/resources/testfile.jpg"
@@ -113,7 +112,7 @@ import scala.util.{Failure, Success}
     def aesKeySpec(key: Array[Byte]) =
       new SecretKeySpec(key, "AES")
 
-    def generateIv() = rand.generateSeed(16)
+    def generateIv() = new SecureRandom().generateSeed(16)
 
     private def aesCipher(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
       val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
