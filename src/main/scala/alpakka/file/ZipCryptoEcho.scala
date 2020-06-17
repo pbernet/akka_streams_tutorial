@@ -15,8 +15,8 @@ import javax.crypto._
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -98,6 +98,7 @@ object ZipCryptoEcho extends App {
       val doneDec = decryptAes(sourceEnc, aesKey, initialisationVector).runWith(sinkDec)
       doneDec.onComplete {
         case Success(_) =>
+          // Because we don't have support for unarchive in alpakka files yet, we use the ArchiveHelper
           val resultFileContentFut =
             FileIO.fromPath(Paths.get(resultFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
           val resultFileContent = Await.result(resultFileContentFut, 10.seconds)
@@ -108,22 +109,11 @@ object ZipCryptoEcho extends App {
               .single(each._2)
               .runWith(FileIO.toPath(Paths.get(s"echo_${each._1}")))
           })
-          println(s"Saved ${unzipResultMap.size} echo .jpg files")
-        case Failure(ex) => println(s"Exception: $ex")
+          println(s"Saved ${unzipResultMap.size} echo_*.jpg files")
+          system.terminate()
+        case Failure(ex) => println(s"Exception: $ex"); system.terminate()
       }
-      terminateWhen(doneDec)
-    case Failure(ex) => println(s"Exception: $ex")
-  }
-
-  def terminateWhen(done: Future[IOResult]) = {
-    done.onComplete {
-      case Success(_) =>
-        println(s"Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        println(s"Flow Failure: $e. About to terminate...")
-        system.terminate()
-    }
+    case Failure(ex) => println(s"Exception: $ex"); system.terminate()
   }
 
   def generateAesKey() = {
