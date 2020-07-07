@@ -20,11 +20,11 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * File echo flow with Zip Archive feature and AES 128 encryption/decryption:
+  * File echo flow with Zip Archive/Unarchive and AES 128 encryption/decryption:
   * 
-  * testfile.jpg (2) -> Archive -> AES 128 encryption -> testfile.encrypted 
-  * -> AES 128 decryption -> testfile_decrypted.zip -> Unarchive (ArchiveHelper.unzip)
-  * -> echo_testfile(1/2).jpg
+  * 63MB.pdf (2) -> Archive.zip() ->
+  * AES 128 encryption -> testfile.encrypted -> AES 128 decryption -> testfile_decrypted.zip ->
+  * Unarchive (ArchiveHelper.unzip) -> echo_(1/2)63MB.pdf
   *
   * Make sure to run with a recent openjdk or with graalvm
   *
@@ -72,22 +72,23 @@ object ZipCryptoEcho extends App {
   val aesKey = generateAesKey()
   val initialisationVector = generateIv()
 
-  val sourceFileName = "./src/main/resources/testfile.jpg"
+  val sourceFileName = "63MB.pdf"
+  val sourceFilePath = s"src/main/resources/$sourceFileName"
   val encFileName = "testfile.encrypted"
-  val resultFileName = "testfile_decrypted.zip"
+  val decFileName = "testfile_decrypted.zip"
 
-  val fileStream1 = FileIO.fromPath(Paths.get(sourceFileName))
-  val fileStream2 = FileIO.fromPath(Paths.get(sourceFileName))
+  val fileStream1 = FileIO.fromPath(Paths.get(sourceFilePath))
+  val fileStream2 = FileIO.fromPath(Paths.get(sourceFilePath))
 
   val filesStream = Source(
     List(
-      (ArchiveMetadata("testfile1.jpg"), fileStream1),
-      (ArchiveMetadata("testfile2.jpg"), fileStream2)
+      (ArchiveMetadata(s"1_$sourceFileName"), fileStream1),
+      (ArchiveMetadata(s"2_$sourceFileName"), fileStream2)
     )
   )
 
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
-  val sinkDec = FileIO.toPath(Paths.get(resultFileName))
+  val sinkDec = FileIO.toPath(Paths.get(decFileName))
 
   val sourceZipped = filesStream.via(Archive.zip())
   val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector)
@@ -100,7 +101,7 @@ object ZipCryptoEcho extends App {
         case Success(_) =>
           // Because we don't have support for unarchive in alpakka files yet, we use the ArchiveHelper
           val resultFileContentFut =
-            FileIO.fromPath(Paths.get(resultFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
+            FileIO.fromPath(Paths.get(decFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
           val resultFileContent = Await.result(resultFileContentFut, 10.seconds)
           val unzipResultMap = new ArchiveHelper().unzip(resultFileContent).asScala
           unzipResultMap.foreach(each => {
@@ -109,7 +110,7 @@ object ZipCryptoEcho extends App {
               .single(each._2)
               .runWith(FileIO.toPath(Paths.get(s"echo_${each._1}")))
           })
-          println(s"Saved ${unzipResultMap.size} echo_*.jpg files")
+          println(s"Saved: ${unzipResultMap.size} echo files")
           system.terminate()
         case Failure(ex) => println(s"Exception: $ex"); system.terminate()
       }
