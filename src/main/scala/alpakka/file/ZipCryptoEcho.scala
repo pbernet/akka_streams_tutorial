@@ -2,7 +2,6 @@ package alpakka.file
 
 import java.nio.file.Paths
 import java.security._
-import java.security.spec.{PKCS8EncodedKeySpec, X509EncodedKeySpec}
 
 import akka.actor.ActorSystem
 import akka.stream._
@@ -13,6 +12,7 @@ import akka.stream.stage._
 import akka.util.ByteString
 import javax.crypto._
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
@@ -20,11 +20,11 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * File echo flow with Zip Archive/Unarchive and AES 128 encryption/decryption:
+  * File echo flow with Zip archive/un-archive and AES 256 encryption/decryption:
   * 
-  * 63MB.pdf (2) -> Archive.zip() ->
+  * 63MB.pdf (2) -> archive (Archive.zip()) ->
   * AES 128 encryption -> testfile.encrypted -> AES 128 decryption -> testfile_decrypted.zip ->
-  * Unarchive (ArchiveHelper.unzip) -> echo_(1/2)63MB.pdf
+  * un-archive (ArchiveHelper.unzip) -> echo_(1/2)63MB.pdf
   *
   * Make sure to run with a recent openjdk or with graalvm
   *
@@ -67,9 +67,11 @@ private[this] class AesStage(cipher: Cipher) extends GraphStage[FlowShape[ByteSt
 object ZipCryptoEcho extends App {
   implicit val system = ActorSystem("ZipCryptoEcho")
   implicit val executionContext = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val aesKeySize = 256
   val aesKey = generateAesKey()
+  //For simplicity we do not transport, the IV as part of the file
   val initialisationVector = generateIv()
 
   val sourceFileName = "63MB.pdf"
@@ -90,31 +92,37 @@ object ZipCryptoEcho extends App {
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
   val sinkDec = FileIO.toPath(Paths.get(decFileName))
 
+  logger.info("Start archiving...")
   val sourceZipped = filesStream.via(Archive.zip())
+
+  logger.info("Start encryption...")
   val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector)
   val doneEnc = sourceEnc.runWith(sinkEnc)
 
+
   doneEnc.onComplete {
     case Success(_) =>
+      logger.info("Start decryption...")
       val doneDec = decryptAes(sourceEnc, aesKey, initialisationVector).runWith(sinkDec)
       doneDec.onComplete {
         case Success(_) =>
-          // Because we don't have support for unarchive in alpakka files yet, we use the ArchiveHelper
+          // Because we don't have support for un-archive in alpakka files, we use the ArchiveHelper
+          logger.info("Start un-archiving...")
           val resultFileContentFut =
             FileIO.fromPath(Paths.get(decFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
           val resultFileContent = Await.result(resultFileContentFut, 10.seconds)
           val unzipResultMap = new ArchiveHelper().unzip(resultFileContent).asScala
           unzipResultMap.foreach(each => {
-            println(s"Unzipped file: ${each._1}")
+            logger.info(s"Unzipped file: ${each._1}")
             Source
               .single(each._2)
               .runWith(FileIO.toPath(Paths.get(s"echo_${each._1}")))
           })
-          println(s"Saved: ${unzipResultMap.size} echo files")
+          logger.info(s"Saved: ${unzipResultMap.size} echo files")
           system.terminate()
-        case Failure(ex) => println(s"Exception: $ex"); system.terminate()
+        case Failure(ex) => logger.info(s"Exception: $ex"); system.terminate()
       }
-    case Failure(ex) => println(s"Exception: $ex"); system.terminate()
+    case Failure(ex) => logger.info(s"Exception: $ex"); system.terminate()
   }
 
   def generateAesKey() = {
@@ -154,29 +162,4 @@ object ZipCryptoEcho extends App {
     val cipher = aesCipher(Cipher.DECRYPT_MODE, keySpec, ivBytes)
     source.via(new AesStage(cipher))
   }
-
-  def getRsaKeyFactory() =
-    KeyFactory.getInstance("RSA")
-
-  def loadRsaPrivateKey(key: Array[Byte]) = {
-    val spec = new PKCS8EncodedKeySpec(key)
-    getRsaKeyFactory().generatePrivate(spec)
-  }
-
-  def loadRsaPublicKey(key: Array[Byte]) = {
-    val spec = new X509EncodedKeySpec(key)
-    getRsaKeyFactory().generatePublic(spec)
-  }
-
-  private def rsaCipher(mode: Int, key: Key) = {
-    val cipher = Cipher.getInstance("RSA")
-    cipher.init(mode, key)
-    cipher
-  }
-
-  def encryptRsa(bytes: Array[Byte], key: PublicKey): Array[Byte] =
-    rsaCipher(Cipher.ENCRYPT_MODE, key).doFinal(bytes)
-
-  def decryptRsa(bytes: Array[Byte], key: PrivateKey): Array[Byte] =
-    rsaCipher(Cipher.DECRYPT_MODE, key).doFinal(bytes)
 }
