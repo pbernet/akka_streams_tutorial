@@ -1,5 +1,6 @@
 package alpakka.file
 
+import java.io.FileInputStream
 import java.nio.file.Paths
 import java.security._
 
@@ -23,10 +24,12 @@ import scala.util.{Failure, Success}
   * File echo flow with Zip archive/un-archive and AES 256 encryption/decryption:
   * 
   * 63MB.pdf (2) -> archive (Archive.zip()) ->
-  * AES 128 encryption -> testfile.encrypted -> AES 128 decryption -> testfile_decrypted.zip ->
-  * un-archive (ArchiveHelper.unzip) -> echo_(1/2)63MB.pdf
+  * AES encryption -> testfile.encrypted -> AES decryption -> testfile_decrypted.zip ->
+  * un-archive (ArchiveHelper.unzip) -> echo_(1/2)_63MB.pdf
   *
-  * Make sure to run with a recent openjdk or with graalvm
+  * Remarks:
+  *  - The initialisationVector is at the first 16 Bytes of the encrypted file
+  *  - Runs on a recent Java 8 openjdk or with graalvm
   *
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
@@ -71,7 +74,6 @@ object ZipCryptoEcho extends App {
 
   val aesKeySize = 256
   val aesKey = generateAesKey()
-  //For simplicity we do not transport, the IV as part of the file
   val initialisationVector = generateIv()
 
   val sourceFileName = "63MB.pdf"
@@ -97,16 +99,25 @@ object ZipCryptoEcho extends App {
 
   logger.info("Start encryption...")
   val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector)
-  val doneEnc = sourceEnc.runWith(sinkEnc)
+
+  //Prepend IV
+  val ivSource = Source.single(ByteString(initialisationVector))
+
+  val doneEnc = sourceEnc
+    .merge(ivSource)
+    .runWith(sinkEnc)
 
 
   doneEnc.onComplete {
     case Success(_) =>
       logger.info("Start decryption...")
-      val doneDec = decryptAes(sourceEnc, aesKey, initialisationVector).runWith(sinkDec)
+
+      //val doneDec = decryptAes(sourceEnc, aesKey, initialisationVector).runWith(sinkDec)
+      val doneDec = decryptAesFromFile(encFileName, aesKey).runWith(sinkDec)
+
       doneDec.onComplete {
         case Success(_) =>
-          // Because we don't have support for un-archive in alpakka files, we use the ArchiveHelper
+          // Use ArchiveHelper, because we don't have support for un-archive in alpakka files
           logger.info("Start un-archiving...")
           val resultFileContentFut =
             FileIO.fromPath(Paths.get(decFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
@@ -161,5 +172,23 @@ object ZipCryptoEcho extends App {
                 ): Source[ByteString, Any] = {
     val cipher = aesCipher(Cipher.DECRYPT_MODE, keySpec, ivBytes)
     source.via(new AesStage(cipher))
+  }
+
+  def decryptAesFromFile(
+                          fileName: String,
+                          keySpec: SecretKeySpec
+                ): Source[ByteString, Any] = {
+
+    //Read IV (first 16 bytes from stream), good old Java to the rescue
+    //Surprisingly difficult in akka streams
+    //https://stackoverflow.com/questions/61822306/reading-first-bytes-from-akka-stream-scaladsl-source
+    //https://stackoverflow.com/questions/40743047/handle-akka-streams-first-element-specially
+
+    val ivBytesBuffer = new Array[Byte](16)
+    val is = new FileInputStream(fileName)
+    is.read(ivBytesBuffer)
+
+    val source = StreamConverters.fromInputStream(() => is)
+    decryptAes(source, keySpec, ivBytesBuffer)
   }
 }
