@@ -36,10 +36,6 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
   * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
   *
-  * TODO
-  * Decryption AES/GCM with large file "63MB.pdf" takes forever
-  *
-  *
   */
 
 private[this] class AesStage(cipher: Cipher) extends GraphStage[FlowShape[ByteString, ByteString]] {
@@ -86,13 +82,12 @@ object ZipCryptoEcho extends App {
 
   //Activate for ChaCha20-Poly1305/None/NoPadding
   //Uses built in Java 11 cipher: https://openjdk.java.net/jeps/329
-  //To run at least 11.0.8_10 is required
+  //To run at least openjdk 11.0.8_10 is required
   //This Issue is fixed there: https://github.com/eclipse/openj9/issues/9535
   //val chaCha20Nonce = generateNonce(ivLengthBytes)
   //val chaCha20Key = generateChaCha20Key()
 
-
-  val sourceFileName = "testfile.jpg" //larger: 63.MB.pdf
+  val sourceFileName = "63MB.pdf"
   val sourceFilePath = s"src/main/resources/$sourceFileName"
   val encFileName = "testfile.encrypted"
   val decFileName = "testfile_decrypted.zip"
@@ -224,7 +219,8 @@ object ZipCryptoEcho extends App {
     val is = new FileInputStream(fileName)
     is.read(ivBytesBuffer)
 
-    val source = StreamConverters.fromInputStream(() => is)
+    //We need a large chunk size here to speed up the AES/GCM decryption
+    val source = StreamConverters.fromInputStream(() => is, chunkSize = 1000 * 1024)
     decryptAes(source, keySpec, ivBytesBuffer, aesMode)
   }
 
