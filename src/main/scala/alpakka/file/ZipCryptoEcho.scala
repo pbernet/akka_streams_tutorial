@@ -12,7 +12,7 @@ import akka.stream.scaladsl._
 import akka.stream.stage._
 import akka.util.ByteString
 import javax.crypto._
-import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
+import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.JavaConverters._
@@ -28,12 +28,16 @@ import scala.util.{Failure, Success}
   * un-archive (ArchiveHelper.unzip) -> echo_(1/2)_63MB.pdf
   *
   * Remarks:
-  *  - The initialisationVector is at the first 16 Bytes of the encrypted file
+  *  - For AES/CBC: initialisationVector is at the first 16 Bytes of the encrypted file
+  *  - For AES/GCM: initialisationVector is at the first 12 Bytes of the encrypted file
   *  - Run with a recent Java 8 openjdk or with graalvm to get the 256 Bit key size
   *
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
   * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
+  *
+  * TODO
+  * Decryption AES/GCM with large file "63MB.pdf" takes forever
   *
   *
   */
@@ -73,19 +77,22 @@ object ZipCryptoEcho extends App {
   implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  //For AES/CBC or AES/GCM
   val aesKeySize = 256
   val aesKey = generateAesKey()
-  val initialisationVector = generateNonce(16)
+  val aesMode =  "AES/CBC"  //Switch to AES/GCM
+  val ivLengthBytes = if (aesMode == "AES/CBC") 16 else 12
+  val initialisationVector = generateNonce(ivLengthBytes)
 
   //Activate for ChaCha20-Poly1305/None/NoPadding
   //Uses built in Java 11 cipher: https://openjdk.java.net/jeps/329
   //To run at least 11.0.8_10 is required
   //This Issue is fixed there: https://github.com/eclipse/openj9/issues/9535
-  //val chaCha20Nonce = generateNonce(12)
+  //val chaCha20Nonce = generateNonce(ivLengthBytes)
   //val chaCha20Key = generateChaCha20Key()
 
 
-  val sourceFileName = "63MB.pdf"
+  val sourceFileName = "testfile.jpg" //larger: 63.MB.pdf
   val sourceFilePath = s"src/main/resources/$sourceFileName"
   val encFileName = "testfile.encrypted"
   val decFileName = "testfile_decrypted.zip"
@@ -106,8 +113,8 @@ object ZipCryptoEcho extends App {
   logger.info("Start archiving...")
   val sourceZipped = filesStream.via(Archive.zip())
 
-  logger.info("Start encryption...")
-  val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector)
+  logger.info(s"Start encryption $aesMode...")
+  val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector, aesMode)
   //val sourceEnc = encryptChaCha20(sourceZipped, chaCha20Key)
 
   //Prepend IV
@@ -121,10 +128,10 @@ object ZipCryptoEcho extends App {
 
   doneEnc.onComplete {
     case Success(_) =>
-      logger.info("Start decryption...")
+      logger.info(s"Start decryption $aesMode...")
 
 
-      val doneDec = decryptAesFromFile(encFileName, aesKey).runWith(sinkDec)
+      val doneDec = decryptAesFromFile(encFileName, aesKey, aesMode).runWith(sinkDec)
       //val doneDec = decryptChaCha20FromFile(encFileName, chaCha20Key).runWith(sinkDec)
 
       doneDec.onComplete {
@@ -159,34 +166,53 @@ object ZipCryptoEcho extends App {
   def aesKeySpec(key: Array[Byte]) =
     new SecretKeySpec(key, "AES")
 
-  private def aesCipher(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
+  private def aesCipherCBC(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
     val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
     val ivSpec = new IvParameterSpec(ivBytes)
     cipher.init(mode, keySpec, ivSpec)
     cipher
   }
 
+  private def aesCipherGCM(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
+    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+
+    //For GCM we need additional "Authentication Tag length in bits"
+    val gcmParameterSpec = new GCMParameterSpec(16 * 8, ivBytes)
+    cipher.init(mode, keySpec, gcmParameterSpec)
+    cipher
+  }
+
   def encryptAes(
                   source: Source[ByteString, Any],
                   keySpec: SecretKeySpec,
-                  ivBytes: Array[Byte]
+                  ivBytes: Array[Byte],
+                  aesMode: String
                 ): Source[ByteString, Any] = {
-    val cipher = aesCipher(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
+    val cipher = aesMode match {
+      case "AES/GCM" =>  aesCipherGCM(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
+      case _ =>  aesCipherCBC(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
+    }
     source.via(new AesStage(cipher))
   }
 
   def decryptAes(
                   source: Source[ByteString, Any],
                   keySpec: SecretKeySpec,
-                  ivBytes: Array[Byte]
+                  ivBytes: Array[Byte],
+                  aesMode: String
                 ): Source[ByteString, Any] = {
-    val cipher = aesCipher(Cipher.DECRYPT_MODE, keySpec, ivBytes)
+
+    val cipher = aesMode match {
+      case "AES/GCM" =>  aesCipherGCM(Cipher.DECRYPT_MODE, keySpec, ivBytes)
+      case _ =>  aesCipherCBC(Cipher.DECRYPT_MODE, keySpec, ivBytes)
+    }
     source.via(new AesStage(cipher))
   }
 
   def decryptAesFromFile(
                           fileName: String,
-                          keySpec: SecretKeySpec
+                          keySpec: SecretKeySpec,
+                          aesMode: String
                 ): Source[ByteString, Any] = {
 
     //Read IV (first 16 bytes from stream), good old Java to the rescue
@@ -194,12 +220,12 @@ object ZipCryptoEcho extends App {
     //https://stackoverflow.com/questions/61822306/reading-first-bytes-from-akka-stream-scaladsl-source
     //https://stackoverflow.com/questions/40743047/handle-akka-streams-first-element-specially
 
-    val ivBytesBuffer = new Array[Byte](16)
+    val ivBytesBuffer = new Array[Byte](ivLengthBytes)
     val is = new FileInputStream(fileName)
     is.read(ivBytesBuffer)
 
     val source = StreamConverters.fromInputStream(() => is)
-    decryptAes(source, keySpec, ivBytesBuffer)
+    decryptAes(source, keySpec, ivBytesBuffer, aesMode)
   }
 
   private def generateNonce(numBytes: Integer) = {
