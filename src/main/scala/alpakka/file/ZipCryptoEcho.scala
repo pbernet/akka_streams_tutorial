@@ -29,11 +29,12 @@ import scala.util.{Failure, Success}
   *
   * Remarks:
   *  - The initialisationVector is at the first 16 Bytes of the encrypted file
-  *  - Runs on a recent Java 8 openjdk or with graalvm
+  *  - Run with a recent Java 8 openjdk or with graalvm to get the 256 Bit key size
   *
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
   * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
+  *
   *
   */
 
@@ -74,7 +75,15 @@ object ZipCryptoEcho extends App {
 
   val aesKeySize = 256
   val aesKey = generateAesKey()
-  val initialisationVector = generateIv()
+  val initialisationVector = generateNonce(16)
+
+  //Activate for ChaCha20-Poly1305/None/NoPadding
+  //Uses built in Java 11 cipher: https://openjdk.java.net/jeps/329
+  //To run at least 11.0.8_10 is required
+  //This Issue is fixed there: https://github.com/eclipse/openj9/issues/9535
+  //val chaCha20Nonce = generateNonce(12)
+  //val chaCha20Key = generateChaCha20Key()
+
 
   val sourceFileName = "63MB.pdf"
   val sourceFilePath = s"src/main/resources/$sourceFileName"
@@ -99,11 +108,13 @@ object ZipCryptoEcho extends App {
 
   logger.info("Start encryption...")
   val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector)
+  //val sourceEnc = encryptChaCha20(sourceZipped, chaCha20Key)
 
   //Prepend IV
   val ivSource = Source.single(ByteString(initialisationVector))
 
   val doneEnc = sourceEnc
+    //Comment out for ChaCha20-Poly1305/None/NoPadding
     .merge(ivSource)
     .runWith(sinkEnc)
 
@@ -112,8 +123,9 @@ object ZipCryptoEcho extends App {
     case Success(_) =>
       logger.info("Start decryption...")
 
-      //val doneDec = decryptAes(sourceEnc, aesKey, initialisationVector).runWith(sinkDec)
+
       val doneDec = decryptAesFromFile(encFileName, aesKey).runWith(sinkDec)
+      //val doneDec = decryptChaCha20FromFile(encFileName, chaCha20Key).runWith(sinkDec)
 
       doneDec.onComplete {
         case Success(_) =>
@@ -146,8 +158,6 @@ object ZipCryptoEcho extends App {
 
   def aesKeySpec(key: Array[Byte]) =
     new SecretKeySpec(key, "AES")
-
-  def generateIv() = new SecureRandom().generateSeed(16)
 
   private def aesCipher(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
     val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
@@ -191,4 +201,48 @@ object ZipCryptoEcho extends App {
     val source = StreamConverters.fromInputStream(() => is)
     decryptAes(source, keySpec, ivBytesBuffer)
   }
+
+  private def generateNonce(numBytes: Integer) = {
+    new SecureRandom().generateSeed(numBytes)
+  }
+
+  //Activate for ChaCha20-Poly1305/None/NoPadding
+
+//  def encryptChaCha20(
+//                       source: Source[ByteString, Any],
+//                       keySpec: SecretKeySpec
+//                     ): Source[ByteString, Any] = {
+//    val ivSpec = new IvParameterSpec(chaCha20Nonce)
+//    val cipher = chaCha20Cipher(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
+//    source.via(new AesStage(cipher))
+//  }
+//
+//  def decryptChaCha20FromFile(
+//                       fileName: String,
+//                       keySpec: SecretKeySpec
+//                     ): Source[ByteString, Any] = {
+//    //Must go via file, otherwise the AesStage can not initialize the cipher correctly
+//    val is = new FileInputStream(fileName)
+//    val source = StreamConverters.fromInputStream(() => is)
+//
+//    val ivSpec = new IvParameterSpec(chaCha20Nonce)
+//    val cipher = chaCha20Cipher(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+//    source.via(new AesStage(cipher))
+//  }
+//
+//  private def chaCha20Cipher(mode: Int, keySpec: SecretKeySpec, ivSpec: IvParameterSpec) = {
+//    val cipher = Cipher.getInstance("ChaCha20-Poly1305/None/NoPadding")
+//    cipher.init(mode, keySpec, ivSpec)
+//    cipher
+//  }
+//
+//  private def generateChaCha20Key() = {
+//    val KEY_LEN = 256 // bits
+//    val keyGen = KeyGenerator.getInstance("ChaCha20")
+//    keyGen.init(KEY_LEN, SecureRandom.getInstanceStrong)
+//    val secretKey = keyGen.generateKey
+//
+//    val secretKeySpec = new SecretKeySpec(secretKey.getEncoded, "ChaCha20")
+//    secretKeySpec
+//  }
 }
