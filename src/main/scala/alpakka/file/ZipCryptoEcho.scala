@@ -220,7 +220,10 @@ object ZipCryptoEcho extends App {
     is.read(ivBytesBuffer)
 
     //We need a large chunk size here to speed up the AES/GCM decryption
-    val source = StreamConverters.fromInputStream(() => is, chunkSize = 1000 * 1024)
+    //In the Java world AES/GCM decryption performance can be an issue because CipherInputStream has a limited buffer size of 512 bytes
+    //https://stackoverflow.com/questions/60575897/cipherinputstream-hangs-while-reading-data
+    //However, even if we stream all the data, it looks as if everything is loaded into memory
+    val source = StreamConverters.fromInputStream(() => is, chunkSize = 10000 * 1024)
     decryptAes(source, keySpec, ivBytesBuffer, aesMode)
   }
 
