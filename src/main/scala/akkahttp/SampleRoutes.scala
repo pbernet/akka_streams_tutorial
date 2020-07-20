@@ -1,9 +1,11 @@
 package akkahttp
 
 import java.io.File
+import java.nio.file.Paths
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import org.slf4j.{Logger, LoggerFactory}
@@ -40,8 +42,21 @@ object SampleRoutes extends App {
     }
   }
 
+  def getFromDocRoot: Route =
+    get {
+      val static = "src/main/resources"
+      concat(
+      pathSingleSlash {
+        val appHtml = Paths.get(static, "SampleRoutes.html").toFile
+        getFromFile(appHtml, ContentTypes.`text/html(UTF-8)`)
+      },
+      pathPrefix("static") {
+        getFromDirectory(static)
+      }
+    )}
+
   def routes: Route = {
-    getFromBrowsableDir ~ parseFormData
+    getFromBrowsableDir ~ parseFormData ~ getFromDocRoot
   }
 
   val bindingFuture = Http().bindAndHandle(routes, "127.0.0.1", 8000)
@@ -56,7 +71,7 @@ object SampleRoutes extends App {
 
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/SampleRoutes.html").!
+    if (os == "mac os x") Process(s"open http://localhost:8000").!
   }
 
   browserClient()
