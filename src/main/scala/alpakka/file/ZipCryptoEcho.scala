@@ -21,7 +21,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * File echo flow with Zip archive/un-archive and AES 256 encryption/decryption:
+  * File echo flow with Zip archive/un-archive and AES 256 CBC/GCM encryption/decryption:
   * 
   * 63MB.pdf (2) -> archive (Archive.zip()) ->
   * AES encryption -> testfile.encrypted -> AES decryption -> testfile_decrypted.zip ->
@@ -31,6 +31,12 @@ import scala.util.{Failure, Success}
   *  - For AES/CBC: initialisationVector is at the first 16 Bytes of the encrypted file
   *  - For AES/GCM: initialisationVector is at the first 12 Bytes of the encrypted file
   *  - Run with a recent Java 8 openjdk or with graalvm to get the 256 Bit key size
+  *  - For cipher "ChaCha20-Poly1305/None/NoPadding" on Java 11 comment in the code bits below
+  *
+  * A word of caution of this concept PoC regarding AES 256 GCM encryption/decryption:
+  * We are using the provided Sun JCE ciphers here. Since the decryption performance of
+  * AES 256 GCM on large files is really poor you should consider the cipher from
+  * bouncycastle.org, which is faster and behaves in a "linear fashion".
   *
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
@@ -210,7 +216,7 @@ object ZipCryptoEcho extends App {
                           aesMode: String
                 ): Source[ByteString, Any] = {
 
-    //Read IV (first 16 bytes from stream), good old Java to the rescue
+    //Read IV (first n bytes from stream), good old Java to the rescue
     //Surprisingly difficult in akka streams
     //https://stackoverflow.com/questions/61822306/reading-first-bytes-from-akka-stream-scaladsl-source
     //https://stackoverflow.com/questions/40743047/handle-akka-streams-first-element-specially
@@ -220,7 +226,7 @@ object ZipCryptoEcho extends App {
     is.read(ivBytesBuffer)
 
     //We need a large chunk size here to speed up the AES/GCM decryption
-    //In the Java world AES/GCM decryption performance can be an issue because CipherInputStream has a limited buffer size of 512 bytes
+    //This is an issue in the Java world, because CipherInputStream has a limited buffer size of 512 bytes
     //https://stackoverflow.com/questions/60575897/cipherinputstream-hangs-while-reading-data
     //However, even if we stream all the data, it looks as if everything is loaded into memory
     val source = StreamConverters.fromInputStream(() => is, chunkSize = 10000 * 1024)
