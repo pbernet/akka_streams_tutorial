@@ -1,8 +1,5 @@
 package alpakka.file;
 
-import org.apache.commons.codec.binary.Base64OutputStream;
-import org.apache.commons.io.IOUtils;
-
 import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,12 +10,15 @@ import java.util.Base64;
  *
  * Avoids OutOfMemoryError:
  * https://stackoverflow.com/questions/9579874/out-of-memory-when-encoding-file-to-base64
+ *
+ * Same with akka streams: alpakka.file.FileIOEcho
+ *
  */
 public class FileEncDec {
 	public static void main(String[] args) {
 
 		String filename = "testfile.jpg";
-		Path path = Paths.get("./src/main/resources/" + filename);
+		Path path = Paths.get("src/main/resources/" + filename);
 
 		try (FileInputStream fis = new FileInputStream(path.toFile())) {
 			Base64.Encoder enc1 = Base64.getEncoder();
@@ -60,16 +60,6 @@ public class FileEncDec {
 			is3.close();
 		} catch (IOException ioe) {
 			System.err.printf("I/O error: %s%n", ioe.getMessage());
-		}
-	}
-
-	//Using commons codec
-	public void encode(File fileIn, File fileOut) throws IOException {
-
-		try (InputStream is = new FileInputStream(fileIn);
-				OutputStream out = new Base64OutputStream(new FileOutputStream(fileOut));
-		) {
-			IOUtils.copy(is, out);
 		}
 	}
 }

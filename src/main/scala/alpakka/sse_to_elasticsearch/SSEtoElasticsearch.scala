@@ -27,10 +27,15 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 /**
-  * Read Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]) and
-  * write to Elasticsearch version 7.x
-  *
+  * Read Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]])
+  * and write them to Elasticsearch version 7.x
   * [[SSEtoElasticsearch.Change]] acts as a data bridge between the two worlds
+  *
+  * Note that alpakka 2.0.1 has this dependency. Output from cmd dependencyTree:
+  * [info]   +-com.lightbend.akka:akka-stream-alpakka-elasticsearch_2.12:2.0.1 [S]
+  * ..
+  * [info]   | +-org.elasticsearch.client:elasticsearch-rest-client:6.3.1
+  *
   */
 object SSEtoElasticsearch {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -47,7 +52,7 @@ object SSEtoElasticsearch {
 
   implicit val format: JsonFormat[Change] = jsonFormat8(Change)
 
-  val elasticsearchVersion = "7.6.1"
+  val elasticsearchVersion = "7.6.2"
   val elasticsearchContainer = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch-oss:" + elasticsearchVersion)
   elasticsearchContainer.start()
   val elasticsearchAddress: Array[String] = elasticsearchContainer.getHttpHostAddress.split(":")

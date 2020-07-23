@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * FileIO echo flow with base64 encoding/decoding to give the CPU sth to do:
+  * FileIO echo flow with base64 encoding/decoding:
   * testfile.jpg -> base64 encoding -> testfile.enc -> base64 decoding -> testfile_result.jpg
   *
   * Remark:
