@@ -52,8 +52,8 @@ object LocalFileCacheCaffeine {
   }
 
   val scaleFactor = 1 //Raise to widen range of IDs and thus have more traffic
-  val evictionTime: Duration = 5.minutes //Lower eg to 1.seconds to see cache and file system deletes
-  val evictionTimeOnError: Duration = 10.minutes
+  val evictionTime: FiniteDuration = 5.minutes //Lower eg to 5.seconds to see cache and file system deletes
+  val evictionTimeOnError: FiniteDuration = 10.minutes
   val localFileCache: Path = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
   logger.info(s"Starting with localFileCache dir: $localFileCache")
@@ -103,7 +103,6 @@ object LocalFileCacheCaffeine {
           val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
 
           //Using get(key => downloadfunction) is preferable to getIfPresent, because the get method performs the computation atomically
-          //Thus there are no 404 from server - exactly what we need
           val downloadedFile = cache.get(message.id, key => new DownloaderRetry().download(key, url, destinationFile))
           logger.info(s"TRACE_ID: ${message.id} successfully read from cache")
           Message(message.group, message.id, downloadedFile)
