@@ -51,7 +51,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
   
   "com.typesafe.play" %% "play" % "2.8.2",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.5",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.11.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
