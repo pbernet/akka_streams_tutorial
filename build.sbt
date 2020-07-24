@@ -2,7 +2,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.11"
+scalaVersion := "2.12.12"
 
 val akkaVersion = "2.6.8"
 val akkaHTTPVersion = "10.1.11"
@@ -49,9 +49,11 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   // TODO Switch to latest v28
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
-  
+
+  //https://github.com/akka/akka/issues/29351
   "com.typesafe.play" %% "play" % "2.8.2",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.5",
+  "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
