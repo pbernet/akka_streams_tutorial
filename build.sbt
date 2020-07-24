@@ -12,7 +12,7 @@ val akkaStreamKafkaVersion = "2.0.4"
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.15.13"
 val streamzVersion = "0.13-RC1"
-val camelVersion = "2.25.1"
+val camelVersion = "2.25.2"
 val testContainersVersion = "1.14.3"
 
 libraryDependencies ++= Seq(
@@ -50,11 +50,11 @@ libraryDependencies ++= Seq(
   // TODO Switch to latest v28
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
   
-  "com.typesafe.play" %% "play" % "2.8.0",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.1",
+  "com.typesafe.play" %% "play" % "2.8.2",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.10.5",
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
-  "commons-io" % "commons-io" % "2.6",
-  "org.apache.commons" % "commons-lang3" % "3.9",
+  "commons-io" % "commons-io" % "2.7",
+  "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.6",
   "com.github.blemale" %% "scaffeine" % "3.0.0" % "compile",
