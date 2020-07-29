@@ -20,9 +20,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-/**
-  * File echo flow with Zip archive/un-archive and AES 256 CBC/GCM encryption/decryption:
-  * 
+/** File echo flow with Zip archive/un-archive and AES 256 CBC/GCM encryption/decryption:
+  *
   * 63MB.pdf (2) -> archive (Archive.zip()) ->
   * AES encryption -> testfile.encrypted -> AES decryption -> testfile_decrypted.zip ->
   * un-archive (ArchiveHelper.unzip) -> echo_(1/2)_63MB.pdf
@@ -34,14 +33,14 @@ import scala.util.{Failure, Success}
   *  - For cipher "ChaCha20-Poly1305/None/NoPadding" on Java 11 comment in the code bits below
   *
   * A word of caution of this concept PoC regarding AES 256 GCM encryption/decryption:
+  *
   * We are using the provided Sun JCE ciphers here. Since the decryption performance of
-  * AES 256 GCM on large files is really poor you should consider the cipher from
-  * bouncycastle.org, which is faster and behaves in a "linear fashion".
+  * AES 256 GCM on large files is really poor, you should consider the cipher from
+  * [[https://bouncycastle.org]] , which is faster and behaves in a "linear fashion".
   *
   * Inspired by:
-  * https://doc.akka.io/docs/alpakka/current/file.html#zip-archive
-  * https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e
-  *
+  *  - [[https://doc.akka.io/docs/alpakka/current/file.html#zip-archive]]
+  *  - [[https://gist.github.com/TimothyKlim/ec5889aa23400529fd5e]]
   */
 
 private[this] class AesStage(cipher: Cipher) extends GraphStage[FlowShape[ByteString, ByteString]] {

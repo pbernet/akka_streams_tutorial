@@ -9,13 +9,14 @@ import akka.stream.scaladsl.FileIO
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-/**
-  * FileIO echo flow with base64 encoding/decoding:
+/** FileIO echo flow with base64 encoding/decoding:
+  *
   * testfile.jpg -> base64 encoding -> testfile.enc -> base64 decoding -> testfile_result.jpg
   *
   * Remark:
+  *
   * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
-  * see: https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks
+  * @see [[https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks]]
   *
   */
 object FileIOEcho extends App {
