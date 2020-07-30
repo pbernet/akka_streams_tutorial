@@ -19,7 +19,7 @@ object CustomCache {
     Behaviors.receive[CacheRequests] { (context, message) =>
       message match {
         case Get(requestId, replyTo) =>
-          context.log.info("Empty cache request for requestId {}.", requestId)
+          context.log.info(s"Empty cache request for requestId $requestId")
           replyTo ! EmptyCache
           Behaviors.same
         case Devices(devices) =>
@@ -35,14 +35,14 @@ object CustomCache {
     Behaviors.receive { (context, message) =>
       message match {
         case Get(requestId, replyTo) =>
-          context.log.info("Cache request for requestId {}.", requestId)
+          context.log.info(s"Cache request for requestId $requestId")
           replyTo ! CachedDevices(devices)
           Behaviors.same
         case Devices(updatedDevices) =>
           context.log.info(s"Updating cache with: ${updatedDevices.size} devices")
           cached(updatedDevices)
         case AddDevices(updatedDevices) =>
-          context.log.info(s"Adding: ${updatedDevices.size} devices.")
+          context.log.info(s"Adding: ${updatedDevices.size} device(s)")
           cached(devices = devices ++ updatedDevices)
       }
     }
