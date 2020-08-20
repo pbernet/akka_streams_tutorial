@@ -4,7 +4,7 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ThrottleMode
 import akka.stream.alpakka.jms.scaladsl.JmsProducer
-import akka.stream.alpakka.jms.{JmsProducerSettings, JmsTextMessage}
+import akka.stream.alpakka.jms.{JmsCorrelationId, JmsProducerSettings, JmsTextMessage}
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import javax.jms.ConnectionFactory
@@ -39,8 +39,10 @@ object JMSTextMessageProducerClient {
       .wireTap(number => logger.info(s"SEND Msg with TRACE_ID: $number"))
       .map { number =>
         JmsTextMessage(s"Payload: ${number.toString}")
-          .withProperty("TRACE_ID", number)
+          .withProperty("TRACE_ID", number)                //custom TRACE_ID
+          .withHeader(JmsCorrelationId.create(number.toString))  //The JMS way
       }
+      //.wireTap(each => println(each.getHeaders))
       .runWith(jmsProducerSink)
   }
 }
