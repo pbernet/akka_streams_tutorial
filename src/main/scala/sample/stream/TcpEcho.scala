@@ -29,21 +29,21 @@ object TcpEcho extends App {
   var serverBinding: Future[Tcp.ServerBinding] = _
 
     if (args.isEmpty) {
-      val (address, port) = ("127.0.0.1", 6000)
-      serverBinding = server(systemServer, address, port)
-      (1 to 10).par.foreach(each => client(each, systemClient, address, port))
+      val (host, port) = ("127.0.0.1", 6000)
+      serverBinding = server(systemServer, host, port)
+      (1 to 10).par.foreach(each => client(each, systemClient, host, port))
     } else {
-      val (address, port) =
+      val (host, port) =
         if (args.length == 3) (args(1), args(2).toInt)
         else ("127.0.0.1", 6000)
       if (args(0) == "server") {
-        serverBinding = server(systemServer, address, port)
+        serverBinding = server(systemServer, host, port)
       } else if (args(0) == "client") {
-        client(1, systemClient, address, port)
+        client(1, systemClient, host, port)
       }
     }
 
-  def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
+  def server(system: ActorSystem, host: String, port: Int): Future[Tcp.ServerBinding] = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
@@ -72,15 +72,15 @@ object TcpEcho extends App {
       })
       connection.handleWith(serverEchoFlow)
     }
-    
-    val connections = Tcp().bind(interface = address, port = port)
+
+    val connections = Tcp().bind(interface = host, port = port)
     val binding = connections.watchTermination()(Keep.left).to(handler).run()
 
     binding.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to: $address:$port: ${e.getMessage}")
+        println(s"Server could not bind to: $host:$port: ${e.getMessage}")
         system.terminate()
     }
 

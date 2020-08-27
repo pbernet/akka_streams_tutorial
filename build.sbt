@@ -17,6 +17,7 @@ val testContainersVersion = "1.14.3"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+  "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -38,6 +39,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
