@@ -130,9 +130,8 @@ object LocalFileCacheCaffeine {
         }
 
         Future(processNext(message)).recoverWith {
-          case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] => {
+          case e: RuntimeException if ExceptionUtils.getRootCause(e).isInstanceOf[HttpResponseException] =>
             attemptToRecover(message, e)
-          }
           case e: Throwable => Future.failed(e)
         }
       }

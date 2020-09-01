@@ -36,10 +36,9 @@ object Hl7TcpClient  extends App with MllpProtocol {
           logger.info(s"Client: $clientname-$i received ACK: ${printable(each.utf8String)}")
         }
       ).recoverWith {
-        case _: RuntimeException => {
+        case _: RuntimeException =>
           logger.info(s"About to retry for: $clientname-$i...")
           sendAndReceive(i)
-        }
         case e: Throwable => Future.failed(e)
       }
       closed.onComplete(each => logger.debug(s"Client: $clientname-$i closed: $each"))

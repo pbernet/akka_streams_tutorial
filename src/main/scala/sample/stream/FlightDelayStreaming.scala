@@ -84,7 +84,7 @@ object FlightDelayStreaming extends App {
 
   def terminateWhen(done: Future[Done]) = {
     done.onComplete {
-      case Success(b) =>
+      case Success(_) =>
         println("Flow Success. About to terminate...")
         system.terminate()
       case Failure(e) =>

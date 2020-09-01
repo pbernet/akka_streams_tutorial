@@ -76,18 +76,15 @@ object WordCountProducer extends App {
   val doneFuture = produce(topic, randomMap)
 
   doneFuture.recover{
-    case e: NetworkException => {
+    case e: NetworkException =>
       println(s"NetworkException $e occurred - Retry...")
       produce(topic, randomMap)
-    }
-    case e: UnknownTopicOrPartitionException => {
+    case e: UnknownTopicOrPartitionException =>
       println(s"UnknownTopicOrPartitionException $e occurred - Retry...")
       produce(topic, randomMap)
-    }
-    case ex: RuntimeException => {
+    case ex: RuntimeException =>
       println(s"RuntimeException $ex occurred - Do not retry. Shutdown...")
       system.terminate()
-    }
   }
 }
 
