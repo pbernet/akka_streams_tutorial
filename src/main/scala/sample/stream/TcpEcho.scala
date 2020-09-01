@@ -3,6 +3,7 @@ package sample.stream
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
 import akka.util.ByteString
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -23,6 +24,7 @@ import scala.util.{Failure, Success}
   *
   */
 object TcpEcho extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val systemServer = ActorSystem("TcpEchoServer")
   val systemClient = ActorSystem("TcpEchoClient")
 
@@ -67,8 +69,8 @@ object TcpEcho extends App {
         .map(ByteString(_))
         .watchTermination()((_, done) => done.onComplete {
         case Failure(err) =>
-          println(s"Server flow failed: $err")
-        case _ => println(s"Server flow terminated for client: ${connection.remoteAddress}")
+          logger.info(s"Server flow failed: $err")
+        case _ => logger.info(s"Server flow terminated for client: ${connection.remoteAddress}")
       })
       connection.handleWith(serverEchoFlow)
     }
@@ -78,9 +80,9 @@ object TcpEcho extends App {
 
     binding.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to: $host:$port: ${e.getMessage}")
+        logger.info(s"Server could not bind to: $host:$port: ${e.getMessage}")
         system.terminate()
     }
 
@@ -94,7 +96,7 @@ object TcpEcho extends App {
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
     val source =  Source(testInput).via(connection)
-    val closed = source.runForeach(each => println(s"Client: $id received echo: ${each.utf8String}"))
-    closed.onComplete(each => println(s"Client: $id closed: $each"))
+    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
+    closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 }
