@@ -26,5 +26,10 @@ services:
       - "2222:22"
     command: echouser:password:::echo
 
+  mosquitto:
+    image: eclipse-mosquitto
+    ports:
+      - "1883:1883"
+
 networks:
   runtime-net:
