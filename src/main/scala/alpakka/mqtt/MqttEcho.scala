@@ -1,4 +1,4 @@
-package sample.stream
+package alpakka.mqtt
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.mqtt.streaming._

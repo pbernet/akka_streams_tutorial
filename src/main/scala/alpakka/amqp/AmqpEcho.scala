@@ -1,4 +1,4 @@
-package sample.stream
+package alpakka.amqp
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
