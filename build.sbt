@@ -40,6 +40,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
@@ -68,6 +69,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
+  "org.testcontainers" % "rabbitmq" % testContainersVersion,
+
   "junit" % "junit" % "4.13-beta-1"
 )
 
