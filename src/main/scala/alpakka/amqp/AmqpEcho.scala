@@ -35,7 +35,6 @@ object AmqpEcho extends App {
   (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
-
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
@@ -48,7 +47,7 @@ object AmqpEcho extends App {
           val noOfSentMsg = writeResult.seq.size
           logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
           receive(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
-        case Failure(exception) => logger.info(s"Exception: $exception")
+        case Failure(exception) => logger.info(s"Exception during send:", exception)
       }
   }
 
@@ -91,7 +90,7 @@ object AmqpEcho extends App {
       case Success(each) =>
         logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
         each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
-      case Failure(exception) => logger.info(s"Exception: $exception")
+      case Failure(exception) => logger.info(s"Exception during receive:", exception)
     }
   }
 }
