@@ -2,15 +2,16 @@ package alpakka.amqp
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.{KillSwitches, UniqueKillSwitch}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.containers.RabbitMQContainer
 
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
@@ -18,7 +19,7 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Add pub/sub example
+  * Finalize pubSubClient
   */
 object AmqpEcho extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -33,11 +34,13 @@ object AmqpEcho extends App {
   logger.info(s"Started rabbitmq on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
   (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
+  //(1 to 1).par.foreach(each => pubSubClient(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
+    
     val queueNameFull = s"$queueName-$id"
     val queueDeclaration = QueueDeclaration(queueNameFull)
 
@@ -50,6 +53,78 @@ object AmqpEcho extends App {
         case Failure(exception) => logger.info(s"Exception during send:", exception)
       }
   }
+
+  /**
+    * TODO document
+    *  - Publisher sends msgs to "exchange"
+    *  - Subscribers subscribe to exchange
+    *
+    * @param id
+    * @param rabbitMQContainer
+    */
+  def pubSubClient(id: Int, rabbitMQContainer: RabbitMQContainer) = {
+    val mappedPort = rabbitMQContainer.getAmqpPort
+    val amqpUri = s"amqp://$host:$mappedPort"
+    val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
+
+    val exchangeName = s"exchange-pub-sub-$id"
+    val exchangeDeclaration = ExchangeDeclaration(exchangeName, "fanout")
+
+    //Publisher
+
+    val amqpSink = AmqpSink.simple(
+      AmqpWriteSettings(connectionProvider)
+        .withExchange(exchangeName)
+        .withDeclaration(exchangeDeclaration)
+    )
+
+    val dataSender: UniqueKillSwitch = Source
+      .repeat("stuff")
+      .wireTap(each => logger.info(s"Sending: $each"))
+      .viaMat(KillSwitches.single)(Keep.right)
+      .map(s => ByteString(s))
+      .to(amqpSink)
+      .run()
+
+    dataSender.shutdown()
+
+
+    //Subscribers
+
+    val fanoutSize = 4
+
+    //Add the index of the source to all incoming messages, so we can distinguish which source the incoming message came from.
+    val mergedSources = (0 until fanoutSize).foldLeft(Source.empty[(Int, String)]) {
+      case (source, fanoutBranch) =>
+        source.merge(
+          AmqpSource
+            .atMostOnceSource(
+              TemporaryQueueSourceSettings(
+                connectionProvider,
+                exchangeName
+              ).withDeclaration(exchangeDeclaration),
+              bufferSize = 1
+            )
+            .map(msg => (fanoutBranch, msg.bytes.utf8String))
+        )
+    }
+
+    val completion = Promise[Done]
+    val mergingFlow: UniqueKillSwitch = mergedSources
+      .viaMat(KillSwitches.single)(Keep.right)
+      .to(Sink.fold(Set.empty[Int]) {
+        case (seen, (branch, element)) =>
+          if (seen.size == fanoutSize) completion.trySuccess(Done)
+          logger.info(s"Receiving: $element")
+          seen + branch
+      })
+      .run()
+
+    mergingFlow.shutdown()
+
+  }
+
+
 
   private def send(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
     val settings = AmqpWriteSettings(connectionProvider)
