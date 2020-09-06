@@ -18,7 +18,6 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Parse readResults for content _.bytes.utf8String
   * Send to different queues
   *
   * Add pub/sub example
@@ -69,7 +68,7 @@ object AmqpEcho extends App {
       Source(input)
         .map(message => WriteMessage(ByteString(message)))
         .via(amqpFlow)
-        .wireTap(each => logger.info(s"WriteResult: $each"))
+        //.wireTap(each => logger.info(s"WriteResult: $each"))
         .runWith(Sink.seq)
     writeResult
   }
@@ -85,12 +84,14 @@ object AmqpEcho extends App {
 
     val readResult: Future[Seq[ReadResult]] =
       amqpSource
-        .wireTap(each => logger.info(s"ReadResult: $each"))
+        //.wireTap(each => logger.info(s"ReadResult: $each"))
         .take(noOfSentMsg)
         .runWith(Sink.seq)
 
     readResult.onComplete {
-      case Success(each) => logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueName")
+      case Success(each) =>
+        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueName")
+        each.seq.foreach(msg => logger.info(s"Payload: ${msg.bytes.utf8String}"))
       case Failure(exception) => logger.info(s"Exception: $exception")
     }
   }
