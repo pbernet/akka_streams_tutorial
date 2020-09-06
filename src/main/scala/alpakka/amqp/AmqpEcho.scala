@@ -18,8 +18,6 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Send to different queues
-  *
   * Add pub/sub example
   */
 object AmqpEcho extends App {
@@ -34,28 +32,29 @@ object AmqpEcho extends App {
   rabbitMQContainer.start()
   logger.info(s"Started rabbitmq on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
-  (1 to 1).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
 
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
-    val queueDeclaration = QueueDeclaration(queueName)
+    val queueNameFull = s"$queueName-$id"
+    val queueDeclaration = QueueDeclaration(queueNameFull)
 
-    send(id, connectionProvider, queueDeclaration)
+    send(id, connectionProvider, queueDeclaration, queueNameFull)
       .onComplete {
         case Success(writeResult) =>
           val noOfSentMsg = writeResult.seq.size
-          logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueName. Starting receiver...")
-          receive(id, connectionProvider, queueDeclaration, noOfSentMsg)
+          logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
+          receive(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
         case Failure(exception) => logger.info(s"Exception: $exception")
       }
   }
 
-  private def send(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration) = {
+  private def send(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
     val settings = AmqpWriteSettings(connectionProvider)
-      .withRoutingKey(queueName)
+      .withRoutingKey(queueNameFull)
       .withDeclaration(queueDeclaration)
       .withBufferSize(10)
       .withConfirmationTimeout(200.millis)
@@ -68,15 +67,15 @@ object AmqpEcho extends App {
       Source(input)
         .map(message => WriteMessage(ByteString(message)))
         .via(amqpFlow)
-        //.wireTap(each => logger.info(s"WriteResult: $each"))
+        .wireTap(each => logger.debug(s"WriteResult: $each"))
         .runWith(Sink.seq)
     writeResult
   }
 
-  private def receive(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int) = {
+  private def receive(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
     val amqpSource: Source[ReadResult, NotUsed] =
       AmqpSource.atMostOnceSource(
-        NamedQueueSourceSettings(connectionProvider, queueName)
+        NamedQueueSourceSettings(connectionProvider, queueNameFull)
           .withDeclaration(queueDeclaration)
           .withAckRequired(false),
         bufferSize = 10
@@ -84,14 +83,14 @@ object AmqpEcho extends App {
 
     val readResult: Future[Seq[ReadResult]] =
       amqpSource
-        //.wireTap(each => logger.info(s"ReadResult: $each"))
+        .wireTap(each => logger.debug(s"ReadResult: $each"))
         .take(noOfSentMsg)
         .runWith(Sink.seq)
 
     readResult.onComplete {
       case Success(each) =>
-        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueName")
-        each.seq.foreach(msg => logger.info(s"Payload: ${msg.bytes.utf8String}"))
+        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
+        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
       case Failure(exception) => logger.info(s"Exception: $exception")
     }
   }
