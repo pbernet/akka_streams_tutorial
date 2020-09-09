@@ -52,11 +52,13 @@ object WebsocketChatEcho extends App with ClientCommon {
     //Optional sample processing flow, to demonstrate the nature of the composition
     val sampleProcessing  = Flow[String].map(i => i.toUpperCase)
 
-    val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) =
-      MergeHub.source[String]
+    val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) = {
+      //We can not set the buffer to 0, so we would loose messages in case of an outage
+      MergeHub.source[String](1)
         //.wireTap(elem => println(s"Server received after MergeHub: $elem"))
         .via(sampleProcessing)
         .toMat(BroadcastHub.sink[String])(Keep.both).run()
+    }
 
     val echoFlow: Flow[Message, Message, NotUsed] =
     Flow[Message].mapAsync(1) {
