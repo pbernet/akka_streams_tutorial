@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{KillSwitches, UniqueKillSwitch}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
 
 import scala.concurrent.duration.DurationInt
@@ -20,9 +20,10 @@ import scala.util.{Failure, Success}
   *
   * TODO
   * Finalize pubSubClient
+  * Add RestartSource
   */
 object AmqpEcho extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  val logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("AmqpEcho")
   implicit val executionContext = system.dispatcher
 
@@ -31,30 +32,36 @@ object AmqpEcho extends App {
 
   val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8")
   rabbitMQContainer.start()
-  logger.info(s"Started rabbitmq on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
+  logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
-  (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
-  //(1 to 1).par.foreach(each => pubSubClient(each, rabbitMQContainer))
+  //(1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
+  (1 to 1).par.foreach(each => pubSubClient(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
+    //TODO Simulate connection problem by falsifying port (eg with +1)
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
-    
+
     val queueNameFull = s"$queueName-$id"
     val queueDeclaration = QueueDeclaration(queueNameFull)
 
-    send(id, connectionProvider, queueDeclaration, queueNameFull)
+    sendToQueue(id, connectionProvider, queueDeclaration, queueNameFull)
       .onComplete {
         case Success(writeResult) =>
           val noOfSentMsg = writeResult.seq.size
           logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
-          receive(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
+          receiveFromQueue(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
         case Failure(exception) => logger.info(s"Exception during send:", exception)
       }
   }
 
   /**
+    *
+    * Send messages to an exchange and then provide instructions to the AMQP server what to do with
+    * incoming messages. We are going to use the fanout type of the exchange,
+    * which enables message broadcasting to multiple consumers.
+    * Exchange declaration for the sink and all of the sources.
     * TODO document
     *  - Publisher sends msgs to "exchange"
     *  - Subscribers subscribe to exchange
@@ -78,15 +85,15 @@ object AmqpEcho extends App {
         .withDeclaration(exchangeDeclaration)
     )
 
-    val dataSender: UniqueKillSwitch = Source
-      .repeat("stuff")
-      .wireTap(each => logger.info(s"Sending: $each"))
+
+    val dataSender = Source(1 to 10)
       .viaMat(KillSwitches.single)(Keep.right)
-      .map(s => ByteString(s))
+      .map(each => s"$id-$each")
+      .wireTap(each => logger.info(s"Sending: $each"))
+      .map(each => ByteString(each))
       .to(amqpSink)
       .run()
 
-    dataSender.shutdown()
 
 
     //Subscribers
@@ -109,9 +116,10 @@ object AmqpEcho extends App {
         )
     }
 
-    val completion = Promise[Done]
+    val completion: Promise[Done] = Promise[Done]
     val mergingFlow: UniqueKillSwitch = mergedSources
       .viaMat(KillSwitches.single)(Keep.right)
+      //TODO What does this do?
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
           if (seen.size == fanoutSize) completion.trySuccess(Done)
@@ -120,13 +128,15 @@ object AmqpEcho extends App {
       })
       .run()
 
-    mergingFlow.shutdown()
 
+    //TODO how to make dependent on finish receiver
+//      logger.info(s"Successfully sent/received messages via: $exchangeName")
+//      dataSender.shutdown()
+//      mergingFlow.shutdown()
   }
 
 
-
-  private def send(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
+  private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
     val settings = AmqpWriteSettings(connectionProvider)
       .withRoutingKey(queueNameFull)
       .withDeclaration(queueDeclaration)
@@ -136,17 +146,16 @@ object AmqpEcho extends App {
     val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
       AmqpFlow.withConfirm(settings)
 
-    val input = Vector(s"$id-1", s"$id-2", s"$id-3", s"$id-4", s"$id-5")
     val writeResult: Future[Seq[WriteResult]] =
-      Source(input)
-        .map(message => WriteMessage(ByteString(message)))
+      Source(1 to 10)
+        .map(each => WriteMessage(ByteString(s"$id-$each")))
         .via(amqpFlow)
         .wireTap(each => logger.debug(s"WriteResult: $each"))
         .runWith(Sink.seq)
     writeResult
   }
 
-  private def receive(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
+  private def receiveFromQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
     val amqpSource: Source[ReadResult, NotUsed] =
       AmqpSource.atMostOnceSource(
         NamedQueueSourceSettings(connectionProvider, queueNameFull)
