@@ -19,7 +19,7 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Add RestartSource and shutdown of pubSubClient
+  * Add RestartSource and shutdown
   * Simulate connection problem by falsifying port (eg with +1)
   */
 object AmqpEcho extends App {
@@ -73,11 +73,6 @@ object AmqpEcho extends App {
 
     receiveFromExchange(id,connectionProvider, exchangeName, exchangeDeclaration)
     sendToExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
-
-    //TODO how to gracefully shutdown
-//      logger.info(s"Successfully sent/received messages via: $exchangeName")
-//      dataSender.shutdown()
-//      mergingFlow.shutdown()
   }
 
   private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
@@ -176,7 +171,7 @@ object AmqpEcho extends App {
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
           if (seen.size == fanoutSize) completion.trySuccess(Done)
-          logger.debug(s"Client: $id-$branch received payload: $element")
+          logger.info(s"Client: $id-$branch received payload: $element")
           seen + branch
       })
       .run()
