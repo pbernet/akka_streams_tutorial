@@ -81,7 +81,7 @@ object AmqpEcho extends App {
   }
 
   private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
-    logger.info(s"Starting sendToQueue $queueNameFull...")
+    logger.info(s"Starting sendToQueue: $queueNameFull...")
 
     val settings = AmqpWriteSettings(connectionProvider)
       .withRoutingKey(queueNameFull)
@@ -102,7 +102,7 @@ object AmqpEcho extends App {
   }
 
   private def receiveFromQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
-    logger.info(s"Starting receiveFromQueue $queueNameFull...")
+    logger.info(s"Starting receiveFromQueue: $queueNameFull...")
 
     val amqpSource: Source[ReadResult, NotUsed] =
       AmqpSource.atMostOnceSource(
@@ -149,8 +149,6 @@ object AmqpEcho extends App {
   }
 
   private def receiveFromExchange(id: Int, connectionProvider: AmqpCachedConnectionProvider, exchangeName: String, exchangeDeclaration: ExchangeDeclaration) = {
-    //If we sleep, we will loose messages
-    //Thread.sleep(5000)
     logger.info(s"Starting receiveFromExchange: $exchangeName...")
 
     val fanoutSize = 4
@@ -167,6 +165,7 @@ object AmqpEcho extends App {
               ).withDeclaration(exchangeDeclaration),
               bufferSize = 1
             )
+            .wireTap(msg => logger.debug(s"Route to branch: $fanoutBranch payload: ${msg.bytes.utf8String}"))
             .map(msg => (fanoutBranch, msg.bytes.utf8String))
         )
     }
@@ -174,11 +173,10 @@ object AmqpEcho extends App {
     val completion: Promise[Done] = Promise[Done]
     val mergingFlow: UniqueKillSwitch = mergedSources
       .viaMat(KillSwitches.single)(Keep.right)
-      //TODO What does this do?
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
           if (seen.size == fanoutSize) completion.trySuccess(Done)
-          logger.info(s"Client: $id received: $element")
+          logger.debug(s"Client: $id-$branch received payload: $element")
           seen + branch
       })
       .run()
