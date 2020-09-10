@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
 import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.stream.{KillSwitches, UniqueKillSwitch}
+import akka.stream.{KillSwitches, ThrottleMode, UniqueKillSwitch}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.slf4j.LoggerFactory
@@ -19,8 +19,8 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Finalize pubSubClient
-  * Add RestartSource
+  * Add RestartSource and shutdown of pubSubClient
+  * Simulate connection problem by falsifying port (eg with +1)
   */
 object AmqpEcho extends App {
   val logger = LoggerFactory.getLogger(this.getClass)
@@ -34,11 +34,10 @@ object AmqpEcho extends App {
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
-  //(1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
-  (1 to 1).par.foreach(each => pubSubClient(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
-    //TODO Simulate connection problem by falsifying port (eg with +1)
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
@@ -57,14 +56,9 @@ object AmqpEcho extends App {
   }
 
   /**
-    *
-    * Send messages to an exchange and then provide instructions to the AMQP server what to do with
-    * incoming messages. We are going to use the fanout type of the exchange,
-    * which enables message broadcasting to multiple consumers.
-    * Exchange declaration for the sink and all of the sources.
-    * TODO document
-    *  - Publisher sends msgs to "exchange"
-    *  - Subscribers subscribe to exchange
+    * Send messages to an "exchange" and then provide instructions to the AMQP server
+    * what to do with these incoming messages. The "fanout" type of the exchange
+    * enables message broadcasting to multiple consumers.
     *
     * @param id
     * @param rabbitMQContainer
@@ -77,7 +71,65 @@ object AmqpEcho extends App {
     val exchangeName = s"exchange-pub-sub-$id"
     val exchangeDeclaration = ExchangeDeclaration(exchangeName, "fanout")
 
-    //Publisher
+    receiveFromExchange(id,connectionProvider, exchangeName, exchangeDeclaration)
+    sendToExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
+
+    //TODO how to gracefully shutdown
+//      logger.info(s"Successfully sent/received messages via: $exchangeName")
+//      dataSender.shutdown()
+//      mergingFlow.shutdown()
+  }
+
+  private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
+    logger.info(s"Starting sendToQueue $queueNameFull...")
+
+    val settings = AmqpWriteSettings(connectionProvider)
+      .withRoutingKey(queueNameFull)
+      .withDeclaration(queueDeclaration)
+      .withBufferSize(10)
+      .withConfirmationTimeout(200.millis)
+
+    val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
+      AmqpFlow.withConfirm(settings)
+
+    val writeResult: Future[Seq[WriteResult]] =
+      Source(1 to 10)
+        .map(each => WriteMessage(ByteString(s"$id-$each")))
+        .via(amqpFlow)
+        .wireTap(each => logger.debug(s"WriteResult: $each"))
+        .runWith(Sink.seq)
+    writeResult
+  }
+
+  private def receiveFromQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
+    logger.info(s"Starting receiveFromQueue $queueNameFull...")
+
+    val amqpSource: Source[ReadResult, NotUsed] =
+      AmqpSource.atMostOnceSource(
+        NamedQueueSourceSettings(connectionProvider, queueNameFull)
+          .withDeclaration(queueDeclaration)
+          .withAckRequired(false),
+        bufferSize = 10
+      )
+
+    val readResult: Future[Seq[ReadResult]] =
+      amqpSource
+        .wireTap(each => logger.debug(s"ReadResult: $each"))
+        .take(noOfSentMsg)
+        .runWith(Sink.seq)
+
+    readResult.onComplete {
+      case Success(each) =>
+        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
+        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
+      case Failure(exception) => logger.info(s"Exception during receive:", exception)
+    }
+  }
+
+  private def sendToExchange(id: Int, connectionProvider: AmqpCachedConnectionProvider, exchangeName: String, exchangeDeclaration: ExchangeDeclaration) = {
+    //Wait until the receiver has registered
+    Thread.sleep(1000)
+    logger.info(s"Starting sendToExchange: $exchangeName...")
 
     val amqpSink = AmqpSink.simple(
       AmqpWriteSettings(connectionProvider)
@@ -88,15 +140,18 @@ object AmqpEcho extends App {
 
     val dataSender = Source(1 to 10)
       .viaMat(KillSwitches.single)(Keep.right)
+      .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
       .map(each => s"$id-$each")
-      .wireTap(each => logger.info(s"Sending: $each"))
+      .wireTap(each => logger.info(s"Client: $id sending: $each"))
       .map(each => ByteString(each))
       .to(amqpSink)
       .run()
+  }
 
-
-
-    //Subscribers
+  private def receiveFromExchange(id: Int, connectionProvider: AmqpCachedConnectionProvider, exchangeName: String, exchangeDeclaration: ExchangeDeclaration) = {
+    //If we sleep, we will loose messages
+    //Thread.sleep(5000)
+    logger.info(s"Starting receiveFromExchange: $exchangeName...")
 
     val fanoutSize = 4
 
@@ -123,58 +178,9 @@ object AmqpEcho extends App {
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
           if (seen.size == fanoutSize) completion.trySuccess(Done)
-          logger.info(s"Receiving: $element")
+          logger.info(s"Client: $id received: $element")
           seen + branch
       })
       .run()
-
-
-    //TODO how to make dependent on finish receiver
-//      logger.info(s"Successfully sent/received messages via: $exchangeName")
-//      dataSender.shutdown()
-//      mergingFlow.shutdown()
-  }
-
-
-  private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
-    val settings = AmqpWriteSettings(connectionProvider)
-      .withRoutingKey(queueNameFull)
-      .withDeclaration(queueDeclaration)
-      .withBufferSize(10)
-      .withConfirmationTimeout(200.millis)
-
-    val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
-      AmqpFlow.withConfirm(settings)
-
-    val writeResult: Future[Seq[WriteResult]] =
-      Source(1 to 10)
-        .map(each => WriteMessage(ByteString(s"$id-$each")))
-        .via(amqpFlow)
-        .wireTap(each => logger.debug(s"WriteResult: $each"))
-        .runWith(Sink.seq)
-    writeResult
-  }
-
-  private def receiveFromQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
-    val amqpSource: Source[ReadResult, NotUsed] =
-      AmqpSource.atMostOnceSource(
-        NamedQueueSourceSettings(connectionProvider, queueNameFull)
-          .withDeclaration(queueDeclaration)
-          .withAckRequired(false),
-        bufferSize = 10
-      )
-
-    val readResult: Future[Seq[ReadResult]] =
-      amqpSource
-        .wireTap(each => logger.debug(s"ReadResult: $each"))
-        .take(noOfSentMsg)
-        .runWith(Sink.seq)
-
-    readResult.onComplete {
-      case Success(each) =>
-        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
-        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
-      case Failure(exception) => logger.info(s"Exception during receive:", exception)
-    }
   }
 }
