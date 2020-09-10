@@ -2,7 +2,7 @@ package alpakka.amqp
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource}
+import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource, CommittableReadResult}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{KillSwitches, ThrottleMode, UniqueKillSwitch}
 import akka.util.ByteString
@@ -10,6 +10,7 @@ import akka.{Done, NotUsed}
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
 
+import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
@@ -34,8 +35,9 @@ object AmqpEcho extends App {
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
-  (1 to 2).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
-  (1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
+  //TODO receiveFromQueueAck does not work yet with //
+  (1 to 1).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
+  //(1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
 
   def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
     val mappedPort = rabbitMQContainer.getAmqpPort
@@ -50,7 +52,8 @@ object AmqpEcho extends App {
         case Success(writeResult) =>
           val noOfSentMsg = writeResult.seq.size
           logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
-          receiveFromQueue(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
+          //receiveFromQueue(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
+          receiveFromQueueAck(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
         case Failure(exception) => logger.info(s"Exception during send:", exception)
       }
   }
@@ -114,6 +117,42 @@ object AmqpEcho extends App {
         .runWith(Sink.seq)
 
     readResult.onComplete {
+      case Success(each) =>
+        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
+        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
+      case Failure(exception) => logger.info(s"Exception during receive:", exception)
+    }
+  }
+
+  private def receiveFromQueueAck(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
+    logger.info(s"Starting receiveFromQueueAck: $queueNameFull...")
+
+    val businessLogic: CommittableReadResult => Future[CommittableReadResult] = Future.successful(_)
+
+    val amqpSource = AmqpSource.committableSource(
+      NamedQueueSourceSettings(connectionProvider, queueNameFull)
+        .withDeclaration(queueDeclaration)
+      .withAckRequired(true),
+      bufferSize = 10
+    )
+
+    val readResultAck: Future[immutable.Seq[ReadResult]] = amqpSource
+      .mapAsync(1)(businessLogic)
+      .mapAsync(1)(cm => {
+        val payloadParsed = cm.message.bytes.utf8String.split("-").last.toInt
+        if (payloadParsed % 2 == 0) {
+          logger.info(s"Payload ack: $payloadParsed")
+          cm.ack().map(_ => cm.message)
+        } else {
+          //TODO What is the semantics of nack?
+          logger.info(s"Payload nack: $payloadParsed")
+          cm.nack(multiple = false, requeue = true).map(_ => cm.message)
+        }
+      })
+      .take(noOfSentMsg)
+      .runWith(Sink.seq)
+
+    readResultAck.onComplete {
       case Success(each) =>
         logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
         each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
