@@ -1,27 +1,26 @@
 package alpakka.amqp
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
 import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource, CommittableReadResult}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{KillSwitches, ThrottleMode, UniqueKillSwitch}
 import akka.util.ByteString
-import akka.{Done, NotUsed}
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
 
-import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 /**
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
   * TODO
-  * Add RestartSource and shutdown
-  * Simulate connection problem by falsifying port (eg with +1)
+  * Add RestartSource
+  * Simulate connection problem by falsifying port
   */
 object AmqpEcho extends App {
   val logger = LoggerFactory.getLogger(this.getClass)
@@ -35,11 +34,10 @@ object AmqpEcho extends App {
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
-  //TODO receiveFromQueueAck does not work yet with //
-  (1 to 1).par.foreach(each => roundTripSendReceive(each, rabbitMQContainer))
-  //(1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => sendReceiveClient(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
 
-  def roundTripSendReceive(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
+  def sendReceiveClient(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
@@ -51,8 +49,7 @@ object AmqpEcho extends App {
       .onComplete {
         case Success(writeResult) =>
           val noOfSentMsg = writeResult.seq.size
-          logger.info(s"Client: $id successfully sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
-          //receiveFromQueue(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
+          logger.info(s"Client: $id sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
           receiveFromQueueAck(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
         case Failure(exception) => logger.info(s"Exception during send:", exception)
       }
@@ -74,7 +71,7 @@ object AmqpEcho extends App {
     val exchangeName = s"exchange-pub-sub-$id"
     val exchangeDeclaration = ExchangeDeclaration(exchangeName, "fanout")
 
-    receiveFromExchange(id,connectionProvider, exchangeName, exchangeDeclaration)
+    receiveFromExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
     sendToExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
   }
 
@@ -99,64 +96,38 @@ object AmqpEcho extends App {
     writeResult
   }
 
-  private def receiveFromQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
-    logger.info(s"Starting receiveFromQueue: $queueNameFull...")
-
-    val amqpSource: Source[ReadResult, NotUsed] =
-      AmqpSource.atMostOnceSource(
-        NamedQueueSourceSettings(connectionProvider, queueNameFull)
-          .withDeclaration(queueDeclaration)
-          .withAckRequired(false),
-        bufferSize = 10
-      )
-
-    val readResult: Future[Seq[ReadResult]] =
-      amqpSource
-        .wireTap(each => logger.debug(s"ReadResult: $each"))
-        .take(noOfSentMsg)
-        .runWith(Sink.seq)
-
-    readResult.onComplete {
-      case Success(each) =>
-        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
-        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
-      case Failure(exception) => logger.info(s"Exception during receive:", exception)
-    }
-  }
-
   private def receiveFromQueueAck(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, noOfSentMsg: Int, queueNameFull: String) = {
     logger.info(s"Starting receiveFromQueueAck: $queueNameFull...")
-
-    val businessLogic: CommittableReadResult => Future[CommittableReadResult] = Future.successful(_)
 
     val amqpSource = AmqpSource.committableSource(
       NamedQueueSourceSettings(connectionProvider, queueNameFull)
         .withDeclaration(queueDeclaration)
-      .withAckRequired(true),
+        .withAckRequired(true),
       bufferSize = 10
     )
 
-    val readResultAck: Future[immutable.Seq[ReadResult]] = amqpSource
-      .mapAsync(1)(businessLogic)
-      .mapAsync(1)(cm => {
-        val payloadParsed = cm.message.bytes.utf8String.split("-").last.toInt
-        if (payloadParsed % 2 == 0) {
-          logger.info(s"Payload ack: $payloadParsed")
-          cm.ack().map(_ => cm.message)
-        } else {
-          //TODO What is the semantics of nack?
-          logger.info(s"Payload nack: $payloadParsed")
-          cm.nack(multiple = false, requeue = true).map(_ => cm.message)
-        }
-      })
-      .take(noOfSentMsg)
-      .runWith(Sink.seq)
+    val done = amqpSource
+      .mapAsync(1)(cm => simulateRandomIssueWhileProcessing(cm))
+      .collect { case Some(readResult) => readResult }
+      .wireTap(each => logger.info(s"Client: $id received and acked msg: ${each.bytes.utf8String} from queue: $queueNameFull"))
+      .runWith(Sink.ignore)
 
-    readResultAck.onComplete {
-      case Success(each) =>
-        logger.info(s"Client: $id successfully received: ${each.seq.size} messages from queue: $queueNameFull")
-        each.seq.foreach(msg => logger.debug(s"Payload: ${msg.bytes.utf8String}"))
+    done.onComplete {
+      case Success(_) => logger.info("Receive loop is done")
       case Failure(exception) => logger.info(s"Exception during receive:", exception)
+    }
+  }
+
+  private def simulateRandomIssueWhileProcessing(cm: CommittableReadResult) = {
+    val payloadParsed = cm.message.bytes.utf8String.split("-").last.toInt
+
+    if (payloadParsed % 2 == Random.nextInt(2)) {
+      logger.debug(s"Reply with ack: $payloadParsed")
+      cm.ack().map(_ => Some(cm.message))
+    } else {
+      //Reject the message and ask server to requeue (= place to its original position, if possible)
+      logger.debug(s"Reply with nack: $payloadParsed")
+      cm.nack(multiple = false, requeue = true).map(_ => None)
     }
   }
 
@@ -171,12 +142,11 @@ object AmqpEcho extends App {
         .withDeclaration(exchangeDeclaration)
     )
 
-
-    val dataSender = Source(1 to 10)
+    Source(1 to 10)
       .viaMat(KillSwitches.single)(Keep.right)
       .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
       .map(each => s"$id-$each")
-      .wireTap(each => logger.info(s"Client: $id sending: $each"))
+      .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
       .map(each => ByteString(each))
       .to(amqpSink)
       .run()
@@ -187,7 +157,7 @@ object AmqpEcho extends App {
 
     val fanoutSize = 4
 
-    //Add the index of the source to all incoming messages, so we can distinguish which source the incoming message came from.
+    //Add the index of the source to all incoming messages, to distinguish which source the incoming message came from
     val mergedSources = (0 until fanoutSize).foldLeft(Source.empty[(Int, String)]) {
       case (source, fanoutBranch) =>
         source.merge(
@@ -210,7 +180,7 @@ object AmqpEcho extends App {
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
           if (seen.size == fanoutSize) completion.trySuccess(Done)
-          logger.info(s"Client: $id-$branch received payload: $element")
+          logger.info(s"Client: $id-$branch received msg: $element from exchange: $exchangeName")
           seen + branch
       })
       .run()
