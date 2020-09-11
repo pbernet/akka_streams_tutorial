@@ -1,11 +1,13 @@
 package sample.stream
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Source, Tcp}
+import akka.stream.scaladsl.{Flow, Framing, Keep, RestartSource, Sink, Source, Tcp}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 /**
@@ -95,8 +97,13 @@ object TcpEcho extends App {
 
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
-    val source =  Source(testInput).via(connection)
-    val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
+
+    val restartSource: Source[ByteString, NotUsed] = RestartSource.onFailuresWithBackoff(
+      minBackoff = 1.seconds,
+      maxBackoff = 60.seconds,
+      randomFactor = 0.2
+    ) { () => Source(testInput).via(connection)}
+    val closed: Future[Done] = restartSource.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 }
