@@ -10,6 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 /**
   * Inspired by:
@@ -85,28 +86,34 @@ object MqttEcho extends App {
 
     val connection = Tcp().outgoingConnection(host, port)
 
-    //TODO When there is no tcp connection: Why does the connection not throw an exception?
-    //https://discuss.lightbend.com/t/alpakka-mqtt-streaming-client-does-not-complain-when-there-is-no-tcp-connection/7113
-    val mqttFlow =
+   val mqttFlow =
       Mqtt
         .clientSessionFlow(clientSession, ByteString(connectionId))
         .join(connection)
 
-    val commands = {
+    val (commands, done) = {
       Source
         .queue(10, OverflowStrategy.backpressure,10)
         .via(mqttFlow)
         //Only the Publish events are interesting
         .collect { case Right(Event(p: Publish, _)) => p }
         .wireTap(event => logger.info(s"Client: $connectionId received payload: ${event.payload.utf8String}"))
-        .toMat(Sink.ignore)(Keep.left)
+        .toMat(Sink.ignore)(Keep.both)
         .run()
     }
+
+    //TODO https://discuss.lightbend.com/t/alpakka-mqtt-streaming-client-does-not-complain-when-there-is-no-tcp-connection/7113
+
+    done.onComplete{
+      case Success(value) => logger.info(s"Flow stopped with: $value. Probably lost tcp connection")
+      case Failure(exception) => logger.error("Error no tcp connection on startup:", exception)
+    }
+
+    //Due to the async nature of the flow above, we don't know if we are really connected
     logger.info(s"Client: $connectionId bound to: $host:$port")
 
     MqttClient(session = clientSession, commands = commands)
   }
-
 }
 
 case class MqttClient(session: ActorMqttClientSession, commands: SourceQueueWithComplete[Command[Nothing]])
