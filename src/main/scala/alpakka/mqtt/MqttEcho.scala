@@ -105,15 +105,13 @@ object MqttEcho extends App {
     }
 
     //TODO https://discuss.lightbend.com/t/alpakka-mqtt-streaming-client-does-not-complain-when-there-is-no-tcp-connection/7113
-
     done.onComplete{
       case Success(value) => logger.info(s"Flow stopped with: $value. Probably lost tcp connection")
       case Failure(exception) => logger.error("Error no tcp connection on startup:", exception)
     }
 
-    //Due to the async nature of the flow above, we don't know if we are really connected
+    //WIP: Due to the async nature of the flow above, we don't know if we are really connected
     logger.info(s"Client: $connectionId bound to: $host:$port")
-
     MqttClient(session = clientSession, commands = commands)
   }
 }
