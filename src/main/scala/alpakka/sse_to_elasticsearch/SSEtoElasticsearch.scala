@@ -31,8 +31,8 @@ import scala.util.control.NonFatal
   * and write them to Elasticsearch version 7.x
   * [[SSEtoElasticsearch.Change]] acts as a data bridge between the two worlds
   *
-  * Note that alpakka 2.0.1 has this dependency. Output from cmd dependencyTree:
-  * [info]   +-com.lightbend.akka:akka-stream-alpakka-elasticsearch_2.12:2.0.1 [S]
+  * Note that alpakka 2.0.2 has this dependency. Output from cmd dependencyTree:
+  * [info]   +-com.lightbend.akka:akka-stream-alpakka-elasticsearch_2.12:2.0.2 [S]
   * ..
   * [info]   | +-org.elasticsearch.client:elasticsearch-rest-client:6.3.1
   *
