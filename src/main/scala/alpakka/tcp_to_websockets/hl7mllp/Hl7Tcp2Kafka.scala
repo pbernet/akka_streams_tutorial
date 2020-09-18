@@ -103,7 +103,7 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
             logger.info("About to parse message: " + printableShort(each))
             val parser = getPipeParser(true)
             val message = parser.parse(each)
-            logger.debug("Successfully parsed")
+            logger.debug(s"Successfully parsed message in version: ${message.getVersion}")
             val ack = parser.encode(message.generateACK())
             encodeMllp(ack)
           } catch {
