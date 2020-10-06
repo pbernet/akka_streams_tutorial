@@ -60,7 +60,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.8.2",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
-  "org.apache.httpcomponents" % "httpclient" % "4.5.9",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
