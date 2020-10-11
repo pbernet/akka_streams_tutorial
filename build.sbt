@@ -74,7 +74,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
 
-  "junit" % "junit" % "4.13-beta-1"
+  "junit" % "junit" % "4.13.1"
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
