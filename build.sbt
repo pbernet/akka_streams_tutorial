@@ -88,7 +88,7 @@ val workaround = {
 
 scalacOptions += "-deprecation"
 
-//Workaround to make cmd dependencyTree work with sbt 1.3.x
-//useCoursier := false
+//Usage: sbt dependencyTree
+addDependencyTreePlugin
 
 fork in run := true
