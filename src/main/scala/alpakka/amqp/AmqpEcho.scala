@@ -3,9 +3,9 @@ package alpakka.amqp
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource, CommittableReadResult}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.stream.{KillSwitches, ThrottleMode, UniqueKillSwitch}
+import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource, CommittableReadResult}
+import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
+import akka.stream.{KillSwitches, ThrottleMode}
 import akka.util.ByteString
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
@@ -18,9 +18,6 @@ import scala.util.{Failure, Random, Success}
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/amqp.html
   *
-  * TODO
-  * Add RestartSource
-  * Simulate connection problem by falsifying port
   */
 object AmqpEcho extends App {
   val logger = LoggerFactory.getLogger(this.getClass)
@@ -30,7 +27,7 @@ object AmqpEcho extends App {
   val (host, port) = ("127.0.0.1", 5672)
   val queueName = "myQueue"
 
-  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8")
+  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8.9")
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
@@ -66,7 +63,19 @@ object AmqpEcho extends App {
   def pubSubClient(id: Int, rabbitMQContainer: RabbitMQContainer) = {
     val mappedPort = rabbitMQContainer.getAmqpPort
     val amqpUri = s"amqp://$host:$mappedPort"
+
     val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
+
+//    val connectionProvider =
+//      AmqpCachedConnectionProvider(
+//        AmqpDetailsConnectionProvider(
+//          host, rabbitMQContainer.getAmqpPort
+//        )
+//          .withAutomaticRecoveryEnabled(false)
+//          .withTopologyRecoveryEnabled(false)
+//          .withNetworkRecoveryInterval(10)
+//          .withRequestedHeartbeat(10)
+//      )
 
     val exchangeName = s"exchange-pub-sub-$id"
     val exchangeDeclaration = ExchangeDeclaration(exchangeName, "fanout")
@@ -87,10 +96,12 @@ object AmqpEcho extends App {
     val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
       AmqpFlow.withConfirm(settings)
 
+    val restartFlow = RestartFlow.onFailuresWithBackoff(1.second, 10.seconds, 0.2, 10)(() => amqpFlow)
+
     val writeResult: Future[Seq[WriteResult]] =
       Source(1 to 10)
         .map(each => WriteMessage(ByteString(s"$id-$each")))
-        .via(amqpFlow)
+        .via(restartFlow)
         .wireTap(each => logger.debug(s"WriteResult: $each"))
         .runWith(Sink.seq)
     writeResult
@@ -136,20 +147,29 @@ object AmqpEcho extends App {
     Thread.sleep(1000)
     logger.info(s"Starting sendToExchange: $exchangeName...")
 
-    val amqpSink = AmqpSink.simple(
-      AmqpWriteSettings(connectionProvider)
-        .withExchange(exchangeName)
-        .withDeclaration(exchangeDeclaration)
-    )
+    val settings = AmqpWriteSettings(connectionProvider)
+      .withExchange(exchangeName)
+      .withDeclaration(exchangeDeclaration)
+      .withBufferSize(10)
+      .withConfirmationTimeout(200.millis)
 
-    Source(1 to 10)
-      .viaMat(KillSwitches.single)(Keep.right)
-      .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
-      .map(each => s"$id-$each")
-      .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
-      .map(each => ByteString(each))
-      .to(amqpSink)
-      .run()
+    val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
+      AmqpFlow.withConfirm(settings)
+
+    val restartFlow = RestartFlow.onFailuresWithBackoff(1.second, 10.seconds, 0.2, 10)(() => amqpFlow)
+
+    val done: Future[Done] =  Source(1 to 100)
+        .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
+        .map(each => s"$id-$each")
+        .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
+        .map(message => WriteMessage(ByteString(message)))
+        .via(restartFlow)
+        .runWith(Sink.ignore)
+
+    done.onComplete {
+      case Success(_) => logger.info("Done sending")
+      case Failure(exception) => logger.info(s"Exception during sending:", exception)
+    }
   }
 
   private def receiveFromExchange(id: Int, connectionProvider: AmqpCachedConnectionProvider, exchangeName: String, exchangeDeclaration: ExchangeDeclaration) = {
@@ -175,7 +195,7 @@ object AmqpEcho extends App {
     }
 
     val completion: Promise[Done] = Promise[Done]
-    val mergingFlow: UniqueKillSwitch = mergedSources
+    mergedSources
       .viaMat(KillSwitches.single)(Keep.right)
       .to(Sink.fold(Set.empty[Int]) {
         case (seen, (branch, element)) =>
