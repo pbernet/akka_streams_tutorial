@@ -3,9 +3,9 @@ package alpakka.amqp
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSink, AmqpSource, CommittableReadResult}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.stream.{KillSwitches, ThrottleMode, UniqueKillSwitch}
+import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource, CommittableReadResult}
+import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
+import akka.stream.{KillSwitches, ThrottleMode}
 import akka.util.ByteString
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
@@ -27,7 +27,7 @@ object AmqpEcho extends App {
   val (host, port) = ("127.0.0.1", 5672)
   val queueName = "myQueue"
 
-  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8")
+  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8.9")
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
