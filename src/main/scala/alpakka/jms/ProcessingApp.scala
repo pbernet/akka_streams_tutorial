@@ -20,9 +20,8 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * ProcessingApp is an Alpakka JMS client which consumes messages from a local
-  * [[alpakka.env.JMSServer]]
-  * JMSServer must be re-started manually to see the restart behaviour
+  * ProcessingApp is an Alpakka JMS client which consumes messages from an
+  * embedded ActiveMQ queue [[alpakka.env.JMSServer]]. The server may be restarted manually
   * Generate messages with [[JMSTextMessageProducerClient]]
   *
   * Up to Alpakka 1.0-M1 there was an issue discussed here:
@@ -31,11 +30,9 @@ import scala.util.{Failure, Success}
   * This was fixed with 1.0-M2
   *
   * This example has been "upcycled" to demonstrate a realistic consumer scenario,
-  * where faulty messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
+  * where non deliverable messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
   *
-  * Alternatively to the ActiveMQ JMSServer you may route the JMS Messages via an Artemis JMS Broker:
-  * Start the Broker from: /docker/docker-compose.yml
-  *
+  * Alternative Artemis JMS Broker: /docker/docker-compose.yml
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -52,10 +49,7 @@ object ProcessingApp {
   def main(args: Array[String]) {
 
     val control: JmsConsumerControl = jmsConsumerSource
-      .mapAsyncUnordered(10) {
-        ackEnvelope: AckEnvelope =>
-          simulateFaultyDeliveryToExternalSystem(ackEnvelope)
-      }
+      .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
       .map {
         ackEnvelope =>
           ackEnvelope.acknowledge()
@@ -70,7 +64,6 @@ object ProcessingApp {
   }
 
   //The "failover:" part in the brokerURL instructs the ActiveMQ client lib to reconnect on network failure
-  //This re-connect on the client lib works complementary with the new 1.0-M2 implementation for re-connect
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
@@ -88,7 +81,13 @@ object ProcessingApp {
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
+  val errorQueue = Source
+    .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
+    .toMat(errorQueueSink) (Keep.left)
+    .run()
 
+
+  //We may do a (blocking) retry in this method to handle recoverable conditions of the external system
   private def simulateFaultyDeliveryToExternalSystem(ackEnvelope: AckEnvelope) = {
     try {
       val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
@@ -113,16 +112,20 @@ object ProcessingApp {
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {
 
-    //TODO replace with SourceQueue (more resource efficient)
-    val done: Future[Done] = Source.single(ackEnvelope.message)
-      .wireTap(message => logger.info(s"Send Msg with TRACE_ID: ${message.getIntProperty("TRACE_ID")} to error queue"))
-      .map((message: Message) => {
-      JmsTextMessage(message.asInstanceOf[TextMessage].getText)
-        .withProperty("errorType", e.getClass.getName)
-        .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
-    })
-      .runWith(errorQueueSink)
-    logWhen(done)
+    val origMessage =  ackEnvelope.message.asInstanceOf[TextMessage]
+    val traceID = origMessage.getIntProperty("TRACE_ID")
+
+    val errorMessage = JmsTextMessage(origMessage.getText)
+      .withProperty("TRACE_ID", traceID)
+      .withProperty("errorType", e.getClass.getName)
+      .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
+
+    errorQueue.offer(errorMessage).map {
+        case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
+        case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
+        case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
+        case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
+      }
   }
 
  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
