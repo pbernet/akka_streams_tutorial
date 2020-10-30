@@ -4,7 +4,7 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ThrottleMode
 import akka.stream.alpakka.jms.scaladsl.JmsProducer
-import akka.stream.alpakka.jms.{JmsCorrelationId, JmsProducerSettings, JmsTextMessage}
+import akka.stream.alpakka.jms._
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import javax.jms.ConnectionFactory
@@ -19,10 +19,23 @@ object JMSTextMessageProducerClient {
   implicit val system = ActorSystem("JMSTextMessageProducerClient")
   implicit val ec = system.dispatcher
 
-  //The "failover:" part in the brokerURL instructs ActiveMQ to reconnect on network failure
-  //This does not interfere with the new 1.0-M2 implementation
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
+  val connectionRetrySettings = ConnectionRetrySettings(system)
+    .withConnectTimeout(10.seconds)
+    .withInitialRetry(100.millis)
+    .withBackoffFactor(2.0d)
+    .withMaxBackoff(1.minute)
+    .withMaxRetries(10)
+
+  val sendRetrySettings = SendRetrySettings(system)
+    .withInitialRetry(20.millis)
+    .withBackoffFactor(1.5d)
+    .withMaxBackoff(500.millis)
+    .withMaxRetries(10)
+
+  //The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
+  //Seems to work together with the new connection and send retry settings on the connector
+  val connectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   def main(args: Array[String]): Unit = {
     jmsTextMessageProducerClient(connectionFactory)
@@ -32,6 +45,9 @@ object JMSTextMessageProducerClient {
     val producerConfig: Config = system.settings.config.getConfig(JmsProducerSettings.configPath)
     val jmsProducerSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(
       JmsProducerSettings(producerConfig, connectionFactory).withQueue("test-queue")
+        .withConnectionRetrySettings(connectionRetrySettings)
+        .withSendRetrySettings(sendRetrySettings)
+        .withSessionCount(1)
     )
 
     Source(1 to 2000000)
