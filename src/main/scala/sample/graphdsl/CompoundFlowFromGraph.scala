@@ -25,9 +25,7 @@ object CompoundFlowFromGraph extends App {
     val processorFlow2: Flow[Int, Int, NotUsed] = Flow[Int].map(_ * 3).wireTap(each => println(s"Processed by Flow2: $each"))
     val listOfFlows: Seq[Flow[Int, Int, NotUsed]] = List(processorFlow1, processorFlow2)
 
-
-    //One processorFlow in parallel
-    val parallelism = 10
+    val parallelism = Runtime.getRuntime.availableProcessors
     val listOfFlow: Seq[Flow[Int, Int, NotUsed]] = (1 to parallelism).map(_ => processorFlow1)
 
 
