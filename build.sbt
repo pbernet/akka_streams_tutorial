@@ -69,7 +69,7 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
+  "org.scalatest" %% "scalatest" % "3.1.4" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
