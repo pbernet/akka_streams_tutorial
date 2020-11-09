@@ -92,7 +92,7 @@ object FileServer extends App {
       }
     }
 
-    val bindingFuture = Http().bindAndHandle(routes, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info(s"Server started, listening on: ${b.localAddress}")

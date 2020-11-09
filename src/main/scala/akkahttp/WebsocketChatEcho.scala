@@ -93,7 +93,7 @@ object WebsocketChatEcho extends App with ClientCommon {
       wsClientRoute ~ wsBrowserClientRoute
     }
 
-    val bindingFuture = Http().bindAndHandle(routes, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture
       .map(_.localAddress)
       .map(addr => println(s"Server bound to: $addr"))

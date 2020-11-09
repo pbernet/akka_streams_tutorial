@@ -5,18 +5,19 @@
 This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) docs, tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * HTTP file download with local cache
-* Windturbine Example
+* Windturbine example
 * Apache Kafka WordCount
 * HL7 V2 over TCP via Kafka to Websockets
 
 These examples all deal with some kind of shared state. 
 
-Another group of examples are the `*Echo` classes, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
+Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
 
 Remarks:
-* Most examples are throttled so you can see from the console output what is happening.
-* Some examples deliberately throw `RuntimeException`, so you can observe recovery.
-* No unit tests and quirky package names.
+* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x) or a late JDK 8 update (to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala))
+* Most examples are throttled so you can see from the console output what is happening
+* Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
+* No unit tests and quirky package names
 
 ## HTTP file download with local cache ##
 Use case with shared state:
@@ -30,7 +31,7 @@ Use case with shared state:
 | [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams flow, which uses a local file cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") to share state|
 
 
-## Windturbine Example ##
+## Windturbine example ##
 Working sample from the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
  from Colin Breck where classic Actors are used to model shared state, life-cycle management and fault-tolerance in combination with akka-streams.
  Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [

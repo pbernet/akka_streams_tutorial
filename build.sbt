@@ -5,7 +5,7 @@ version := "1.0"
 scalaVersion := "2.12.12"
 
 val akkaVersion = "2.6.10"
-val akkaHTTPVersion = "10.1.11"
+val akkaHTTPVersion = "10.2.1"
 val alpakkaVersion = "2.0.2"
 val akkaStreamKafkaVersion = "2.0.4"
 
@@ -69,7 +69,7 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.0.6" % "test",
+  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,

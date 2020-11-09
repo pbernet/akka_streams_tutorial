@@ -59,7 +59,7 @@ object SampleRoutes extends App {
     getFromBrowsableDir ~ parseFormData ~ getFromDocRoot
   }
 
-  val bindingFuture = Http().bindAndHandle(routes, "127.0.0.1", 8000)
+  val bindingFuture = Http().newServerAt("127.0.0.1", 8000).bindFlow(routes)
 
   bindingFuture.onComplete {
     case Success(b) =>

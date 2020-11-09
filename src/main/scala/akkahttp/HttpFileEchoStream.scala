@@ -76,7 +76,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         }
     }
 
-    val bindingFuture = Http().bindAndHandle(routes, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
