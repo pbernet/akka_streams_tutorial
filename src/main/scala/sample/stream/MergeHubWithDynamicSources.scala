@@ -5,8 +5,8 @@ import akka.actor.ActorSystem
 import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.{Flow, MergeHub, RunnableGraph, Sink, Source}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
-
 /**
   * Inspired by:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-broadcasthub-and-partitionhub

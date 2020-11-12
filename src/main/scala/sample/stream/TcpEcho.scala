@@ -6,10 +6,10 @@ import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
-
 /**
   * Inspired by:
   * https://doc.akka.io/docs/akka/current/stream/stream-io.html?language=scala

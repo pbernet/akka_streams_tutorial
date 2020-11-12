@@ -24,6 +24,6 @@ class Total extends Actor {
       df.setTimeZone(TimeZone.getTimeZone("Europe/Zurich"))
 
       println(s"${df.format(date) } - Current total of all measurements: $total")
-      sender ! Done
+      sender() ! Done
   }
 }

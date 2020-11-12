@@ -15,10 +15,10 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
-
 
 trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 

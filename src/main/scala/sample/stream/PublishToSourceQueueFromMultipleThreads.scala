@@ -7,10 +7,10 @@ import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
 import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-
 /**
   * n parallel publishing clients -> sourceQueue -> slowSink
   *
@@ -42,7 +42,7 @@ object PublishToSourceQueueFromMultipleThreads extends App {
     .queue[Int](bufferSize, OverflowStrategy.backpressure, maxConcurrentOffers)
     .groupedWithin(10, 1.seconds)
     .to(slowSink)
-    .run
+    .run()
 
   val doneConsuming: Future[Done] = sourceQueue.watchCompletion()
   signalWhen(doneConsuming, "consuming") //never completes

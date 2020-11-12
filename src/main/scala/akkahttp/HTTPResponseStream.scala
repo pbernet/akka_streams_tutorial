@@ -90,7 +90,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
             val finishedWriting = r.discardEntityBytes().future
             onComplete(finishedWriting) { done =>
               //Limit response by appending eg .take(5)
-              val responseStream: Stream[ExamplePerson] = Stream.continually(ExamplePerson(s"request:$id"))
+              val responseStream: LazyList[ExamplePerson] = LazyList.continually(ExamplePerson(s"request:$id"))
               complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
             }
           }

@@ -1,5 +1,6 @@
 package alpakka.mqtt
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.alpakka.mqtt.streaming._
 import akka.stream.alpakka.mqtt.streaming.scaladsl.{ActorMqttClientSession, Mqtt}
@@ -8,9 +9,10 @@ import akka.stream.{OverflowStrategy, ThrottleMode}
 import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Inspired by:
@@ -39,22 +41,33 @@ object MqttEcho extends App {
     val clientId = s"pub-$id"
     val pub = client(clientId, sys, host, port)
 
-    pub.commands.offer(Command(Connect(clientId, ConnectFlags.CleanSession)))
+
+    val connectCommand = Command(Connect(clientId, ConnectFlags.CleanSession))
+    if (! pub.done.isCompleted) pub.commands.offer(connectCommand)
+
 
     Source(1 to 100)
-      .throttle(
-        elements = 1,
-        per = 1.second,
-        maximumBurst = 1,
-        mode = ThrottleMode.shaping
-      )
-      .map { each =>
-        //On the server each new retained message overwrites the previous one
-        val publish = Publish(ControlPacketFlags.RETAIN | ControlPacketFlags.QoSAtLeastOnceDelivery, topic, ByteString(each.toString))
+      .throttle(elements = 1, per = 1.second, maximumBurst = 1, mode = ThrottleMode.shaping)
+      .wireTap(each => logger.info(s"Client sending: $each"))
+      //TODO With mapAsync this is hanging after the 1st msg - do the results need to be consumed/pulled?
+      //It looks as if the ConnAck/PubAck/ need to be handled to see if we are still connected...
+      .map {
+        msg =>
 
-        logger.info(s"Client: $clientId send payload: ${publish.payload.utf8String}")
-        pub.session ! Command(publish)
-      }.runWith(Sink.ignore)
+          //if (pub.done.isCompleted) throw new RuntimeException("Server not reachable")
+
+          //TODO What is the benefit of this meccano? Does the Promise carry a ACK Result?
+          val promise = Promise[None.type]()
+          //On the server each new retained message overwrites the previous one
+          val publish = Publish(ControlPacketFlags.RETAIN | ControlPacketFlags.QoSAtLeastOnceDelivery, topic, ByteString(msg.toString))
+          pub.session ! Command(publish, () => promise.complete(Try(None)))
+          promise.future
+      }
+      .runWith(Sink.ignore)
+
+
+
+
   }
 
   def clientSubscriber(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
@@ -97,12 +110,32 @@ object MqttEcho extends App {
       Source
         .queue(10, OverflowStrategy.backpressure,10)
         .via(restartFlow)
+
+        //TODO Read ConnAck/SubAck/PubAck and send to ConnectedActor to be able to see if we are still connected
+        //Additional hints:
+        //https://github.com/akka/alpakka/issues/1581
+
+              .filter {
+                case Right(Event(_: ConnAck, _)) =>
+                  logger.info("Received ConnAck")
+                  false
+                case Right(Event(_: SubAck, _)) =>
+                  logger.info("Received SubAck")
+                  false
+                case Right(Event(p: PubAck, Some(ack))) =>
+                  logger.info(s"Received PubAck" + p.packetId)
+                  false
+                case _ => true
+              }
+
+
         //Only the Publish events are interesting
         .collect { case Right(Event(p: Publish, _)) => p }
-        .wireTap(event => logger.info(s"Client: $connectionId received payload: ${event.payload.utf8String}"))
+        .wireTap(event => logger.info(s"Client: $connectionId received: ${event.payload.utf8String}"))
         .toMat(Sink.ignore)(Keep.both)
         .run()
     }
+
 
     //TODO https://discuss.lightbend.com/t/alpakka-mqtt-streaming-client-does-not-complain-when-there-is-no-tcp-connection/7113
     done.onComplete{
@@ -112,8 +145,116 @@ object MqttEcho extends App {
 
     //WIP: Due to the async nature of the flow above, we don't know if we are really connected
     logger.info(s"Client: $connectionId bound to: $host:$port")
-    MqttClient(session = clientSession, commands = commands)
+    MqttClient(session = clientSession, commands = commands, done = done)
   }
+
+
+
+//  //TODO inspiration
+//  //https://github.com/michalstutzmann/scala-util/tree/master/src/main/scala/com/github/mwegrz/scalautil/mqtt
+//
+//  override def createFlow[A, B](topics: Map[String, Qos], qos: Qos, name: String)(implicit
+//                                                                                  aSerde: Serde[A],
+//                                                                                  bSerde: Serde[B]
+//  ): Flow[(String, A), (String, B), Future[Connected]] = {
+//    val connection = Tcp().outgoingConnection(host, port)
+//    val session = ActorMqttClientSession(MqttSessionSettings())
+//    val uuid = UUID.randomUUID()
+//    val clientSessionFlow: Flow[Command[() => Unit], Either[MqttCodec.DecodeError, Event[() => Unit]], Future[
+//      Tcp.OutgoingConnection
+//    ]] =
+//      Mqtt
+//        .clientSessionFlow(session, ByteString(uuid.toString))
+//        .joinMat(connection)(Keep.right)
+//    val connectCommand = Connect(
+//      if (clientId.isEmpty) uuid.toString else clientId,
+//      ConnectFlags.CleanSession,
+//      username,
+//      password
+//    )
+//    val connAckPromise = Promise[Unit]
+//    val subAckPromise = if (topics.nonEmpty) Promise[Unit] else Promise.successful(())
+//
+//    Flow[(String, A)]
+//      .mapAsync(parallelism) {
+//        case (topic, msg) =>
+//          val promise = Promise[None.type]()
+//          session ! Command(
+//            Publish(qos.toControlPacketFlags, topic, ByteString(aSerde.valueToBytes(msg).toArray)),
+//            () => promise.complete(Try(None))
+//          )
+//          promise.future
+//      }
+//      .mapConcat(_ => Nil)
+//      //Interesting concept prepend
+//      .prepend(
+//        Source(
+//          if (topics.nonEmpty) {
+//            Iterable(
+//              Command[() => Unit](connectCommand),
+//              Command[() => Unit](
+//                Subscribe(topics.map { case (name, qos) => (name, qos.toControlPacketFlags) }.toSeq)
+//              )
+//            )
+//          } else {
+//            Iterable(Command[() => Unit](connectCommand))
+//          }
+//        )
+//      )
+//      .viaMat(clientSessionFlow)(Keep.right)
+//      .filter {
+//        case Right(Event(_: ConnAck, _)) =>
+//          connAckPromise.complete(Success(()))
+//          false
+//        case Right(Event(_: SubAck, _)) if topics.nonEmpty =>
+//          subAckPromise.complete(Success(()))
+//          false
+//        case Right(Event(_: PubAck, Some(ack))) =>
+//          ack()
+//          false
+//        case _ => true
+//      }
+//      .collect {
+//        case Right(Event(p: Publish, _)) =>
+//          (p.topicName, bSerde.bytesToValue(ByteVector(p.payload.toArray)))
+//      }
+//      .watchTermination() { (outgoingConnection, f) =>
+//        f.onComplete {
+//          case Success(_) =>
+//            session.shutdown()
+//            log.debug("Flow completed", "name" -> name)
+//          case Failure(exception) =>
+//            session.shutdown()
+//            throw log.error("Flow failed", exception, "name" -> name)
+//        }
+//
+//        log.debug("Flow created", "name" -> name)
+//
+//        val connected = for {
+//          value <- outgoingConnection
+//          _ <- connAckPromise.future
+//          _ <- subAckPromise.future
+//        } yield {
+//          Connected(value)
+//        }
+//
+//        connected.onComplete {
+//          case Success(Connected(value)) =>
+//            log.debug(
+//              "Connection established",
+//              ("name" -> name, "host" -> value.remoteAddress.getHostName, "port" -> value.remoteAddress.getPort)
+//            )
+//          case Failure(exception) =>
+//            log.error("Connection failed", exception, "name" -> name)
+//        }
+//
+//        connected
+//      }
+//  }
+
+
+
+
 }
 
-case class MqttClient(session: ActorMqttClientSession, commands: SourceQueueWithComplete[Command[Nothing]])
+case class MqttClient(session: ActorMqttClientSession, commands: SourceQueueWithComplete[Command[Nothing]], done: Future[Done])

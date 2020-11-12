@@ -24,11 +24,11 @@ class TotalFake extends Actor {
     case IncrementWord(value, id) =>
       println(s"$id - WORD count fakeNews: $value (+ ${value - totalWords})")
       totalWords = value
-      sender ! Done
+      sender() ! Done
 
     case IncrementMessage(value, id) =>
       totalNews += value
       println(s"$id - MESSAGES count: $totalNews (+ $value)")
-      sender ! Done
+      sender() ! Done
   }
 }

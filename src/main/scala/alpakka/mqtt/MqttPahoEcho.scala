@@ -11,6 +11,7 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Seq
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -80,7 +81,7 @@ object MqttPahoEcho extends App {
             exception.printStackTrace()
             null
         }
-        .foreach(_ => system.terminate)
+        .foreach(_ => system.terminate())
     }
 
 
@@ -90,7 +91,7 @@ object MqttPahoEcho extends App {
     * Tries to restart clientSubscriber on initial connection problem, but has not the desired effect
     */
   private def wrapWithAsRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
-    val fut = Promise[Done]
+    val fut = Promise[Done]()
     RestartSource.withBackoff(1000.millis, 5.seconds, randomFactor = 0.2d, maxRestarts = 5) {
       () => source.mapMaterializedValue(mat => fut.completeWith(mat))
     }.mapMaterializedValue(_ => fut.future)

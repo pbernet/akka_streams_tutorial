@@ -65,7 +65,7 @@ object SSEtoElasticsearch {
   val elasticsearchSource: Source[ReadResult[json.JsObject], NotUsed] = ElasticsearchSource.create(indexName, typeName, """{"match_all": {}}""")
 
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
     logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
 
     readFromWikipediaAndWriteToElasticsearch()

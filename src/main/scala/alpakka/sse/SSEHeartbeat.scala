@@ -29,7 +29,7 @@ object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
     simpleClient(address, port) //is not recovering after RuntimeException on server

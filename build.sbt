@@ -2,7 +2,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.12"
+scalaVersion := "2.13.3"
 
 val akkaVersion = "2.6.10"
 val akkaHTTPVersion = "10.2.1"
@@ -65,7 +65,7 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
-  "com.twitter" %% "bijection-avro" % "0.9.6",
+  "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
@@ -78,6 +78,15 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13-beta-1"
 )
 
+libraryDependencies ++= {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, major)) if major <= 12 =>
+      Seq()
+    case _ =>
+      Seq("org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1")
+  }
+}
+
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
@@ -89,7 +98,8 @@ val workaround = {
 
 scalacOptions += "-deprecation"
 
+//TODO Enable for 2.13 once it is available
 //Usage: sbt dependencyTree
-addDependencyTreePlugin
+//addDependencyTreePlugin
 
 fork in run := true

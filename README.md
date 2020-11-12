@@ -14,7 +14,7 @@ These examples all deal with some kind of shared state.
 Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
 
 Remarks:
-* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x) or a late JDK 8 update (to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala))
+* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8 update (to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala))
 * Most examples are throttled so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
 * No unit tests and quirky package names
@@ -63,7 +63,7 @@ Start the classes in the order below and watch the console output.
 `WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-This PoC in package `alpakka.tcp_to_websockets` is some kind of Alpakka-Trophy with these stages:
+This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets)) is some kind of Alpakka-Trophy with these stages:
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 

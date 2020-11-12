@@ -44,7 +44,7 @@ object WindTurbineServer {
 
 
   def main(args: Array[String]): Unit = {
-    val total = system.actorOf(Props[Total], "total")
+    val total = system.actorOf(Props[Total](), "total")
 
     def average[T]( ts: Iterable[T] )( implicit num: Numeric[T] ) = {
       val avg = num.toDouble( ts.sum ) / ts.size
