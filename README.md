@@ -14,7 +14,7 @@ These examples all deal with some kind of shared state.
 Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
 
 Remarks:
-* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8 update (to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala))
+* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
 * No unit tests and quirky package names

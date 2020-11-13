@@ -17,16 +17,18 @@ import scala.concurrent.{Future, Promise}
 
 
 /**
+  * Roundtrip with the Alpakka connector based on Eclipse Paho
+  *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/mqtt.html
   * https://akka.io/alpakka-samples/mqtt-to-kafka/example.html
   * https://akka.io/alpakka-samples/mqtt-to-kafka/full-source.html
   *
   * Prerequisite:
-  *  - Start the docker MQTT broker from: /docker/docker-compose.yml
-  *     eg by cmd line: docker-compose up -d mosquitto
+  * Start the docker MQTT broker from: /docker/docker-compose.yml
+  * eg by cmd line: docker-compose up -d mosquitto
   *
-  * Works, but recover issues both on startup and during operation
+  * Works, but has recover issues both on startup and during operation
   *
   */
 object MqttPahoEcho extends App {

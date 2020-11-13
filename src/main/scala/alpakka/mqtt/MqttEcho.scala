@@ -15,12 +15,18 @@ import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Inspired by:
+  * The MQTT Streaming connector. Work in progress...
+  * See also: [[MqttPahoEcho]]
+  *
+  * Doc:
   * https://doc.akka.io/docs/alpakka/current/mqtt-streaming.html
   *
+  * Inspiration:
+  * https://github.com/michalstutzmann/scala-util/tree/master/src/main/scala/com/github/mwegrz/scalautil/mqtt
+  *
   * Prerequisite:
-  *  - Start the docker MQTT broker from: /docker/docker-compose.yml
-  *     eg by cmd line: docker-compose up -d mosquitto
+  * Start the docker MQTT broker from: /docker/docker-compose.yml
+  * eg by cmd line: docker-compose up -d mosquitto
   *
   */
 object MqttEcho extends App {
@@ -47,7 +53,7 @@ object MqttEcho extends App {
 
 
     Source(1 to 100)
-      .throttle(elements = 1, per = 1.second, maximumBurst = 1, mode = ThrottleMode.shaping)
+      .throttle(1, 1.second, 1, ThrottleMode.shaping)
       .wireTap(each => logger.info(s"Client sending: $each"))
       //TODO With mapAsync this is hanging after the 1st msg - do the results need to be consumed/pulled?
       //It looks as if the ConnAck/PubAck/ need to be handled to see if we are still connected...
@@ -64,10 +70,6 @@ object MqttEcho extends App {
           promise.future
       }
       .runWith(Sink.ignore)
-
-
-
-
   }
 
   def clientSubscriber(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
@@ -108,28 +110,29 @@ object MqttEcho extends App {
 
     val (commands, done) = {
       Source
-        .queue(10, OverflowStrategy.backpressure,10)
+        .queue(10, OverflowStrategy.backpressure, 10)
         .via(restartFlow)
 
-        //TODO Read ConnAck/SubAck/PubAck and send to ConnectedActor to be able to see if we are still connected
+        //TODO Process ConnAck/SubAck/PubAck as an indicator on the application level to see if we are still connected
+        //Coordinate via additional ConnectedActor?
         //Additional hints:
         //https://github.com/akka/alpakka/issues/1581
 
-              .filter {
-                case Right(Event(_: ConnAck, _)) =>
-                  logger.info("Received ConnAck")
-                  false
-                case Right(Event(_: SubAck, _)) =>
-                  logger.info("Received SubAck")
-                  false
-                case Right(Event(p: PubAck, Some(ack))) =>
-                  logger.info(s"Received PubAck" + p.packetId)
-                  false
-                case _ => true
-              }
+        .filter {
+          case Right(Event(_: ConnAck, _)) =>
+            logger.info("Received ConnAck")
+            false
+          case Right(Event(_: SubAck, _)) =>
+            logger.info("Received SubAck")
+            false
+          case Right(Event(p: PubAck, Some(ack))) =>
+            logger.info(s"Received PubAck" + p.packetId)
+            false
+          case _ => true
+        }
 
 
-        //Only the Publish events are interesting
+        //Only the Publish events are interesting for the subscriber
         .collect { case Right(Event(p: Publish, _)) => p }
         .wireTap(event => logger.info(s"Client: $connectionId received: ${event.payload.utf8String}"))
         .toMat(Sink.ignore)(Keep.both)
@@ -147,114 +150,6 @@ object MqttEcho extends App {
     logger.info(s"Client: $connectionId bound to: $host:$port")
     MqttClient(session = clientSession, commands = commands, done = done)
   }
-
-
-
-//  //TODO inspiration
-//  //https://github.com/michalstutzmann/scala-util/tree/master/src/main/scala/com/github/mwegrz/scalautil/mqtt
-//
-//  override def createFlow[A, B](topics: Map[String, Qos], qos: Qos, name: String)(implicit
-//                                                                                  aSerde: Serde[A],
-//                                                                                  bSerde: Serde[B]
-//  ): Flow[(String, A), (String, B), Future[Connected]] = {
-//    val connection = Tcp().outgoingConnection(host, port)
-//    val session = ActorMqttClientSession(MqttSessionSettings())
-//    val uuid = UUID.randomUUID()
-//    val clientSessionFlow: Flow[Command[() => Unit], Either[MqttCodec.DecodeError, Event[() => Unit]], Future[
-//      Tcp.OutgoingConnection
-//    ]] =
-//      Mqtt
-//        .clientSessionFlow(session, ByteString(uuid.toString))
-//        .joinMat(connection)(Keep.right)
-//    val connectCommand = Connect(
-//      if (clientId.isEmpty) uuid.toString else clientId,
-//      ConnectFlags.CleanSession,
-//      username,
-//      password
-//    )
-//    val connAckPromise = Promise[Unit]
-//    val subAckPromise = if (topics.nonEmpty) Promise[Unit] else Promise.successful(())
-//
-//    Flow[(String, A)]
-//      .mapAsync(parallelism) {
-//        case (topic, msg) =>
-//          val promise = Promise[None.type]()
-//          session ! Command(
-//            Publish(qos.toControlPacketFlags, topic, ByteString(aSerde.valueToBytes(msg).toArray)),
-//            () => promise.complete(Try(None))
-//          )
-//          promise.future
-//      }
-//      .mapConcat(_ => Nil)
-//      //Interesting concept prepend
-//      .prepend(
-//        Source(
-//          if (topics.nonEmpty) {
-//            Iterable(
-//              Command[() => Unit](connectCommand),
-//              Command[() => Unit](
-//                Subscribe(topics.map { case (name, qos) => (name, qos.toControlPacketFlags) }.toSeq)
-//              )
-//            )
-//          } else {
-//            Iterable(Command[() => Unit](connectCommand))
-//          }
-//        )
-//      )
-//      .viaMat(clientSessionFlow)(Keep.right)
-//      .filter {
-//        case Right(Event(_: ConnAck, _)) =>
-//          connAckPromise.complete(Success(()))
-//          false
-//        case Right(Event(_: SubAck, _)) if topics.nonEmpty =>
-//          subAckPromise.complete(Success(()))
-//          false
-//        case Right(Event(_: PubAck, Some(ack))) =>
-//          ack()
-//          false
-//        case _ => true
-//      }
-//      .collect {
-//        case Right(Event(p: Publish, _)) =>
-//          (p.topicName, bSerde.bytesToValue(ByteVector(p.payload.toArray)))
-//      }
-//      .watchTermination() { (outgoingConnection, f) =>
-//        f.onComplete {
-//          case Success(_) =>
-//            session.shutdown()
-//            log.debug("Flow completed", "name" -> name)
-//          case Failure(exception) =>
-//            session.shutdown()
-//            throw log.error("Flow failed", exception, "name" -> name)
-//        }
-//
-//        log.debug("Flow created", "name" -> name)
-//
-//        val connected = for {
-//          value <- outgoingConnection
-//          _ <- connAckPromise.future
-//          _ <- subAckPromise.future
-//        } yield {
-//          Connected(value)
-//        }
-//
-//        connected.onComplete {
-//          case Success(Connected(value)) =>
-//            log.debug(
-//              "Connection established",
-//              ("name" -> name, "host" -> value.remoteAddress.getHostName, "port" -> value.remoteAddress.getPort)
-//            )
-//          case Failure(exception) =>
-//            log.error("Connection failed", exception, "name" -> name)
-//        }
-//
-//        connected
-//      }
-//  }
-
-
-
-
 }
 
 case class MqttClient(session: ActorMqttClientSession, commands: SourceQueueWithComplete[Command[Nothing]], done: Future[Done])
