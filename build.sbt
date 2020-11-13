@@ -97,8 +97,9 @@ val workaround = {
 }
 
 scalacOptions += "-deprecation"
+scalacOptions += "-feature"
 
-//TODO Enable for 2.13 once it is available
+//TODO Enable the recent insourced plugin for 2.13, once it is available. Worked for 2.12.12
 //Usage: sbt dependencyTree
 //addDependencyTreePlugin
 
