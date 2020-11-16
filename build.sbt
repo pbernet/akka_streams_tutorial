@@ -16,6 +16,8 @@ val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.0-rc2"
 
 libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1",
+
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -78,15 +80,6 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13-beta-1"
 )
 
-libraryDependencies ++= {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, major)) if major <= 12 =>
-      Seq()
-    case _ =>
-      Seq("org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1")
-  }
-}
-
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
@@ -98,9 +91,5 @@ val workaround = {
 
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
-
-//TODO Enable the recent insourced plugin for 2.13, once it is available. Worked for 2.12.12
-//Usage: sbt dependencyTree
-//addDependencyTreePlugin
 
 fork in run := true
