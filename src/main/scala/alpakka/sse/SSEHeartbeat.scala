@@ -29,7 +29,7 @@ object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
     simpleClient(address, port) //is not recovering after RuntimeException on server
@@ -91,11 +91,8 @@ object SSEHeartbeat {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    val restartSource = RestartSource.withBackoff(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-    ) { () =>
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
       Source.futureSource {
         Http()
           .singleRequest(HttpRequest(

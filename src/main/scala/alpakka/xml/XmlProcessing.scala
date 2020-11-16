@@ -34,7 +34,7 @@ object XmlProcessing extends App {
     .statefulMapConcat(() => {
 
       // state
-      val stringBuilder: StringBuilder = StringBuilder.newBuilder
+      val stringBuilder: StringBuilder = new StringBuilder()
       var counter: Int = 0
 
       // aggregation function

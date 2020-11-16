@@ -3,7 +3,7 @@ dist:
 language:
   scala
 scala:
-  - 2.12.10
+  - 2.13.3
 jdk:
   - oraclejdk8
   - openjdk8

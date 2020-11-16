@@ -89,7 +89,7 @@ public class TcpEchoJava {
                 Source.from(testInput).via(Tcp.get(system).outgoingConnection(serverAddress.getHostString(), serverAddress.getPort()));
 
         CompletionStage<ByteString> result = responseStream.runFold(
-                ByteString.empty(), ByteString::concat, materializer);
+                ByteString.emptyByteString(), ByteString::concat, materializer);
 
         result.handle((success, failure) -> {
             if (failure != null) {

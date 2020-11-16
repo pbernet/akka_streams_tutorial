@@ -1,5 +1,4 @@
-//With sbt 1.4.x this plugin is "insourced". Usage: dependencyTree
-//https://github.com/sbt/sbt/issues/4706
-//addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.10.0-RC1")
-
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.23")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.21")
+//The now built in dependencyTree task is usually enough
+//https://www.scala-sbt.org/1.x/docs/sbt-1.4-Release-Notes.html#sbt-dependency-graph+is+in-sourced
+//addDependencyTreePlugin

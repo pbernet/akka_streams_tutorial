@@ -2,7 +2,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.12"
+scalaVersion := "2.13.3"
 
 val akkaVersion = "2.6.10"
 val akkaHTTPVersion = "10.2.1"
@@ -16,6 +16,8 @@ val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.0-rc2"
 
 libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1",
+
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -65,7 +67,7 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
-  "com.twitter" %% "bijection-avro" % "0.9.6",
+  "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
@@ -88,8 +90,6 @@ val workaround = {
 }
 
 scalacOptions += "-deprecation"
-
-//Usage: sbt dependencyTree
-addDependencyTreePlugin
+scalacOptions += "-feature"
 
 fork in run := true

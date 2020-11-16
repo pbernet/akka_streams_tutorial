@@ -46,7 +46,7 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
 
     val control: JmsConsumerControl = jmsConsumerSource
       .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))

@@ -5,15 +5,15 @@ import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
 import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource, CommittableReadResult}
 import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
-import akka.stream.{KillSwitches, ThrottleMode}
+import akka.stream.{KillSwitches, RestartSettings, ThrottleMode}
 import akka.util.ByteString
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.RabbitMQContainer
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Random, Success}
-
 /**
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/amqp.html
@@ -45,7 +45,7 @@ object AmqpEcho extends App {
     sendToQueue(id, connectionProvider, queueDeclaration, queueNameFull)
       .onComplete {
         case Success(writeResult) =>
-          val noOfSentMsg = writeResult.seq.size
+          val noOfSentMsg = writeResult.size
           logger.info(s"Client: $id sent: $noOfSentMsg messages to queue: $queueNameFull. Starting receiver...")
           receiveFromQueueAck(id, connectionProvider, queueDeclaration, noOfSentMsg, queueNameFull)
         case Failure(exception) => logger.info(s"Exception during send:", exception)
@@ -96,7 +96,8 @@ object AmqpEcho extends App {
     val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
       AmqpFlow.withConfirm(settings)
 
-    val restartFlow = RestartFlow.onFailuresWithBackoff(1.second, 10.seconds, 0.2, 10)(() => amqpFlow)
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartFlow = RestartFlow.onFailuresWithBackoff(restartSettings)(() => amqpFlow)
 
     val writeResult: Future[Seq[WriteResult]] =
       Source(1 to 10)
@@ -156,7 +157,8 @@ object AmqpEcho extends App {
     val amqpFlow: Flow[WriteMessage, WriteResult, Future[Done]] =
       AmqpFlow.withConfirm(settings)
 
-    val restartFlow = RestartFlow.onFailuresWithBackoff(1.second, 10.seconds, 0.2, 10)(() => amqpFlow)
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartFlow = RestartFlow.onFailuresWithBackoff(restartSettings)(() => amqpFlow)
 
     val done: Future[Done] =  Source(1 to 100)
         .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
@@ -194,7 +196,7 @@ object AmqpEcho extends App {
         )
     }
 
-    val completion: Promise[Done] = Promise[Done]
+    val completion: Promise[Done] = Promise[Done]()
     mergedSources
       .viaMat(KillSwitches.single)(Keep.right)
       .to(Sink.fold(Set.empty[Int]) {

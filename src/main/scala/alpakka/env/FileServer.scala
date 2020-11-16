@@ -66,7 +66,7 @@ object FileServer extends App {
               complete(randomErrorHttpStatusCode)
             } else if (id.toInt % 5 == 0) { // 5, 15, 25
               //Causes TimeoutException on client if sleep time > 5 sec
-              randomSleeper
+              randomSleeper()
               getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
             } else {
               getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
@@ -82,7 +82,7 @@ object FileServer extends App {
           } else {
             cache.put(id, "downloading")  //to simulate blocking on concurrent requests
             get {
-              randomSleeper
+              randomSleeper()
               val response = getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
               cache.put(id, "downloaded")
               response
