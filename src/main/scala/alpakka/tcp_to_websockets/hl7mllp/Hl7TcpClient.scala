@@ -6,6 +6,7 @@ import akka.util.ByteString
 import ca.uhn.hl7v2.AcknowledgmentCode
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 

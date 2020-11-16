@@ -42,7 +42,7 @@ object WebsocketServer extends App with WebSocketDirectives {
         handleWebSocketMessages(echoFlow)
       }
 
-    val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
     bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)

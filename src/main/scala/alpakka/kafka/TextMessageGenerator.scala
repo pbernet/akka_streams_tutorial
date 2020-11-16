@@ -79,7 +79,7 @@ object TextMessageGenerator {
         val word: String = genRandWord(minWordLen, maxWordLen)
         text += word
 
-        if (math.random < randomLevel) text += " " + keyword
+        if (math.random() < randomLevel) text += " " + keyword
 
         clauseLen += word.length
         wordCount += 1

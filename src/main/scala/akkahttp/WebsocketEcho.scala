@@ -11,12 +11,12 @@ import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
 import scala.sys.process.Process
 import scala.util.{Failure, Success}
-
 trait ClientCommon {
   implicit val system = ActorSystem("Websocket")
   implicit val executionContext = system.dispatcher
@@ -86,7 +86,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         handleWebSocketMessages(echoFlow)
       }
 
-    val bindingFuture = Http().bindAndHandle(websocketRoute, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
     bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
@@ -126,7 +126,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   def singleWebSocketRequestSourceQueueClient(id: Int, address: String, port: Int) = {
 
     val (source, sourceQueue) = {
-      val p = Promise[SourceQueue[Message]]
+      val p = Promise[SourceQueue[Message]]()
       val s = Source.queue[Message](100, OverflowStrategy.backpressure, 100).mapMaterializedValue(m => {
         p.trySuccess(m)
         m

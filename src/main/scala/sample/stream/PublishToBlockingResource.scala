@@ -7,9 +7,9 @@ import akka.actor.ActorSystem
 import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Failure
-
 
 /**
   * n parallel clients -> blocking resource (simulated by java.util.concurrent.BlockingQueue) -> slowSink

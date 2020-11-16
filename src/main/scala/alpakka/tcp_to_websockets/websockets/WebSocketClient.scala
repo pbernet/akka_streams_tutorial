@@ -35,7 +35,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
   def singleWebSocketRequestSourceQueueClient(id: String, endpoint: String) = {
 
     val (source, sourceQueue) = {
-      val p = Promise[SourceQueue[Message]]
+      val p = Promise[SourceQueue[Message]]()
       val s = Source.queue[Message](0, OverflowStrategy.backpressure, 1).mapMaterializedValue(m => {
         p.trySuccess(m)
         m

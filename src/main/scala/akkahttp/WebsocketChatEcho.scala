@@ -9,9 +9,9 @@ import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
 import akkahttp.WebsocketEcho.handleWebSocketMessages
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 /**
   * A simple WebSocket chat system using only akka streams with the help of MergeHub Source and BroadcastHub Sink
   *
@@ -93,7 +93,7 @@ object WebsocketChatEcho extends App with ClientCommon {
       wsClientRoute ~ wsBrowserClientRoute
     }
 
-    val bindingFuture = Http().bindAndHandle(routes, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture
       .map(_.localAddress)
       .map(addr => println(s"Server bound to: $addr"))

@@ -8,7 +8,7 @@ import akka.stream.scaladsl.Source
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
-
+import scala.language.postfixOps
 /**
   * Inspired by:
   * https://stackoverflow.com/questions/4662292/scala-median-implementation

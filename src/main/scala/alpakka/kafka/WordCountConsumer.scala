@@ -28,7 +28,7 @@ object WordCountConsumer extends App {
   implicit val system = ActorSystem("WordCountConsumer")
   implicit val ec = system.dispatcher
 
-  val total = system.actorOf(Props[TotalFake], "totalFake")
+  val total = system.actorOf(Props[TotalFake](), "totalFake")
 
   val committerSettings = CommitterSettings(system).withMaxBatch(1)
 

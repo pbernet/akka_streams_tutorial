@@ -37,7 +37,7 @@ object SampleRoutes extends App {
   }
 
   def parseFormData: Route = path("post") {
-    formFields('color, 'age.as[Int]) { (color, age) =>
+    formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
       complete(s"The color is '$color' and the age is $age")
     }
   }
@@ -59,7 +59,7 @@ object SampleRoutes extends App {
     getFromBrowsableDir ~ parseFormData ~ getFromDocRoot
   }
 
-  val bindingFuture = Http().bindAndHandle(routes, "127.0.0.1", 8000)
+  val bindingFuture = Http().newServerAt("127.0.0.1", 8000).bindFlow(routes)
 
   bindingFuture.onComplete {
     case Success(b) =>

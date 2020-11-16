@@ -2,20 +2,22 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.12.12"
+scalaVersion := "2.13.3"
 
-val akkaVersion = "2.6.8"
-val akkaHTTPVersion = "10.1.11"
-val alpakkaVersion = "2.0.1"
+val akkaVersion = "2.6.10"
+val akkaHTTPVersion = "10.2.1"
+val alpakkaVersion = "2.0.2"
 val akkaStreamKafkaVersion = "2.0.4"
 
 val kafkaVersion = "2.4.1"
-val activemqVersion =  "5.15.13"
+val activemqVersion =  "5.16.0"
 val streamzVersion = "0.13-RC1"
 val camelVersion = "2.25.2"
-val testContainersVersion = "1.14.3"
+val testContainersVersion = "1.15.0-rc2"
 
 libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1",
+
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -40,6 +42,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
@@ -64,11 +67,11 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
-  "com.twitter" %% "bijection-avro" % "0.9.6",
-  "com.github.blemale" %% "scaffeine" % "4.0.2",
+  "com.twitter" %% "bijection-avro" % "0.9.7",
+  "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.0.6" % "test",
+  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -87,8 +90,6 @@ val workaround = {
 }
 
 scalacOptions += "-deprecation"
-
-//Workaround to make cmd dependencyTree work with sbt 1.3.x
-//useCoursier := false
+scalacOptions += "-feature"
 
 fork in run := true

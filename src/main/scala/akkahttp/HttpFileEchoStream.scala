@@ -76,7 +76,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         }
     }
 
-    val bindingFuture = Http().bindAndHandle(routes, address, port)
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
@@ -97,7 +97,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   def filesToUpload(): Source[FileHandle, NotUsed] =
     //Unbounded stream. Limit for testing purposes by appending eg .take(5)
-    Source(Stream.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
+    Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
 
 
   def roundtripClient(address: String, port: Int) = {
