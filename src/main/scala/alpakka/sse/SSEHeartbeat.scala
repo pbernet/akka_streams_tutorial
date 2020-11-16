@@ -91,11 +91,8 @@ object SSEHeartbeat {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    val restartSource = RestartSource.withBackoff(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-    ) { () =>
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
       Source.futureSource {
         Http()
           .singleRequest(HttpRequest(

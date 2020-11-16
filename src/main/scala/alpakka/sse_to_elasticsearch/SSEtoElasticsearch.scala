@@ -9,7 +9,7 @@ import akka.stream.alpakka.elasticsearch.WriteMessage.createIndexMessage
 import akka.stream.alpakka.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
 import akka.stream.alpakka.elasticsearch.{ApiVersion, ElasticsearchWriteSettings, ReadResult, WriteMessage}
 import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import akka.stream.{ActorAttributes, Supervision}
+import akka.stream.{ActorAttributes, RestartSettings, Supervision}
 import akka.{Done, NotUsed}
 import org.apache.http.HttpHost
 import org.elasticsearch.client.RestClient
@@ -80,11 +80,8 @@ object SSEtoElasticsearch {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    val restartSource = RestartSource.withBackoff(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-    ) { () =>
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
       Source.futureSource {
         Http()
           .singleRequest(HttpRequest(

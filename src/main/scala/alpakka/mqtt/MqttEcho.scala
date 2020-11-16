@@ -5,7 +5,7 @@ import akka.actor.ActorSystem
 import akka.stream.alpakka.mqtt.streaming._
 import akka.stream.alpakka.mqtt.streaming.scaladsl.{ActorMqttClientSession, Mqtt}
 import akka.stream.scaladsl.{Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Tcp}
-import akka.stream.{OverflowStrategy, ThrottleMode}
+import akka.stream.{OverflowStrategy, RestartSettings, ThrottleMode}
 import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -106,7 +106,8 @@ object MqttEcho extends App {
         .clientSessionFlow(clientSession, ByteString(connectionId))
         .join(connection)
 
-    val restartFlow = RestartFlow.onFailuresWithBackoff(1.second, 10.seconds, 0.2, 10)(() => mqttFlow)
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartFlow = RestartFlow.onFailuresWithBackoff(restartSettings)(() => mqttFlow)
 
     val (commands, done) = {
       Source

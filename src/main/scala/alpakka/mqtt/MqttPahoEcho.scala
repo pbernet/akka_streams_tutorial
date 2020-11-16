@@ -94,7 +94,8 @@ object MqttPahoEcho extends App {
     */
   private def wrapWithAsRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
     val fut = Promise[Done]()
-    RestartSource.withBackoff(1000.millis, 5.seconds, randomFactor = 0.2d, maxRestarts = 5) {
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    RestartSource.withBackoff(restartSettings) {
       () => source.mapMaterializedValue(mat => fut.completeWith(mat))
     }.mapMaterializedValue(_ => fut.future)
   }

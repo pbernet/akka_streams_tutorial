@@ -9,6 +9,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
+
 object Hl7TcpClient  extends App with MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val system = ActorSystem("Hl7TcpClient")

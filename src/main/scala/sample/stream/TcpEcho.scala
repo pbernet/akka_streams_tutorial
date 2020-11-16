@@ -1,9 +1,9 @@
 package sample.stream
 
 import akka.actor.ActorSystem
+import akka.stream.RestartSettings
 import akka.stream.scaladsl.{Flow, Framing, Keep, RestartSource, Sink, Source, Tcp}
 import akka.util.ByteString
-import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters._
@@ -98,12 +98,9 @@ object TcpEcho extends App {
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
 
-    val restartSource: Source[ByteString, NotUsed] = RestartSource.onFailuresWithBackoff(
-      minBackoff = 1.seconds,
-      maxBackoff = 60.seconds,
-      randomFactor = 0.2
-    ) { () => Source(testInput).via(connection)}
-    val closed: Future[Done] = restartSource.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.onFailuresWithBackoff(restartSettings) { () => Source(testInput).via(connection)}
+    val closed = restartSource.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
 }
