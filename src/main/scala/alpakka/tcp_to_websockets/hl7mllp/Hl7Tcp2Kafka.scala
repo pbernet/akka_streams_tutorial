@@ -82,6 +82,11 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
 
     val kafkaProducer: Flow[String, Either[Valid[String], Invalid[String]], NotUsed] = Flow[String]
       .map(each => {
+        //Retry handling for Kafka producers is now built-in, see:
+        //https://doc.akka.io/docs/alpakka-kafka/current/errorhandling.html#failing-producer
+        //When using the built-in strategy, the buffers are filled when Kafka goes down and then messages are sent once Kafka recovers.
+        //However, for this HL7 use case handling errors on the MLLP protocol level (by replying with a NACK) might be
+        //a better strategy to give the HL7 sender a chance to re-send in-flight messages in case THIS client goes down as well.
         val topicExists = adminClient.listTopics.names.get.contains(topic)
         if (topicExists) {
           producer.send(new ProducerRecord(topic, partition0, null: String, each))

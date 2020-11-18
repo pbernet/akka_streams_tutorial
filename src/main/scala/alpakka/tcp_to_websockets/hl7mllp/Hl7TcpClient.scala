@@ -16,33 +16,32 @@ object Hl7TcpClient  extends App with MllpProtocol {
 
   val (address, port) = ("127.0.0.1", 6160)
 
-  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000, system, address, port))
   (1 to 1).par.foreach(each => localSingleMessageClient(each, 100, system, address, port))
+  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000, system, address, port))
 
-
-  def localSingleMessageClient(clientname: Int, numberOfMessages: Int, system: ActorSystem, address: String, port: Int): Unit = {
+  def localSingleMessageClient(client: Int, numberOfMessages: Int, system: ActorSystem, address: String, port: Int): Unit = {
     implicit val sys = system
     implicit val ec = system.dispatcher
 
     val connection = Tcp().outgoingConnection(address, port)
 
     def sendAndReceive(i: Int): Future[Int] = {
-      val traceID = s"$clientname-${i.toString}"
+      val traceID = s"$client-${i.toString}"
       val source = Source.single(ByteString(encodeMllp(generateTestMessage(traceID)))).via(connection)
       val closed = source.runForeach(each =>
         if (isNACK(each)) {
-          logger.info(s"Client: $clientname-$i received NACK: ${printable(each.utf8String)}")
+          logger.info(s"Client: $client-$i received NACK: ${printable(each.utf8String)}")
           throw new RuntimeException("NACK")
         } else {
-          logger.info(s"Client: $clientname-$i received ACK: ${printable(each.utf8String)}")
+          logger.info(s"Client: $client-$i received ACK: ${printable(each.utf8String)}")
         }
       ).recoverWith {
-        case _: RuntimeException =>
-          logger.info(s"About to retry for: $clientname-$i...")
+        case ex: RuntimeException =>
+          logger.warn(s"Client: $client-$i about to retry, because of: $ex")
           sendAndReceive(i)
         case e: Throwable => Future.failed(e)
       }
-      closed.onComplete(each => logger.debug(s"Client: $clientname-$i closed: $each"))
+      closed.onComplete(each => logger.debug(s"Client: $client-$i closed: $each"))
       Future(i)
     }
 
@@ -65,7 +64,7 @@ object Hl7TcpClient  extends App with MllpProtocol {
   }
 
   private def generateTestMessage(senderTraceID: String) = {
-    //For now put the senderTraceID into the "sender lab" field to follow the messages accross the workflow
+    //For now put the senderTraceID into the "sender lab" field to follow the messages across the workflow
     val message = new StringBuilder
     message ++= s"MSH|^~\\&|$senderTraceID|MCM|LABADT|MCM|198808181126|SECURITY|ADT^A01|1234|P|2.5.1|"
     message ++= CARRIAGE_RETURN
