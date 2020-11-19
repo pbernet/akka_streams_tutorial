@@ -30,6 +30,7 @@ libraryDependencies ++= Seq(
   "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1.1",
   "org.apache.activemq" % "activemq-client" % activemqVersion,
   "org.apache.activemq" % "activemq-broker" % activemqVersion,
+  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
