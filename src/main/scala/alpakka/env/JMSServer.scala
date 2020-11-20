@@ -18,7 +18,7 @@ object JMSServer extends App {
 
   broker.setSchedulerSupport(false)
   broker.setPersistent(true)
-  broker.setDataDirectory("/tmp")
+  broker.setDataDirectory(System.getProperty("java.io.tmpdir"))
   broker.setBrokerName(host)
   broker.setAdvisorySupport(false)
   broker.setUseJmx(true)
