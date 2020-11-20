@@ -75,7 +75,7 @@ object ProcessingApp {
       // Maximum number of messages to prefetch before applying backpressure. Default value is: 100
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
-      .withBufferSize(100)
+      .withBufferSize(0)
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
   )
 
