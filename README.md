@@ -63,7 +63,7 @@ Start the classes in the order below and watch the console output.
 `WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets)) is some kind of Alpakka-Trophy with these stages:
+This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is some kind of Alpakka-Trophy with these stages:
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
