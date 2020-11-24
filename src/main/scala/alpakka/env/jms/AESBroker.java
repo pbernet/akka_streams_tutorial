@@ -29,31 +29,29 @@ public class AESBroker extends BrokerFilter {
     private static final String KEY_STRING = System.getProperty("activemq.aeskey");
 
     private Key aesKey = null;
-    private Cipher cipher = null;
 
     public AESBroker(Broker next) throws Exception {
         super(next);
+        init();
     }
 
-    //Not called in constructor because of race condition
     private void init() throws Exception {
         if (KEY_STRING == null || KEY_STRING.length() != 16) {
             throw new Exception("Bad AES key configured - ensure that JVM system property 'activemq.aeskey' is set to a 16 character string");
         }
         if (aesKey == null) {
             aesKey = new SecretKeySpec(KEY_STRING.getBytes(), "AES");
-            cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
         }
     }
 
     public String encrypt(String text) throws Exception {
-        init();
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING", "BC");
         cipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
         return toHexString(cipher.doFinal(text.getBytes()));
     }
 
     public String decrypt(String text) throws Exception {
-        init();
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING", "BC");
         cipher.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
         return new String(cipher.doFinal(toByteArray(text)));
     }
@@ -143,7 +141,7 @@ public class AESBroker extends BrokerFilter {
 
             return tm;
         } else {
-            LOGGER.info("Can not decrypt message with id: {}, because it is already decrypted", msg.getCorrelationId());
+            LOGGER.debug("Can not decrypt message with id: {}, because it is already decrypted", msg.getCorrelationId());
             return msg;
         }
     }

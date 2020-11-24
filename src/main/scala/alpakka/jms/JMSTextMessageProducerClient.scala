@@ -3,8 +3,8 @@ package alpakka.jms
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ThrottleMode
-import akka.stream.alpakka.jms.scaladsl.JmsProducer
 import akka.stream.alpakka.jms._
+import akka.stream.alpakka.jms.scaladsl.JmsProducer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import javax.jms.ConnectionFactory
@@ -51,7 +51,7 @@ object JMSTextMessageProducerClient {
     )
 
     Source(1 to 2000000)
-      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+      .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .wireTap(number => logger.info(s"SEND Msg with TRACE_ID: $number"))
       .map { number =>
         JmsTextMessage(s"Payload: ${number.toString}")
