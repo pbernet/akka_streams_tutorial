@@ -14,39 +14,46 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.jms.JMSException;
 import javax.xml.bind.DatatypeConverter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Base64;
 
 /**
  * Uses AES 256 "AES/CBC/PKCS5PADDING" with empty IV for now
- *
  */
 public class AESBroker extends BrokerFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AESBroker.class);
 
-    private final String keyStr = System.getProperty("activemq.aeskey");
+    private static final String IS_ENCRYPTED = "isEncrypted";
+    private static final String KEY_STRING = System.getProperty("activemq.aeskey");
+
     private Key aesKey = null;
     private Cipher cipher = null;
 
     public AESBroker(Broker next) throws Exception {
         super(next);
-        init();
     }
 
+    //Not called in constructor because of race condition
     private void init() throws Exception {
-        if (keyStr == null || keyStr.length() != 16) {
+        if (KEY_STRING == null || KEY_STRING.length() != 16) {
             throw new Exception("Bad AES key configured - ensure that JVM system property 'activemq.aeskey' is set to a 16 character string");
         }
-        aesKey = new SecretKeySpec(keyStr.getBytes(), "AES");
-        cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+        if (aesKey == null) {
+            aesKey = new SecretKeySpec(KEY_STRING.getBytes(), "AES");
+            cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+        }
     }
 
     public String encrypt(String text) throws Exception {
+        init();
         cipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
         return toHexString(cipher.doFinal(text.getBytes()));
     }
 
     public String decrypt(String text) throws Exception {
+        init();
         cipher.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
         return new String(cipher.doFinal(toByteArray(text)));
     }
@@ -60,33 +67,32 @@ public class AESBroker extends BrokerFilter {
     }
 
     public Message encryptMessage(Message msg) {
+        LOGGER.debug("About to encrypt message with id: {}", msg.getCorrelationId());
 
-        String msgBody = "";
+        String msgBodyOriginal;
+        String msgBodyEncrypted;
         ActiveMQTextMessage tm = initializeTextMessage(msg);
         try {
-            msgBody = tm.getText();
-        }
-        catch (JMSException e) {
-            LOGGER.error("Could not get message body contents for encryption \n" + e.getMessage());
+            msgBodyOriginal = tm.getText();
+        } catch (JMSException e) {
+            LOGGER.error("Could not get message body contents for encryption. Cause:", e);
             return msg;
         }
 
         try {
-            msgBody = encrypt(msgBody);
-            msgBody = Base64.getEncoder().encodeToString(msgBody.getBytes());
-        }
-        catch (Exception e) {
-            LOGGER.error("Could not encrypt message\n", e);
+            msgBodyEncrypted = Base64.getEncoder().encodeToString(encrypt(msgBodyOriginal).getBytes());
+        } catch (Exception e) {
+            LOGGER.error("Could not encrypt message with id: {}. Cause:", tm.getCorrelationId(), e);
             return msg;
         }
 
-        LOGGER.debug("Encrypted message to: " + msgBody);
+        LOGGER.debug("Successfully encrypted message to:" + msgBodyEncrypted);
 
         try {
-            tm.setText(msgBody);
-        }
-        catch (Exception e) {
-            LOGGER.error("Could not write to message body\n", e);
+            tm.setText(msgBodyEncrypted);
+            tm.setProperty(IS_ENCRYPTED, true);
+        } catch (Exception e) {
+            LOGGER.error("Could not write to message body. Cause:", e);
             return msg;
         }
 
@@ -94,37 +100,52 @@ public class AESBroker extends BrokerFilter {
     }
 
     public Message decryptMessage(Message msg) {
+        LOGGER.debug("About to decrypt message with id: {}", msg.getCorrelationId());
 
-        String msgBody = "";
+        String msgBodyOriginal;
+        String msgBodyDecrypted;
+        Boolean isEncrypted;
         ActiveMQTextMessage tm = initializeTextMessage(msg);
+
         try {
-            msgBody = tm.getText();
-        }
-        catch (JMSException e) {
-            LOGGER.error("Could not get message body contents for decryption \n", e);
+            isEncrypted = (Boolean) tm.getProperty(IS_ENCRYPTED);
+        } catch (IOException e) {
+            LOGGER.error("Could not read metadata attribute {}. Cause:", IS_ENCRYPTED, e);
             return msg;
         }
 
-        try {
-            msgBody = new String(Base64.getDecoder().decode(msgBody),"utf-8");
-            msgBody = decrypt(msgBody);
-        }
-        catch (Exception e) {
-            LOGGER.error("Could not decrypt message\n", e);
+        if (isEncrypted) {
+            try {
+                msgBodyOriginal = tm.getText();
+                LOGGER.debug("About to decrypt message with id: {} and content: {}", msg.getCorrelationId(), msgBodyOriginal);
+            } catch (JMSException e) {
+                LOGGER.error("Could not get message body contents for decryption. Cause:", e);
+                return msg;
+            }
+
+
+            try {
+                msgBodyDecrypted = decrypt(new String(Base64.getDecoder().decode(msgBodyOriginal), StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                LOGGER.error("Could not decrypt message with id: {}. Cause:", tm.getCorrelationId(), e);
+                return msg;
+            }
+
+            LOGGER.debug("Successfully decrypted message to: " + msgBodyDecrypted);
+
+            try {
+                tm.setText(msgBodyDecrypted);
+                tm.setProperty(IS_ENCRYPTED, false);
+            } catch (Exception e) {
+                LOGGER.error("Could not write to message body. Cause:", e);
+                return msg;
+            }
+
+            return tm;
+        } else {
+            LOGGER.info("Can not decrypt message with id: {}, because it is already decrypted", msg.getCorrelationId());
             return msg;
         }
-
-        LOGGER.debug("Decrypted message to: " + msgBody);
-
-        try {
-            tm.setText(msgBody);
-        }
-        catch (Exception e) {
-            LOGGER.error("Could not write to message body\n" + e.getMessage());
-            return msg;
-        }
-
-        return tm;
     }
 
     private ActiveMQTextMessage initializeTextMessage(Message msg) {

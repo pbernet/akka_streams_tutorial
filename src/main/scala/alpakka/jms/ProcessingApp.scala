@@ -91,8 +91,9 @@ object ProcessingApp {
   private def simulateFaultyDeliveryToExternalSystem(ackEnvelope: AckEnvelope) = {
     try {
       val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
+      val payload = ackEnvelope.message.asInstanceOf[TextMessage].getText
       val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 100
-      logger.info(s"RECEIVED Msg with TRACE_ID: $traceID - Working for: $randomTime ms")
+      logger.info(s"RECEIVED Msg with TRACE_ID: $traceID and payload: $payload - Working for: $randomTime ms")
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < randomTime) {
         if (randomTime >= 400) throw new RuntimeException("BOOM") //comment out for "happy path"
@@ -116,6 +117,7 @@ object ProcessingApp {
     val traceID = origMessage.getIntProperty("TRACE_ID")
 
     val errorMessage = JmsTextMessage(origMessage.getText)
+      .withHeader(JmsCorrelationId.create(traceID.toString))
       .withProperty("TRACE_ID", traceID)
       .withProperty("errorType", e.getClass.getName)
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)

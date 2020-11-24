@@ -35,13 +35,12 @@ object JMSServer extends App {
   broker.setUseJmx(true)
   broker.setSchedulerSupport(false)
 
+  broker.setUseShutdownHook(true)
   broker.start()
 
   if (broker.isStarted) {
     logger.info(s"JMSServer is started with available processors: ${Runtime.getRuntime.availableProcessors()}")
   }
 
-  System.in.read
-  broker.stop()
-  broker.waitUntilStopped()
+  Thread.currentThread.join()
 }
