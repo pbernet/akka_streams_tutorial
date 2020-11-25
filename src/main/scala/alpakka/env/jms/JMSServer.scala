@@ -1,6 +1,5 @@
-package alpakka.env
+package alpakka.env.jms
 
-import alpakka.env.jms.AESBrokerPlugin
 import org.apache.activemq.broker.{BrokerPlugin, BrokerService}
 import org.slf4j.{Logger, LoggerFactory}
 

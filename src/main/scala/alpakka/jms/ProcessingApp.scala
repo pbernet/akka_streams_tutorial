@@ -20,9 +20,11 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * ProcessingApp is an Alpakka JMS client which consumes messages from an
-  * embedded ActiveMQ queue [[alpakka.env.JMSServer]]. The server may be restarted manually
-  * Generate messages with [[JMSTextMessageProducerClient]]
+  * An Alpakka JMS client which consumes text messages from:
+  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
+  *  - Artemis JMS Broker on docker: /docker/docker-compose.yml
+  *
+  * Generate text messages with [[JMSTextMessageProducerClient]]
   *
   * Up to Alpakka 1.0-M1 there was an issue discussed here:
   * Alpakka JMS connector restart behaviour
@@ -32,7 +34,6 @@ import scala.util.{Failure, Success}
   * This example has been "upcycled" to demonstrate a realistic consumer scenario,
   * where non deliverable messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
   *
-  * Alternative Artemis JMS Broker: /docker/docker-compose.yml
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -143,6 +144,9 @@ object ProcessingApp {
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 
+      //Sometimes after restarts of the server, there are pending messages
+      //The reason for this may be faulty ack handling (the message is consumed but never acknowledged)
+      //After another restart of the JMS server these messages are then consumed
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }
