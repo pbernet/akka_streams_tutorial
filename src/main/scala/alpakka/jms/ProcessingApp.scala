@@ -144,9 +144,10 @@ object ProcessingApp {
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 
-      //Sometimes after restarts of the server, there are pending messages
-      //The reason for this may be faulty ack handling (the message is consumed but never acknowledged)
+      //Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
+      //The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
       //After another restart of the JMS server these messages are then consumed
+      //If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }
