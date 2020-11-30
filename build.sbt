@@ -16,7 +16,7 @@ val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.0-rc2"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0-RC1",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
