@@ -6,6 +6,7 @@ import org.apache.activemq.broker.ProducerBrokerExchange;
 import org.apache.activemq.command.ActiveMQTextMessage;
 import org.apache.activemq.command.Message;
 import org.apache.activemq.command.MessageDispatch;
+import org.apache.commons.compress.utils.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,13 +15,17 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.jms.JMSException;
 import javax.xml.bind.DatatypeConverter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * Uses AES 256 "AES/CBC/PKCS5PADDING" with empty IV for now
+ * Uses AES 256 "AES/CBC/PKCS5PADDING"
  */
 public class AESBroker extends BrokerFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AESBroker.class);
@@ -28,7 +33,8 @@ public class AESBroker extends BrokerFilter {
     private static final String IS_ENCRYPTED = "isEncrypted";
     private static final String KEY_STRING = System.getProperty("activemq.aeskey");
 
-    private Key aesKey = null;
+    private Key aesKey;
+    private int initialisationVectorLength = 16;
 
     public AESBroker(Broker next) throws Exception {
         super(next);
@@ -39,21 +45,32 @@ public class AESBroker extends BrokerFilter {
         if (KEY_STRING == null || KEY_STRING.length() != 16) {
             throw new Exception("Bad AES key configured - ensure that JVM system property 'activemq.aeskey' is set to a 16 character string");
         }
-        if (aesKey == null) {
-            aesKey = new SecretKeySpec(KEY_STRING.getBytes(), "AES");
-        }
+        aesKey = new SecretKeySpec(KEY_STRING.getBytes(), "AES");
     }
 
     public String encrypt(String text) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING", "BC");
-        cipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
-        return toHexString(cipher.doFinal(text.getBytes()));
+        byte [] iv = genInitialisationVector();
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
+
+        //Prepend IV
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        outputStream.write(iv);
+        outputStream.write(cipher.doFinal(text.getBytes()));
+
+        return toHexString(outputStream.toByteArray());
     }
 
     public String decrypt(String text) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING", "BC");
-        cipher.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(new byte[16]));
-        return new String(cipher.doFinal(toByteArray(text)));
+
+        //Read IV (first n bytes from payload)
+        byte[] ivBytesBuffer = new byte[initialisationVectorLength];
+        InputStream payload = new ByteArrayInputStream(toByteArray(text));
+        payload.read(ivBytesBuffer);
+
+        cipher.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(ivBytesBuffer));
+        return new String(cipher.doFinal(IOUtils.toByteArray(payload)));
     }
 
     public String toHexString(byte[] array) {
@@ -166,5 +183,10 @@ public class AESBroker extends BrokerFilter {
             messageDispatch.setMessage(decryptedMessage);
             next.preProcessDispatch(messageDispatch);
         }
+    }
+
+    //Synonym for IV: nonce (= number once)
+    private byte [] genInitialisationVector() {
+        return new SecureRandom().generateSeed(initialisationVectorLength);
     }
 }
