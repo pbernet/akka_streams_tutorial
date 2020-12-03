@@ -68,7 +68,7 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % "4.5.9",
   "commons-io" % "commons-io" % "2.7",
   "org.apache.commons" % "commons-lang3" % "3.11",
-  "org.apache.avro" % "avro" % "1.8.2",
+  "org.apache.avro" % "avro" % "1.10.1",
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.1",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
