@@ -23,7 +23,11 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  
+
+  //"Overrides needed for gRPC
+  "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
+  "com.typesafe.akka" %% "akka-http2-support" % akkaHTTPVersion,
+
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
@@ -95,3 +99,11 @@ scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
 fork in run := true
+
+enablePlugins(AkkaGrpcPlugin)
+
+// TODO enable gRPC with metadata accessible API on server
+// see:
+// https://doc.akka.io/docs/akka-grpc/current/buildtools/sbt.html#generating-server-
+// https://doc.akka.io/docs/akka-grpc/current/server/details.html#accessing-request-metadata
+//akkaGrpcCodeGeneratorSettings += "server_power_apis"

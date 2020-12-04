@@ -27,6 +27,9 @@
     <logger name="net.schmizz.sshj" level="ERROR"/>
     <logger name="com.hierynomus.sshj" level="ERROR"/>
 
+    <!-- Turn down noise from netty in gRPC example -->
+    <logger name="io.grpc.netty" level="INFO"/>
+
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
     </root>
