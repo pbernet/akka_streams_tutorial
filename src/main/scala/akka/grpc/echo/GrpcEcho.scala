@@ -1,6 +1,7 @@
-package example.myapp.helloworld
+package akka.grpc.echo
 
 import akka.actor.ActorSystem
+import akka.grpc.GrpcClientSettings
 import akka.http.scaladsl.Http
 import akka.stream.scaladsl.Source
 import akka.{Done, NotUsed}
@@ -8,7 +9,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 /**
@@ -80,12 +81,12 @@ object GrpcEcho extends App {
     val greeterServiceClient = GreeterServiceClient(clientSettings)
 
     // Run examples for each of the exposed service methods.
-//    runSingleRequestReplyExample()
-//    runStreamingRequestExample()
-//    runStreamingReplyExample()
-//    runStreamingRequestReplyExample()
+    //    runSingleRequestReplyExample()
+    //    runStreamingRequestExample()
+    //    runStreamingReplyExample()
+    //    runStreamingRequestReplyExample()
 
-    system.scheduler.scheduleAtFixedRate(1.second, 1.second) (() => runSingleRequestReplyExample(id))
+    system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(id))
 
     def runSingleRequestReplyExample(id: Int): Unit = {
       logger.info(s"Client: $id request")

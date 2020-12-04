@@ -1,10 +1,10 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "example.myapp.helloworld.grpc";
+option java_package = "akka.grpc.echo";
 option java_outer_classname = "GrpcEchoProto";
 
-package helloworld;
+package echo;
 
 ////////////////////////////////////// The greeting service definition.
 service GreeterService {

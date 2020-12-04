@@ -1,11 +1,12 @@
-package example.myapp.helloworld
+package akka.grpc.echo
 
 import akka.actor.ActorSystem
+import akka.grpc.GrpcClientSettings
 import akka.stream.scaladsl.Source
 import akka.{Done, NotUsed}
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 object GreeterClient extends App {

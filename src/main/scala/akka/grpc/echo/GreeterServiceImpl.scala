@@ -1,4 +1,4 @@
-package example.myapp.helloworld
+package akka.grpc.echo
 
 import akka.NotUsed
 import akka.stream.Materializer
