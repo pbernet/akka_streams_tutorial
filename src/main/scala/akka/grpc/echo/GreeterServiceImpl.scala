@@ -1,22 +1,25 @@
 package akka.grpc.echo
 
+import java.time.Instant
+
 import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
+import com.google.protobuf.timestamp.Timestamp
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
+
+
 
 class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   import mat.executionContext
 
+  //Metadata attributes for now transported as part of payload
   override def sayHello(in: HelloRequest): Future[HelloReply] = {
-    //Metadata eg client id for now transported as part of payload ${in.clientId}
-    logger.info(s"Server received from client: xx with name: ${in.name}")
-    //Extend signature
-    //Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(123456, 123))))
-    Future.successful(HelloReply(s"Hello, ${in.name}"))
+    logger.info(s"Server: received msg from client: ${in.clientId} with name: ${in.name}")
+    Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
   }
 
   override def itKeepsTalking(in: Source[HelloRequest, NotUsed]): Future[HelloReply] = {

@@ -1,42 +1,37 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 option java_multiple_files = true;
 option java_package = "akka.grpc.echo";
 option java_outer_classname = "GrpcEchoProto";
 
 package echo;
 
-////////////////////////////////////// The greeting service definition.
+/*
+ * Interface definition file shared between client/server
+ * Alternative:
+ * https://doc.akka.io/docs/akka-grpc/current/buildtools/sbt.html#loading-proto-files-from-artifacts
+ */
 service GreeterService {
-  //////////////////////
-  // Sends a greeting //
-  ////////*****/////////
-  //      HELLO       //
-  ////////*****/////////
+
   rpc SayHello (HelloRequest) returns (HelloReply) {}
 
-  // Comment spanning
-  // on several lines
   rpc ItKeepsTalking (stream HelloRequest) returns (HelloReply) {}
 
-  /*
-   * C style comments
-   */
   rpc ItKeepsReplying (HelloRequest) returns (stream HelloReply) {}
 
-  /* C style comments
-   * on several lines
-   * with non-empty heading/trailing line */
   rpc StreamHellos (stream HelloRequest) returns (stream HelloReply) {}
 }
 
-// The request message containing the user's name (= payload) and client_id (= metadata)
+// The request message containing the user's name and client_id (= metadata)
 message HelloRequest {
   string name = 1;
-  //uint32 client_id = 2;
+  uint32 client_id = 2;
 }
 
-// The response message containing the greetings
+// The response message containing the message and a timestamp (= metadata)
 message HelloReply {
   string message = 1;
+  google.protobuf.Timestamp timestamp = 2;
 }

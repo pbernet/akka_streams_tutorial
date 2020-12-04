@@ -24,9 +24,18 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
 
-  //"Overrides needed for gRPC
+  // Overrides needed for gRPC
   "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
   "com.typesafe.akka" %% "akka-http2-support" % akkaHTTPVersion,
+
+  // We need to explicitly "load" the timestamp.proto src
+  // see:
+  // https://github.com/thesamet/sbt-protoc/issues/144
+  // https://github.com/thesamet/sbt-protoc
+  "com.google.protobuf" % "protobuf-java" % "3.11.4" % "protobuf-src" intransitive(),
+
+  //TODO Check out interesting other predef protos
+  //"com.google.api.grpc" % "proto-google-common-protos" % "1.17.0" % "protobuf-src" intransitive(),
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,

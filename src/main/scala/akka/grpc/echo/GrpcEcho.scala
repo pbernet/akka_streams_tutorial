@@ -90,7 +90,7 @@ object GrpcEcho extends App {
 
     def runSingleRequestReplyExample(id: Int): Unit = {
       logger.info(s"Client: $id request")
-      val reply = greeterServiceClient.sayHello(HelloRequest("Alice"))
+      val reply = greeterServiceClient.sayHello(HelloRequest("Alice", id))
       reply.onComplete {
         case Success(msg) =>
           logger.info(s"Client: $id got single reply: $msg")
