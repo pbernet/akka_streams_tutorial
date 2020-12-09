@@ -20,7 +20,7 @@ import scala.util.{Failure, Success}
 
 /**
   * Initiate n singleRequest and in the response consume the stream of elements from the server
-  * From client point of view similar to SSEHeartbeat
+  * From client point of view similar to [[alpakka.sse.SSEHeartbeat]]
   *
   * Doc streaming implications:
   * https://doc.akka.io/docs/akka-http/current/implications-of-streaming-http-entity.html#implications-of-the-streaming-nature-of-request-response-entities
@@ -54,7 +54,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
         Range(0, requestParallelism).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
       )
 
-    // Run singleRequest and completely consume response elements
+    // Run singleRequest and consume all response elements
     def runRequestDownload(req: HttpRequest) =
       Http()
         .singleRequest(req)
