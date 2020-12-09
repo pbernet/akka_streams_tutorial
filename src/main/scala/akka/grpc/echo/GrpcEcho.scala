@@ -15,6 +15,7 @@ import scala.util.{Failure, Success}
 /**
   * Roundtrip using gRPC showing:
   *  - runSingleRequestReply
+  *  - ...
   *
   *
   * Doc:
@@ -22,6 +23,9 @@ import scala.util.{Failure, Success}
   * https://developer.lightbend.com/guides/akka-grpc-quickstart-scala
   *
   * TODO
+  *  - Delay server restart and add retry to clients
+  *  - Add isReplyToAll in runStreamingRequestReplyExample
+  *  - refactor retry from GreeterClient
   *  - Add access to Metadata
   *
   */
@@ -32,7 +36,7 @@ object GrpcEcho extends App {
 
   val (host, port) = ("127.0.0.1", 8080)
   server(systemServer, host, port)
-  (1 to 1).par.foreach(each => client(each, systemClient, host, port))
+  (1 to 2).par.foreach(each => client(each, systemClient, host, port))
 
   def server(system: ActorSystem, host: String, port: Int) = {
     implicit val sys = system
@@ -80,13 +84,13 @@ object GrpcEcho extends App {
     // Create a client-side stub for the service
     val greeterServiceClient = GreeterServiceClient(clientSettings)
 
-    // Run examples for each of the exposed service methods.
+    // TODO Switch on/off: Run examples for each of the exposed service methods.
     //    runSingleRequestReplyExample()
     //    runStreamingRequestExample()
     //    runStreamingReplyExample()
-    //    runStreamingRequestReplyExample()
+        runStreamingRequestReplyExample(id)
 
-    system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(id))
+    //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(id))
 
     def runSingleRequestReplyExample(id: Int): Unit = {
       logger.info(s"Client: $id request")
@@ -123,19 +127,20 @@ object GrpcEcho extends App {
       }
     }
 
-    def runStreamingRequestReplyExample(): Unit = {
+    def runStreamingRequestReplyExample(id: Int): Unit = {
+      logger.info(s"Started runStreamingRequestReplyExample for client: $id")
       val requestStream: Source[HelloRequest, NotUsed] =
         Source
           .tick(100.millis, 1.second, "tick")
           .zipWithIndex
           .map { case (_, i) => i }
-          .map(i => HelloRequest(s"Alice-$i"))
-          .take(10)
+          .map(i => HelloRequest(s"Alice-$id-$i"))
+          .take(10) //limit
           .mapMaterializedValue(_ => NotUsed)
 
       val responseStream: Source[HelloReply, NotUsed] = greeterServiceClient.streamHellos(requestStream)
       val done: Future[Done] =
-        responseStream.runForeach(reply => println(s"got streaming reply: ${reply.message}"))
+        responseStream.runForeach(reply => println(s"Client with id: $id got streaming reply: ${reply.message}"))
 
       done.onComplete {
         case Success(_) =>

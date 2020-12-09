@@ -4,12 +4,14 @@ import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.stream.scaladsl.Source
 import akka.{Done, NotUsed}
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 object GreeterClient extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("GreeterClient")
   implicit val executionContext = system.dispatcher
 
@@ -28,24 +30,32 @@ object GreeterClient extends App {
   val client: GreeterService = GreeterServiceClient(clientSettings)
 
   // Run examples for each of the exposed service methods.
-  runSingleRequestReplyExample()
-  runStreamingRequestExample()
-  runStreamingReplyExample()
-  runStreamingRequestReplyExample()
+  //runSingleRequestReplyExample()
+  //runStreamingRequestExample()
+  //runStreamingReplyExample()
+  //runStreamingRequestReplyExample()
 
-  system.scheduler.schedule(1.second, 1.second) {
-    runSingleRequestReplyExample()
-  }
+  //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample())
+  runSingleRequestReplyExample()
 
   def runSingleRequestReplyExample(): Unit = {
-    system.log.info("Performing request")
-    val reply = client.sayHello(HelloRequest("Alice"))
-    reply.onComplete {
-      case Success(msg) =>
-        println(s"got single reply: $msg")
-      case Failure(e) =>
-        println(s"Error sayHello: $e")
-    }
+
+    // Use akka retry utility to handle case when server not reachable one first request
+    implicit val scheduler = system.scheduler
+    val maxAttempts = 10
+    val delaySeconds = 1
+
+    val retried = akka.pattern.retry[HelloReply](
+      attempt = () => client.sayHello(HelloRequest("Alice")),
+      attempts = maxAttempts,
+      delay = 1.second)
+
+    retried.onComplete {
+          case Success(msg) =>
+            println(s"got single reply: $msg")
+          case Failure(e) =>
+            println(s"Server not reachable after $maxAttempts attempts within ${maxAttempts*delaySeconds} seconds. Reply from server: $e")
+        }
   }
 
   def runStreamingRequestExample(): Unit = {
@@ -53,22 +63,22 @@ object GreeterClient extends App {
     val reply = client.itKeepsTalking(Source(requests))
     reply.onComplete {
       case Success(msg) =>
-        println(s"got single reply for streaming requests: $msg")
+        logger.info(s"got single reply for streaming requests: $msg")
       case Failure(e) =>
-        println(s"Error streamingRequest: $e")
+        logger.info(s"Error streamingRequest: $e")
     }
   }
 
   def runStreamingReplyExample(): Unit = {
     val responseStream = client.itKeepsReplying(HelloRequest("Alice"))
     val done: Future[Done] =
-      responseStream.runForeach(reply => println(s"got streaming reply: ${reply.message}"))
+      responseStream.runForeach(reply => logger.info(s"got streaming reply: ${reply.message}"))
 
     done.onComplete {
       case Success(_) =>
-        println("streamingReply done")
+        logger.info("streamingReply done")
       case Failure(e) =>
-        println(s"Error streamingReply: $e")
+        logger.info(s"Error streamingReply: $e")
     }
   }
 
@@ -84,13 +94,13 @@ object GreeterClient extends App {
 
     val responseStream: Source[HelloReply, NotUsed] = client.streamHellos(requestStream)
     val done: Future[Done] =
-      responseStream.runForeach(reply => println(s"got streaming reply: ${reply.message}"))
+      responseStream.runForeach(reply => logger.info(s"got streaming reply: ${reply.message}"))
 
     done.onComplete {
       case Success(_) =>
-        println("streamingRequestReply done")
+        logger.info("streamingRequestReply done")
       case Failure(e) =>
-        println(s"Error streamingRequestReply: $e")
+        logger.info(s"Error streamingRequestReply: $e")
     }
   }
 }
