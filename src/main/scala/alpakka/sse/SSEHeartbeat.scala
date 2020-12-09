@@ -18,8 +18,8 @@ import scala.util.{Failure, Success}
 
 /**
   * Basic heartbeat example, enhanced with an additional backoffClient which is recovering
-  * thanks to the new RestartSource feature in akka 2.5.4 - see:
-  * http://doc.akka.io/docs/akka/current/scala/stream/stream-error.html#delayed-restarts-with-a-backoff-stage
+  * after RuntimeException on server, see Doc RestartSource:
+  * https://doc.akka.io/docs/akka/current/stream/stream-error.html?language=scala#delayed-restarts-with-a-backoff-operator
   *
   * An even more resilient sse server->client implementation is here:
   * http://developer.lightbend.com/docs/alpakka/current/sse.html
