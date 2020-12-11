@@ -15,6 +15,7 @@ import scala.concurrent.duration.DurationInt
 
 
 class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
+  import mat.executionContext
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val replyFun = {request: HelloRequest => HelloReply(s"Hello, ${request.name}")}
@@ -25,11 +26,9 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
       .toMat(BroadcastHub.sink[HelloReply])(Keep.both)
       .run()
 
-  import mat.executionContext
-
   //Metadata attributes for now transported as part of payload
   override def sayHello(in: HelloRequest): Future[HelloReply] = {
-    logger.info(s"Server: received msg from client: ${in.clientId} with name: ${in.name}")
+    logger.info(s"Server received msg from client: ${in.clientId} with name: ${in.name}")
     Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
   }
 

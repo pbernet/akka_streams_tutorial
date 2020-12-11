@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
   *
   */
 
-class GreeterServer extends App {
+object GreeterServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("GreeterServer")
   implicit val ec = system.dispatcher
