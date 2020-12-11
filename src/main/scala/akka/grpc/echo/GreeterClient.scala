@@ -17,7 +17,6 @@ import scala.util.{Failure, Success}
   * For simplicity reasons all the grpc sources are kept in one place
   *
   * TODO
-  * - refactor retry
   * - add // clients?
   * - Add Balancing
   * - Add access to Metadata?
@@ -29,7 +28,8 @@ object GreeterClient extends App {
   
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
-    //.withDeadline(1.second) //TODO Check impact and need
+    // Time to wait for a reply from server and retry our request after that
+    .withDeadline(1.second)
     .withTls(false)
 
 
@@ -38,39 +38,17 @@ object GreeterClient extends App {
   // And via service discovery https://doc.akka.io/docs/akka-grpc/current/client/configuration.html#using-akka-discovery-for-endpoint-discovery
   // val clientSettings = GrpcClientSettings.fromConfig(GreeterService.name)
 
-  // Create a client-side stub for the service
   val client: GreeterService = GreeterServiceClient(clientSettings)
 
 
   def runSingleRequestReplyExample(id: Int): Unit = {
-
-    // Use akka retry utility to handle case when server not reachable one first request
-    implicit val scheduler = system.scheduler
-    val maxAttempts = 5
-    val delay = 1
-
-    val retried = akka.pattern.retry[HelloReply](
-      attempt = () => client.sayHello(HelloRequest("Alice", id)),
-      attempts = maxAttempts,
-      delay = delay.second)
-
-    retried.onComplete {
-          case Success(msg) =>
-            logger.info(s"Client: $id got single reply: $msg")
-          case Failure(e) =>
-            logger.info(s"Server not reachable after: $maxAttempts attempts within ${maxAttempts*delay} seconds. Reply from server: $e")
-        }
+      withRetry(() => client.sayHello(HelloRequest("Alice", id)), id)
   }
 
-  def runStreamingRequestExample(): Unit = {
-    val requests = List("Alice", "Bob", "Peter").map(HelloRequest(_))
-    val reply = client.itKeepsTalking(Source(requests))
-    reply.onComplete {
-      case Success(msg) =>
-        logger.info(s"got single reply for streaming requests: $msg")
-      case Failure(e) =>
-        logger.info(s"Error streamingRequest: $e")
-    }
+  def runStreamingRequestExample(id: Int): Unit = {
+    val source = Source(1 to 100)
+      .map(each => HelloRequest(each.toString, id))
+    withRetry(() => client.itKeepsTalking(source), id)
   }
 
   def runStreamingReplyExample(): Unit = {
@@ -86,9 +64,28 @@ object GreeterClient extends App {
     }
   }
 
+  // Use akka retry utility to handle case when server is not reachable on initial request
+  private def withRetry(fun: () => Future[HelloReply], id: Int) = {
+    implicit val scheduler = system.scheduler
+    val maxAttempts = 10
+    val delay = 1
+
+    val retried = akka.pattern.retry[HelloReply](
+      attempt = fun,
+      attempts = maxAttempts,
+      delay = delay.second)
+
+    retried.onComplete {
+      case Success(msg) =>
+        logger.info(s"Client: $id got reply: $msg")
+      case Failure(e) =>
+        logger.info(s"Server not reachable on initial request after: $maxAttempts attempts within ${maxAttempts*delay} seconds. Give up. Ex: $e")
+    }
+  }
+
 
   // Run examples for each of the exposed service methods
-  system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
-  //runStreamingRequestExample()
+  //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
+  runStreamingRequestExample(1)
   //runStreamingReplyExample()
 }
