@@ -4,8 +4,8 @@ import java.time.Instant
 
 import akka.NotUsed
 import akka.grpc.echo.gen._
+import akka.stream.Materializer
 import akka.stream.scaladsl.{BroadcastHub, Keep, MergeHub, Sink, Source}
-import akka.stream.{Materializer, ThrottleMode}
 import com.google.protobuf.timestamp.Timestamp
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -26,22 +26,28 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
       .toMat(BroadcastHub.sink[HelloReply])(Keep.both)
       .run()
 
-  //Metadata attributes for now transported as part of payload
+  // Metadata attributes for now transported as part of payload
   override def sayHello(in: HelloRequest): Future[HelloReply] = {
-    logger.info(s"Server received msg from client: ${in.clientId} with name: ${in.name}")
+    logger.info(s"Server received single msg from client: ${in.clientId} with name: ${in.name}")
     Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
   }
 
+  // Utilize to send a batch of data and ack together
   override def itKeepsTalking(in: Source[HelloRequest, NotUsed]): Future[HelloReply] = {
-    logger.info(s"sayHello to in stream...")
-    in.runWith(Sink.seq).map(elements => HelloReply(s"Hello, ${elements.map(_.name).mkString(", ")}"))
+    in
+      .wireTap(each => logger.info(s"Server received stream of msgs from client: ${each.clientId} with name: ${each.name}") )
+      .runWith(Sink.seq).map(elements => HelloReply(s"Hello, ${elements.map(_.name).mkString(", ")}"))
   }
 
+  // Utilize to have heartbeat functionality on the application level
+  // TODO vs https://github.com/grpc/grpc/blob/master/doc/health-checking.md
   override def itKeepsReplying(in: HelloRequest): Source[HelloReply, NotUsed] = {
     logger.info(s"Starting heartbeat...")
-    Source(1 to 100)
-      .throttle(1, 1.second, 10, ThrottleMode.shaping)
-      .map(each => HelloReply(each.toString))
+
+    Source
+      .tick(initialDelay = 0.seconds, interval = 1.seconds, NotUsed)
+      .map(each => HelloReply(each.toString, Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
+      .mapMaterializedValue(each => NotUsed)
   }
 
   override def streamHellos(in: Source[HelloRequest, NotUsed]): Source[HelloReply, NotUsed] = {

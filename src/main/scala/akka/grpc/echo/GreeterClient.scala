@@ -1,6 +1,5 @@
 package akka.grpc.echo
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.grpc.echo.gen._
@@ -29,7 +28,7 @@ object GreeterClient extends App {
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
     // Time to wait for a reply from server and retry our request after that
-    .withDeadline(1.second)
+    //.withDeadline(1.second)
     .withTls(false)
 
 
@@ -51,10 +50,11 @@ object GreeterClient extends App {
     withRetry(() => client.itKeepsTalking(source), id)
   }
 
-  def runStreamingReplyExample(): Unit = {
-    val responseStream = client.itKeepsReplying(HelloRequest("Alice"))
-    val done: Future[Done] =
-      responseStream.runForeach(reply => logger.info(s"got streaming reply: ${reply.message}"))
+  //TODO Add initial withRetry
+  def runStreamingReplyExample(id: Int): Unit = {
+    val responseStream = client.itKeepsReplying(HelloRequest("Start Heartbeat", id))
+    val done = responseStream
+      .runForeach(reply => logger.info(s"Client: $id got streaming reply: ${reply.timestamp}"))
 
     done.onComplete {
       case Success(_) =>
@@ -86,6 +86,6 @@ object GreeterClient extends App {
 
   // Run examples for each of the exposed service methods
   //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
-  runStreamingRequestExample(1)
-  //runStreamingReplyExample()
+  //runStreamingRequestExample(1)
+  runStreamingReplyExample(1)
 }
