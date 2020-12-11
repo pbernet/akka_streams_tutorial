@@ -1,15 +1,25 @@
 package akka.grpc.echo
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.stream.scaladsl.Source
-import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
+
+/**
+  * gRPC client to run against [[GreeterServer]]
+  * For simplicity reasons all the grpc sources are kept in one place
+  *
+  * TODO
+  * - refactor retry
+  * - Add Balancing
+  * - Add access to Metadata?
+  */
 object GreeterClient extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("GreeterClient")
@@ -22,9 +32,11 @@ object GreeterClient extends App {
     .withTls(false)
 
 
+  // TODO Maybe add discovery
   // Or via application.conf:
   // And via service discovery https://doc.akka.io/docs/akka-grpc/current/client/configuration.html#using-akka-discovery-for-endpoint-discovery
   // val clientSettings = GrpcClientSettings.fromConfig(GreeterService.name)
+
 
   // Create a client-side stub for the service
   val client: GreeterService = GreeterServiceClient(clientSettings)
@@ -33,7 +45,7 @@ object GreeterClient extends App {
   //runSingleRequestReplyExample()
   //runStreamingRequestExample()
   //runStreamingReplyExample()
-  //runStreamingRequestReplyExample()
+
 
   //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample())
   runSingleRequestReplyExample()
@@ -79,28 +91,6 @@ object GreeterClient extends App {
         logger.info("streamingReply done")
       case Failure(e) =>
         logger.info(s"Error streamingReply: $e")
-    }
-  }
-
-  def runStreamingRequestReplyExample(): Unit = {
-    val requestStream: Source[HelloRequest, NotUsed] =
-      Source
-        .tick(100.millis, 1.second, "tick")
-        .zipWithIndex
-        .map { case (_, i) => i }
-        .map(i => HelloRequest(s"Alice-$i"))
-        .take(10)
-        .mapMaterializedValue(_ => NotUsed)
-
-    val responseStream: Source[HelloReply, NotUsed] = client.streamHellos(requestStream)
-    val done: Future[Done] =
-      responseStream.runForeach(reply => logger.info(s"got streaming reply: ${reply.message}"))
-
-    done.onComplete {
-      case Success(_) =>
-        logger.info("streamingRequestReply done")
-      case Failure(e) =>
-        logger.info(s"Error streamingRequestReply: $e")
     }
   }
 }

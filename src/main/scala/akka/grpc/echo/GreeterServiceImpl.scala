@@ -19,6 +19,7 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   val replyFun = {request: HelloRequest => HelloReply(s"Hello, ${request.name}")}
   val (inboundHub: Sink[HelloRequest, NotUsed], outboundHub: Source[HelloReply, NotUsed]) =
     MergeHub.source[HelloRequest]
+      .wireTap(each => logger.info(s"Server received streamHellos request from client: ${each.clientId}"))
       .map(replyFun)
       .toMat(BroadcastHub.sink[HelloReply])(Keep.both)
       .run()
@@ -43,16 +44,12 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
       .map(each => HelloReply(each.toString))
   }
 
-
-  //TODO Add param how to reply (single vs chat) as part of request?
   override def streamHellos(in: Source[HelloRequest, NotUsed]): Source[HelloReply, NotUsed] = {
-    logger.info(s"sayHello to stream...")
-    //Reply to asking client
-    in.map(replyFun)
 
-    // Reply to all clients, "chat server"
-    // The stream of incoming HelloRequest messages are sent out as corresponding HelloReply.
-    // From all clients to all clients, like a chat room.
+    //Reply to asking client only
+    //in.map(replyFun)
+
+    // Reply to all clients, like a chat room
     in.runWith(inboundHub)
     outboundHub
   }
