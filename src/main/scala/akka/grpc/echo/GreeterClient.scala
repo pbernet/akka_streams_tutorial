@@ -3,6 +3,7 @@ package akka.grpc.echo
 import akka.Done
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
+import akka.grpc.echo.gen._
 import akka.stream.scaladsl.Source
 import org.slf4j.{Logger, LoggerFactory}
 

@@ -3,6 +3,7 @@ package akka.grpc.echo
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
+import akka.grpc.echo.gen._
 import akka.http.scaladsl.Http
 import akka.stream.ThrottleMode
 import akka.stream.scaladsl.Source

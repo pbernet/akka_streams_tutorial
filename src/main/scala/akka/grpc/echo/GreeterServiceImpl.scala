@@ -3,6 +3,7 @@ package akka.grpc.echo
 import java.time.Instant
 
 import akka.NotUsed
+import akka.grpc.echo.gen._
 import akka.stream.scaladsl.{BroadcastHub, Keep, MergeHub, Sink, Source}
 import akka.stream.{Materializer, ThrottleMode}
 import com.google.protobuf.timestamp.Timestamp

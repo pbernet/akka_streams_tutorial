@@ -1,6 +1,7 @@
 package akka.grpc.echo
 
 import akka.actor.ActorSystem
+import akka.grpc.echo.gen._
 import akka.http.scaladsl.Http
 import org.slf4j.{Logger, LoggerFactory}
 
