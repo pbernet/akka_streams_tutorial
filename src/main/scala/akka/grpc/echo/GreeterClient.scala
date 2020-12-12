@@ -1,10 +1,11 @@
 package akka.grpc.echo
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.grpc.echo.gen._
 import akka.stream.RestartSettings
-import akka.stream.scaladsl.{RestartSource, Source}
+import akka.stream.scaladsl.{RestartSource, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
@@ -17,6 +18,7 @@ import scala.util.{Failure, Success}
   * For simplicity reasons all the grpc sources are kept in one place
   *
   * TODO
+  * - Verify this kind of application backpressure also for runStreamingRequestExample
   * - add // clients?
   * - Add Balancing
   * - Add access to Metadata?
@@ -29,7 +31,7 @@ object GreeterClient extends App {
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
     // Time to wait for a reply from server and retry our request after that
-    .withDeadline(1.second)
+    .withDeadline(1.second)   //TODO Does not seem to have an effect anymore
     .withTls(false)
 
   val clientSettingsHeartbeat = GrpcClientSettings
@@ -46,8 +48,25 @@ object GreeterClient extends App {
   val clientHeartbeat: GreeterService = GreeterServiceClient(clientSettingsHeartbeat)
 
 
+  // Send n single messages, wait for ack (to get application backpressure). Retry on failure
   def runSingleRequestReplyExample(id: Int): Unit = {
-      withRetry(() => client.sayHello(HelloRequest("Alice", id)), id)
+
+    def sendAndReceive(i: Int): Future[Done] = {
+      Source.single(id)
+        .mapAsync(1)(each => client.sayHello(HelloRequest(s"$each-$i", id)))
+        .runForeach(reply => logger.info(s"Client: $id received reply: $reply"))
+        .recoverWith {
+          case ex: RuntimeException =>
+            logger.warn(s"Client: $id about to retry for element $i, because of: $ex")
+            sendAndReceive(i)
+          case e: Throwable => Future.failed(e)
+        }
+    }
+
+    Source(1 to 100)
+      .throttle(1, 1.second)
+      .mapAsync(1)(i => sendAndReceive(i))
+      .runWith(Sink.ignore)
   }
 
   def runStreamingRequestExample(id: Int): Unit = {
@@ -96,6 +115,7 @@ object GreeterClient extends App {
 
   // Run examples for each of the exposed service methods
   //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
-  runStreamingRequestExample(1)
-  runStreamingReplyExample(1)
+  runSingleRequestReplyExample(1)
+  //runStreamingRequestExample(1)
+  //runStreamingReplyExample(1)
 }
