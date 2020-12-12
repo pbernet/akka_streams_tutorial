@@ -3,7 +3,8 @@ package akka.grpc.echo
 import akka.actor.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.grpc.echo.gen._
-import akka.stream.scaladsl.Source
+import akka.stream.RestartSettings
+import akka.stream.scaladsl.{RestartSource, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
@@ -28,7 +29,11 @@ object GreeterClient extends App {
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
     // Time to wait for a reply from server and retry our request after that
-    //.withDeadline(1.second)
+    .withDeadline(1.second)
+    .withTls(false)
+
+  val clientSettingsHeartbeat = GrpcClientSettings
+    .connectToServiceAt("127.0.0.1", 8080)
     .withTls(false)
 
 
@@ -38,6 +43,7 @@ object GreeterClient extends App {
   // val clientSettings = GrpcClientSettings.fromConfig(GreeterService.name)
 
   val client: GreeterService = GreeterServiceClient(clientSettings)
+  val clientHeartbeat: GreeterService = GreeterServiceClient(clientSettingsHeartbeat)
 
 
   def runSingleRequestReplyExample(id: Int): Unit = {
@@ -50,10 +56,14 @@ object GreeterClient extends App {
     withRetry(() => client.itKeepsTalking(source), id)
   }
 
-  //TODO Add initial withRetry
+
   def runStreamingReplyExample(id: Int): Unit = {
-    val responseStream = client.itKeepsReplying(HelloRequest("Start Heartbeat", id))
-    val done = responseStream
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
+      clientHeartbeat.itKeepsReplying(HelloRequest("Alice", id))
+    }
+
+    val done = restartSource
       .runForeach(reply => logger.info(s"Client: $id got streaming reply: ${reply.timestamp}"))
 
     done.onComplete {
@@ -86,6 +96,6 @@ object GreeterClient extends App {
 
   // Run examples for each of the exposed service methods
   //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
-  //runStreamingRequestExample(1)
+  runStreamingRequestExample(1)
   runStreamingReplyExample(1)
 }

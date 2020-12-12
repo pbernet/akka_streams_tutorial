@@ -35,11 +35,11 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   // Utilize to send a batch of data and ack together
   override def itKeepsTalking(in: Source[HelloRequest, NotUsed]): Future[HelloReply] = {
     in
-      .wireTap(each => logger.info(s"Server received stream of msgs from client: ${each.clientId} with name: ${each.name}") )
+      .wireTap(each => logger.info(s"Server received streamed msg from client: ${each.clientId} with name: ${each.name}") )
       .runWith(Sink.seq).map(elements => HelloReply(s"Hello, ${elements.map(_.name).mkString(", ")}"))
   }
 
-  // Utilize to have heartbeat functionality on the application level
+  // Heartbeat server -> client on the application level
   // TODO vs https://github.com/grpc/grpc/blob/master/doc/health-checking.md
   override def itKeepsReplying(in: HelloRequest): Source[HelloReply, NotUsed] = {
     logger.info(s"Starting heartbeat...")
@@ -47,7 +47,7 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
     Source
       .tick(initialDelay = 0.seconds, interval = 1.seconds, NotUsed)
       .map(each => HelloReply(each.toString, Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
-      .mapMaterializedValue(each => NotUsed)
+      .mapMaterializedValue(_ => NotUsed)
   }
 
   override def streamHellos(in: Source[HelloRequest, NotUsed]): Source[HelloReply, NotUsed] = {
