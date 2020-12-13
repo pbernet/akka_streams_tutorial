@@ -21,21 +21,21 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   val replyFun = {request: HelloRequest => HelloReply(s"Hello, ${request.name}")}
   val (inboundHub: Sink[HelloRequest, NotUsed], outboundHub: Source[HelloReply, NotUsed]) =
     MergeHub.source[HelloRequest]
-      .wireTap(each => logger.info(s"Server received streamHellos request from client: ${each.clientId}"))
+      .wireTap(each => logger.info(s"Received streamHellos request from client: ${each.clientId}"))
       .map(replyFun)
       .toMat(BroadcastHub.sink[HelloReply])(Keep.both)
       .run()
 
   // Metadata attributes for now transported as part of payload
   override def sayHello(in: HelloRequest): Future[HelloReply] = {
-    logger.info(s"Server received single msg from client: ${in.clientId} with name: ${in.name}")
+    logger.info("Received from client: ${in.clientId} single msg: ${in.name}")
     Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
   }
 
   // Utilize to send a batch of data and ack together
   override def itKeepsTalking(in: Source[HelloRequest, NotUsed]): Future[HelloReply] = {
     in
-      .wireTap(each => logger.info(s"Server received streamed msg from client: ${each.clientId} with name: ${each.name}") )
+      .wireTap(each => logger.info(s"Received from client: ${each.clientId} streamed msg: ${each.name}") )
       .runWith(Sink.seq).map(elements => HelloReply(s"Hello, ${elements.map(_.name).mkString(", ")}"))
   }
 

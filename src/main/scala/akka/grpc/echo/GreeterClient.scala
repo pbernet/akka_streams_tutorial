@@ -15,10 +15,12 @@ import scala.util.{Failure, Success}
 
 /**
   * gRPC client to run against [[GreeterServer]]
+  * Playground to test different ways of transmission, regarding resilience
+  *
   * For simplicity reasons all the grpc sources are kept in one place
   *
   * TODO
-  * - Verify this kind of application backpressure also for runStreamingRequestExample
+  * - Test if this kind of "application backpressure" would also for runStreamingRequestExample
   * - add // clients?
   * - Add Balancing
   * - Add access to Metadata?
@@ -30,8 +32,8 @@ object GreeterClient extends App {
   
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
-    // Time to wait for a reply from server and retry our request after that
-    .withDeadline(1.second)   //TODO Does not seem to have an effect anymore
+    // Time to wait for a reply from server and retry request after that, used as last resort
+    //.withDeadline(110.second)   //TODO Does NOT seem to have an effect anymore with single request and is not
     .withTls(false)
 
   val clientSettingsHeartbeat = GrpcClientSettings
@@ -48,16 +50,17 @@ object GreeterClient extends App {
   val clientHeartbeat: GreeterService = GreeterServiceClient(clientSettingsHeartbeat)
 
 
-  // Send n single messages, wait for ack (to get application backpressure). Retry on failure
+  // Send single message and wait for ack (to get application backpressure). Retry on failure
   def runSingleRequestReplyExample(id: Int): Unit = {
 
     def sendAndReceive(i: Int): Future[Done] = {
       Source.single(id)
         .mapAsync(1)(each => client.sayHello(HelloRequest(s"$each-$i", id)))
-        .runForeach(reply => logger.info(s"Client: $id received reply: $reply"))
+        .runForeach(reply => logger.info(s"Client: $id received single reply: $reply"))
         .recoverWith {
           case ex: RuntimeException =>
             logger.warn(s"Client: $id about to retry for element $i, because of: $ex")
+            Thread.sleep(1000)
             sendAndReceive(i)
           case e: Throwable => Future.failed(e)
         }
@@ -69,9 +72,13 @@ object GreeterClient extends App {
       .runWith(Sink.ignore)
   }
 
+  // Send a stream of messages and ack all of them. Retry all of them on failure
   def runStreamingRequestExample(id: Int): Unit = {
-    val source = Source(1 to 100)
-      .map(each => HelloRequest(each.toString, id))
+    val maxElements = 100
+    val source = Source(1 to maxElements)
+      .throttle(1, 1.second)
+      .wireTap(each => logger.info(s"Client: $id sending streamed msg: $each/$maxElements"))
+      .map(each => HelloRequest(s"$id-$each/$maxElements", id))
     withRetry(() => client.itKeepsTalking(source), id)
   }
 
@@ -96,7 +103,7 @@ object GreeterClient extends App {
   // Use akka retry utility to handle case when server is not reachable on initial request
   private def withRetry(fun: () => Future[HelloReply], id: Int) = {
     implicit val scheduler = system.scheduler
-    val maxAttempts = 10
+    val maxAttempts = 30
     val delay = 1
 
     val retried = akka.pattern.retry[HelloReply](
@@ -106,7 +113,7 @@ object GreeterClient extends App {
 
     retried.onComplete {
       case Success(msg) =>
-        logger.info(s"Client: $id got reply: $msg")
+        logger.info(s"Client: $id received streamed reply: $msg")
       case Failure(e) =>
         logger.info(s"Server not reachable on initial request after: $maxAttempts attempts within ${maxAttempts*delay} seconds. Give up. Ex: $e")
     }
@@ -114,8 +121,7 @@ object GreeterClient extends App {
 
 
   // Run examples for each of the exposed service methods
-  //system.scheduler.scheduleAtFixedRate(1.second, 1.second)(() => runSingleRequestReplyExample(1))
   runSingleRequestReplyExample(1)
-  //runStreamingRequestExample(1)
+  runStreamingRequestExample(1)
   //runStreamingReplyExample(1)
 }
