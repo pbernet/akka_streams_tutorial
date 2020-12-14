@@ -1,12 +1,13 @@
 package alpakka.kafka
 
-import akka.Done
 import akka.actor.{ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.kafka.scaladsl.{Committer, Consumer}
-import akka.kafka.{CommitterSettings, ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.Sink
+import akka.kafka.{CommitterSettings, ConsumerMessage, ConsumerSettings, Subscriptions}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Sink, ZipWith}
+import akka.stream.{FlowShape, Graph}
 import akka.util.Timeout
+import akka.{Done, NotUsed}
 import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
@@ -60,15 +61,15 @@ object WordCountConsumer extends App {
   }
 
   def createAndRunConsumerMessageCount(id: String) = {
+    implicit val askTimeout = Timeout(5.seconds)
+
+    val writeFlow = Flow[ConsumerMessage.CommittableMessage[String, java.lang.Long]]
+      .map(msg => IncrementMessage(msg.record.value.toInt, id))
+      .ask[Done](total)
+
     Consumer.committableSource(createConsumerSettings("messagecount consumer group"), Subscriptions.topics("messagecount-output"))
-      .mapAsync(1) { msg =>
-        //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
-        import akka.pattern.ask
-        implicit val askTimeout: Timeout = Timeout(3.seconds)
-        (total ? IncrementMessage(msg.record.value.toInt, id))
-          .mapTo[Done]
-          .map(_ => msg.committableOffset)
-      }
+      .via(PassThroughFlow(writeFlow, Keep.right))
+      .map(_.committableOffset)
       .via(Committer.flow(committerSettings))
       .toMat(Sink.seq)(DrainingControl.apply)
       .run()
@@ -85,4 +86,27 @@ object WordCountConsumer extends App {
     drainingControlW2.drainAndShutdown()
     drainingControlM.drainAndShutdown()
   }
+
+  object PassThroughFlow {
+    def apply[A, T](processingFlow: Flow[A, T, NotUsed]): Graph[FlowShape[A, (T, A)], NotUsed] =
+      apply[A, T, (T, A)](processingFlow, Keep.both)
+
+    def apply[A, T, O](processingFlow: Flow[A, T, NotUsed], output: (T, A) => O): Graph[FlowShape[A, O], NotUsed] =
+      Flow.fromGraph(GraphDSL.create() { implicit builder =>
+      {
+        import GraphDSL.Implicits._
+
+        val broadcast = builder.add(Broadcast[A](2))
+        val zip = builder.add(ZipWith[T, A, O]((left, right) => output(left, right)))
+
+        // format: off
+        broadcast.out(0) ~> processingFlow ~> zip.in0
+        broadcast.out(1)         ~>           zip.in1
+        // format: on
+
+        FlowShape(broadcast.in, zip.out)
+      }
+      })
+  }
+
 }
