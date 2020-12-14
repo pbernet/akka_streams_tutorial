@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.kafka.scaladsl.{Committer, Consumer}
 import akka.kafka.{CommitterSettings, ConsumerMessage, ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Sink, ZipWith}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, ZipWith}
 import akka.stream.{FlowShape, Graph}
 import akka.util.Timeout
 import akka.{Done, NotUsed}
@@ -41,6 +41,7 @@ object WordCountConsumer extends App {
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
   }
 
+  //TODO For unknown reasons the processing hangs if PassThroughFlow and ask operator are applied here
   def createAndRunConsumerWordCount(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
@@ -55,8 +56,7 @@ object WordCountConsumer extends App {
           Future(msg).map(_ => msg.committableOffset)
         }
       }
-      .via(Committer.flow(committerSettings))
-      .toMat(Sink.seq)(DrainingControl.apply)
+      .toMat(Committer.sink(committerSettings))(DrainingControl.apply)
       .run()
   }
 
@@ -70,8 +70,7 @@ object WordCountConsumer extends App {
     Consumer.committableSource(createConsumerSettings("messagecount consumer group"), Subscriptions.topics("messagecount-output"))
       .via(PassThroughFlow(writeFlow, Keep.right))
       .map(_.committableOffset)
-      .via(Committer.flow(committerSettings))
-      .toMat(Sink.seq)(DrainingControl.apply)
+      .toMat(Committer.sink(committerSettings))(DrainingControl.apply)
       .run()
   }
 
