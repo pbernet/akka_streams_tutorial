@@ -12,7 +12,6 @@ import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -41,21 +40,16 @@ object WordCountConsumer extends App {
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
   }
 
-  // TODO If PassThroughFlow and ask operator would be applied here the processing hangs, due to the additional filtering
   def createAndRunConsumerWordCount(id: String) = {
+    implicit val askTimeout = Timeout(5.seconds)
+
+    val writeFlow = Flow[ConsumerMessage.CommittableMessage[String, java.lang.Long]]
+      .map(msg => IncrementWord(msg, id))
+      .ask[Done](total)
+
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
-      .mapAsync(1) { msg =>
-        //println(s"$id - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${msg.record.value()}")
-        if (msg.record.key().equalsIgnoreCase("fakeNews")) { //hardcoded because WordCountProducer.fakeNewsKeyword does not work
-          import akka.pattern.ask
-          implicit val askTimeout: Timeout = Timeout(3.seconds)
-          (total ? IncrementWord(msg.record.value.toInt, id))
-            .mapTo[Done]
-            .map(_ => msg.committableOffset)
-        } else {
-          Future(msg).map(_ => msg.committableOffset)
-        }
-      }
+      .via(PassThroughFlow(writeFlow, Keep.right))
+      .map(_.committableOffset)
       .toMat(Committer.sink(committerSettings))(DrainingControl.apply)
       .run()
   }
@@ -65,7 +59,7 @@ object WordCountConsumer extends App {
     implicit val askTimeout = Timeout(5.seconds)
 
     val writeFlow = Flow[ConsumerMessage.CommittableMessage[String, java.lang.Long]]
-      .map(msg => IncrementMessage(msg.record.value.toInt, id))
+      .map(msg => IncrementMessage(msg, id))
       .ask[Done](total)
 
     Consumer.committableSource(createConsumerSettings("messagecount consumer group"), Subscriptions.topics("messagecount-output"))
