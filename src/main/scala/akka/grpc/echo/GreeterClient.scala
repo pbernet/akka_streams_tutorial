@@ -35,6 +35,7 @@ object GreeterClient extends App {
     // Time to wait for a reply from server and retry request after that, used as last resort
     //.withDeadline(110.second)   //TODO Does NOT seem to have an effect anymore with single request and is not
     .withTls(false)
+    //.withConnectionAttempts(1)   //TODO What is the benefit, what is the default value?
 
   val clientSettingsHeartbeat = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
