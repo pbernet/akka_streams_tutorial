@@ -41,7 +41,7 @@ object WordCountConsumer extends App {
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
   }
 
-  //TODO For unknown reasons the processing hangs if PassThroughFlow and ask operator are applied here
+  // TODO If PassThroughFlow and ask operator would be applied here the processing hangs, due to the additional filtering
   def createAndRunConsumerWordCount(id: String) = {
     Consumer.committableSource(createConsumerSettings("wordcount consumer group"), Subscriptions.topics("wordcount-output"))
       .mapAsync(1) { msg =>
@@ -60,6 +60,7 @@ object WordCountConsumer extends App {
       .run()
   }
 
+  // Simple case where PassThroughFlow and ask operator work
   def createAndRunConsumerMessageCount(id: String) = {
     implicit val askTimeout = Timeout(5.seconds)
 
@@ -98,14 +99,10 @@ object WordCountConsumer extends App {
         val broadcast = builder.add(Broadcast[A](2))
         val zip = builder.add(ZipWith[T, A, O]((left, right) => output(left, right)))
 
-        // format: off
         broadcast.out(0) ~> processingFlow ~> zip.in0
         broadcast.out(1)         ~>           zip.in1
-        // format: on
-
         FlowShape(broadcast.in, zip.out)
       }
       })
   }
-
 }
