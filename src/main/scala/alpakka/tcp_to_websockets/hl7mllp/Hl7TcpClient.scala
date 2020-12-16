@@ -1,5 +1,6 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source, Tcp}
 import akka.util.ByteString
@@ -16,49 +17,45 @@ object Hl7TcpClient  extends App with MllpProtocol {
   implicit val executionContext = system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6160)
+  val connection = Tcp().outgoingConnection(address, port)
 
-  (1 to 1).par.foreach(each => localSingleMessageClient(each, 100, address, port))
-  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000, address, port))
+  (1 to 1).par.foreach(each => localSingleMessageClient(each, 100))
+  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000))
 
-  def localSingleMessageClient(client: Int, numberOfMessages: Int, address: String, port: Int): Unit = {
-
-    val connection = Tcp().outgoingConnection(address, port)
-
-    def sendAndReceive(i: Int): Future[Int] = {
-      val traceID = s"$client-${i.toString}"
-      val source = Source.single(ByteString(encodeMllp(generateTestMessage(traceID)))).via(connection)
-      val closed = source.runForeach(each =>
-        if (isNACK(each)) {
-          logger.info(s"Client: $client-$i received NACK: ${printable(each.utf8String)}")
-          throw new RuntimeException("NACK")
-        } else {
-          logger.info(s"Client: $client-$i received ACK: ${printable(each.utf8String)}")
-        }
-      ).recoverWith {
-        case ex: RuntimeException =>
-          logger.warn(s"Client: $client-$i about to retry, because of: $ex")
-          sendAndReceive(i)
-        case e: Throwable => Future.failed(e)
-      }
-      closed.onComplete(each => logger.debug(s"Client: $client-$i closed: $each"))
-      Future(i)
-    }
-
+  def localSingleMessageClient(client: Int, numberOfMessages: Int): Unit = {
     Source(1 to numberOfMessages)
       .throttle(1, 1.second)
-      .mapAsync(1)(i => sendAndReceive(i))
+      .mapAsync(1)(msgID => sendAndReceive(s"$client-$msgID", None))
       .runWith(Sink.ignore)
   }
 
-  def localStreamingMessageClient(id: Int, numberOfMesssages: Int, address: String, port: Int): Unit = {
-
-    val connection = Tcp().outgoingConnection(address, port)
-
+  def localStreamingMessageClient(id: Int, numberOfMesssages: Int): Unit = {
     val hl7MllpMessages=  (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString)) ))
     val source = Source(hl7MllpMessages).throttle(10, 1.second).via(connection)
     val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }
+
+  private def sendAndReceive(traceID: String, hl7Msg: Option[String]): Future[NotUsed] = {
+    val hl7MsgString = hl7Msg.getOrElse(generateTestMessage(traceID))
+    val source = Source.single(ByteString(encodeMllp(hl7MsgString))).via(connection)
+    val closed = source.runForeach(each =>
+      if (isNACK(each)) {
+        logger.info(s"Client for traceID: $traceID received NACK: ${printable(each.utf8String)}")
+        throw new RuntimeException("NACK")
+      } else {
+        logger.info(s"Client for traceID: $traceID received ACK: ${printable(each.utf8String)}")
+      }
+    ).recoverWith {
+      case ex: RuntimeException =>
+        logger.warn(s"Client for traceID: $traceID about to retry, because of: $ex")
+        sendAndReceive(traceID, hl7Msg)
+      case e: Throwable => Future.failed(e)
+    }
+    closed.onComplete(each => logger.debug(s"Client for traceID: $traceID closed: $each"))
+    Future(NotUsed)
+  }
+
 
   private def generateTestMessage(senderTraceID: String) = {
     //For now put the senderTraceID into the "sender lab" field to follow the messages across the workflow
