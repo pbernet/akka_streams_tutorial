@@ -12,16 +12,15 @@ import scala.concurrent.duration._
 
 object Hl7TcpClient  extends App with MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val system = ActorSystem("Hl7TcpClient")
+  implicit val system = ActorSystem("Hl7TcpClient")
+  implicit val executionContext = system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6160)
 
-  (1 to 1).par.foreach(each => localSingleMessageClient(each, 100, system, address, port))
-  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000, system, address, port))
+  (1 to 1).par.foreach(each => localSingleMessageClient(each, 100, address, port))
+  //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000, address, port))
 
-  def localSingleMessageClient(client: Int, numberOfMessages: Int, system: ActorSystem, address: String, port: Int): Unit = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+  def localSingleMessageClient(client: Int, numberOfMessages: Int, address: String, port: Int): Unit = {
 
     val connection = Tcp().outgoingConnection(address, port)
 
@@ -51,9 +50,7 @@ object Hl7TcpClient  extends App with MllpProtocol {
       .runWith(Sink.ignore)
   }
 
-  def localStreamingMessageClient(id: Int, numberOfMesssages: Int, system: ActorSystem, address: String, port: Int): Unit = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+  def localStreamingMessageClient(id: Int, numberOfMesssages: Int, address: String, port: Int): Unit = {
 
     val connection = Tcp().outgoingConnection(address, port)
 

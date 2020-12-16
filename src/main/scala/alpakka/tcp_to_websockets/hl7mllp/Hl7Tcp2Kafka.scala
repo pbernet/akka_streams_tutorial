@@ -41,7 +41,8 @@ import scala.util.{Failure, Success}
   */
 object Hl7Tcp2Kafka extends App with MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val system = ActorSystem("Hl7Tcp2Kafka")
+  implicit val system = ActorSystem("Hl7Tcp2Kafka")
+  implicit val executionContext = system.dispatcher
 
   val bootstrapServers = "localhost:9092"
   val topic = "hl7-input"
@@ -54,12 +55,10 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
   val adminClient = initializeAdminClient(bootstrapServers)
 
   val (address, port) = ("127.0.0.1", 6160)
-  val serverBinding = server(system, address, port)
+  val serverBinding = server(address, port)
 
 
-  def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+  def server(address: String, port: Int): Future[Tcp.ServerBinding] = {
 
     val deciderFlow: Supervision.Decider = {
       case NonFatal(e) =>
