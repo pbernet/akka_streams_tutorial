@@ -1,7 +1,5 @@
 package alpakka.kafka
 
-import java.lang
-
 import akka.Done
 import akka.actor.Actor
 import akka.kafka.ConsumerMessage.CommittableMessage
@@ -15,8 +13,8 @@ import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
   * Note that a message can contain several "fakeNews" keywords
   */
 object TotalFake {
-  case class IncrementWord(msg: CommittableMessage[String, lang.Long], id: String)
-  case class IncrementMessage(msg: CommittableMessage[String, lang.Long], id: String)
+  case class IncrementWord(msg: CommittableMessage[String, java.lang.Long], id: String)
+  case class IncrementMessage(msg: CommittableMessage[String, java.lang.Long], id: String)
 }
 
 class TotalFake extends Actor {
@@ -37,7 +35,7 @@ class TotalFake extends Actor {
       val newValue = msg.record.value.toInt
 
       totalNews += newValue
-      println(s"$id - MESSAGES count: $totalNews (+ $newValue)")
+      println(s"$id - MESSAGE count: $totalNews (+ $newValue)")
       sender() ! Done
   }
 }

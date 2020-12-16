@@ -15,10 +15,10 @@ import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializ
 import scala.concurrent.duration._
 
 /**
-  * Consumers W.1 and W.2 consume half of the partitions each within the wordcount consumer group
-  * Only one consumer will consume the "fakeNews" partition
+  * Consumers W.1 and W.2 consume each (half of the) partitions within the "wordcount consumer group"
+  * However, only one consumer will consume the "fakeNews" partition
   *
-  * Consumer M is a single consumer for all the partitions in the messagecount consumer group
+  * Consumer M is a single consumer for all the partitions in the "messagecount consumer group"
   *
   * Use the offset storage in Kafka:
   * https://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka-committing
@@ -54,7 +54,6 @@ object WordCountConsumer extends App {
       .run()
   }
 
-  // Simple case where PassThroughFlow and ask operator work
   def createAndRunConsumerMessageCount(id: String) = {
     implicit val askTimeout = Timeout(5.seconds)
 
