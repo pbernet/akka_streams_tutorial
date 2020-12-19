@@ -28,9 +28,6 @@ object GreeterServer extends App {
 
   val bound: Future[Http.ServerBinding] = Http(system)
     .newServerAt(host, port)
-    // TODO Enable HTTPS with dummy context:
-    // https://github.com/akka/akka-http/blob/master/akka-http-core/src/test/scala/akka/http/impl/util/ExampleHttpContexts.scala
-    //.enableHttps(serverHttpContext)
     .bind(service)
     .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 10.seconds))
 

@@ -15,12 +15,16 @@ package echo;
  */
 service GreeterService {
 
+  // unary call
   rpc SayHello (HelloRequest) returns (HelloReply) {}
 
+  // client streaming cal
   rpc ItKeepsTalking (stream HelloRequest) returns (HelloReply) {}
 
+  // server streaming call
   rpc ItKeepsReplying (HelloRequest) returns (stream HelloReply) {}
 
+  // client and server streaming call
   rpc StreamHellos (stream HelloRequest) returns (stream HelloReply) {}
 }
 

@@ -15,9 +15,8 @@ import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 /**
-  * A simple compact chat system based on gRPC in the same
+  * A chat system based on gRPC in the same
   * fashion as [[akkahttp.WebsocketChatEcho]]
-  * For simplicity reasons all the grpc sources are kept in one place
   *
   * Doc:
   * https://doc.akka.io/docs/akka-grpc/current/server/walkthrough.html

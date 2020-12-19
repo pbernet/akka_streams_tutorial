@@ -8,6 +8,7 @@ import akka.stream.RestartSettings
 import akka.stream.scaladsl.{RestartSource, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
@@ -15,43 +16,35 @@ import scala.util.{Failure, Success}
 
 /**
   * gRPC client to run against [[GreeterServer]]
-  * Playground to test different ways of transmission, regarding resilience
+  * Playground to test different ways of interaction, with a focus on resilience
   *
-  * For simplicity reasons all the grpc sources are kept in one place
-  *
-  * TODO
-  * - Test if this kind of "application backpressure" would also for runStreamingRequestExample
-  * - add // clients?
-  * - Add Balancing
-  * - Add access to Metadata?
   */
 object GreeterClient extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("GreeterClient")
   implicit val executionContext = system.dispatcher
-  
+
+  val maxElements = 10
+
+  // For all requests
+  // set config:
+  // https://doc.akka.io/docs/akka-grpc/current/client/configuration.html#using-akka-discovery-for-endpoint-discovery
+  // and metadata:
+  // https://doc.akka.io/docs/akka-grpc/current/client/details.html#request-metadata
   val clientSettings = GrpcClientSettings
     .connectToServiceAt("127.0.0.1", 8080)
-    // Time to wait for a reply from server and retry request after that, used as last resort
-    //.withDeadline(110.second)   //TODO Does NOT seem to have an effect anymore with single request and is not
     .withTls(false)
-    //.withConnectionAttempts(1)   //TODO What is the benefit, what is the default value?
-
-  val clientSettingsHeartbeat = GrpcClientSettings
-    .connectToServiceAt("127.0.0.1", 8080)
-    .withTls(false)
-
-
-  // TODO Maybe add discovery
-  // Or via application.conf:
-  // And via service discovery https://doc.akka.io/docs/akka-grpc/current/client/configuration.html#using-akka-discovery-for-endpoint-discovery
-  // val clientSettings = GrpcClientSettings.fromConfig(GreeterService.name)
 
   val client: GreeterService = GreeterServiceClient(clientSettings)
-  val clientHeartbeat: GreeterService = GreeterServiceClient(clientSettingsHeartbeat)
 
 
-  // Send single message and wait for ack (to get application backpressure). Retry on failure
+  // Comment out to run examples in isolation
+  (1 to 1).par.foreach(each => runSingleRequestReplyExample(each))
+  (1 to 1).par.foreach(each => runStreamingRequestExample(each))
+  (1 to 1).par.foreach(each => runStreamingReplyExample(each))
+
+
+  // Send single message and wait for ACK (to get application backpressure). Retry on failure
   def runSingleRequestReplyExample(id: Int): Unit = {
 
     def sendAndReceive(i: Int): Future[Done] = {
@@ -67,15 +60,14 @@ object GreeterClient extends App {
         }
     }
 
-    Source(1 to 100)
+    Source(1 to maxElements)
       .throttle(1, 1.second)
       .mapAsync(1)(i => sendAndReceive(i))
       .runWith(Sink.ignore)
   }
 
-  // Send a stream of messages and ack all of them. Retry all of them on failure
+  // Send a stream of messages and wait for ACK after last message. Retry all on failure
   def runStreamingRequestExample(id: Int): Unit = {
-    val maxElements = 100
     val source = Source(1 to maxElements)
       .throttle(1, 1.second)
       .wireTap(each => logger.info(s"Client: $id sending streamed msg: $each/$maxElements"))
@@ -87,7 +79,7 @@ object GreeterClient extends App {
   def runStreamingReplyExample(id: Int): Unit = {
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartSource = RestartSource.withBackoff(restartSettings) { () =>
-      clientHeartbeat.itKeepsReplying(HelloRequest("Alice", id))
+      client.itKeepsReplying(HelloRequest("1", id))
     }
 
     val done = restartSource
@@ -101,10 +93,10 @@ object GreeterClient extends App {
     }
   }
 
-  // Use akka retry utility to handle case when server is not reachable on initial request
+  // Use akka retry to handle case when server is not reachable
   private def withRetry(fun: () => Future[HelloReply], id: Int) = {
     implicit val scheduler = system.scheduler
-    val maxAttempts = 30
+    val maxAttempts = 10
     val delay = 1
 
     val retried = akka.pattern.retry[HelloReply](
@@ -119,10 +111,4 @@ object GreeterClient extends App {
         logger.info(s"Server not reachable on initial request after: $maxAttempts attempts within ${maxAttempts*delay} seconds. Give up. Ex: $e")
     }
   }
-
-
-  // Run examples for each of the exposed service methods
-  runSingleRequestReplyExample(1)
-  runStreamingRequestExample(1)
-  //runStreamingReplyExample(1)
 }

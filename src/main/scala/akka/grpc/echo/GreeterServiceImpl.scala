@@ -13,7 +13,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 
-
+/**
+  * For simplicity reasons all the grpc sources are kept here
+  *
+  * @param mat
+  */
 class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   import mat.executionContext
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -28,19 +32,21 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
 
   // Metadata attributes for now transported as part of payload
   override def sayHello(in: HelloRequest): Future[HelloReply] = {
-    logger.info("Received from client: ${in.clientId} single msg: ${in.name}")
-    Future.successful(HelloReply(s"Hello, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
+    logger.info(s"Received from client: ${in.clientId} single msg: ${in.name}")
+    Future.successful(HelloReply(s"ACK, ${in.name}", Some(Timestamp.apply(Instant.now().getEpochSecond, 0))))
   }
 
-  // Utilize to send a batch of data and ack together
+  // Receive a batch/stream of elements and ACK at the end
   override def itKeepsTalking(in: Source[HelloRequest, NotUsed]): Future[HelloReply] = {
     in
       .wireTap(each => logger.info(s"Received from client: ${each.clientId} streamed msg: ${each.name}") )
-      .runWith(Sink.seq).map(elements => HelloReply(s"Hello, ${elements.map(_.name).mkString(", ")}"))
+      .runWith(Sink.seq).map(elements => HelloReply(s"ACK, ${elements.map(_.name).mkString(", ")}"))
   }
 
-  // Heartbeat server -> client on the application level
-  // TODO vs https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+  // Example of an application level heartbeat: server -> client
+  // vs dedicated Health service, according to spec:
+  // https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+  // https://github.com/akka/akka-grpc/issues/700
   override def itKeepsReplying(in: HelloRequest): Source[HelloReply, NotUsed] = {
     logger.info(s"Starting heartbeat...")
 
