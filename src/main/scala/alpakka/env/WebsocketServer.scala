@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -18,6 +19,7 @@ import scala.util.{Failure, Success}
   *
   */
 object WebsocketServer extends App with WebSocketDirectives {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("WebsocketServer")
   implicit val executionContext = system.dispatcher
 
@@ -29,7 +31,7 @@ object WebsocketServer extends App with WebSocketDirectives {
     def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
         case tm: TextMessage =>
-          println(s"Server received: $tm")
+          logger.info(s"Server received: $tm")
           TextMessage(Source.single("Echo: ") ++ tm.textStream) :: Nil
         case bm: BinaryMessage =>
           // ignore binary messages but drain content to avoid the stream being clogged
@@ -45,18 +47,18 @@ object WebsocketServer extends App with WebSocketDirectives {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
 
     sys.addShutdownHook {
-      println("About to shutdown...")
+      logger.info("About to shutdown...")
       val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-      println("Waiting for connections to terminate...")
+      logger.info("Waiting for connections to terminate...")
       val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-      println("Connections terminated")
+      logger.info("Connections terminated")
       onceAllConnectionsTerminated.flatMap { _ => system.terminate()
       }
     }
