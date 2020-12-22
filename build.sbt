@@ -11,9 +11,9 @@ val alpakkaKafkaConnector = "2.0.5"
 
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.16.0"
-val streamzVersion = "0.13-RC1"
+val streamzVersion = "0.13-RC4"
 val camelVersion = "2.25.2"
-val testContainersVersion = "1.15.0-rc2"
+val testContainersVersion = "1.15.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
@@ -78,12 +78,12 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.8.2",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
-  "org.apache.httpcomponents" % "httpclient" % "4.5.9",
-  "commons-io" % "commons-io" % "2.7",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.13",
+  "commons-io" % "commons-io" % "2.8.0",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
   "com.twitter" %% "bijection-avro" % "0.9.7",
-  "com.github.blemale" %% "scaffeine" % "4.0.1",
+  "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % "test",
@@ -92,7 +92,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
 
-  "junit" % "junit" % "4.13-beta-1"
+  "junit" % "junit" % "4.13.1"
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
