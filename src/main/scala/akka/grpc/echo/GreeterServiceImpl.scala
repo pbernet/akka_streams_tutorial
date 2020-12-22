@@ -25,7 +25,7 @@ class GreeterServiceImpl(implicit mat: Materializer) extends GreeterService {
   val replyFun = {request: HelloRequest => HelloReply(s"Hello, ${request.name}")}
   val (inboundHub: Sink[HelloRequest, NotUsed], outboundHub: Source[HelloReply, NotUsed]) =
     MergeHub.source[HelloRequest]
-      .wireTap(each => logger.info(s"Received streamHellos request from client: ${each.clientId}"))
+      .wireTap(each => logger.debug(s"Received streamHellos request from client: ${each.clientId}"))
       .map(replyFun)
       .toMat(BroadcastHub.sink[HelloReply])(Keep.both)
       .run()
