@@ -58,7 +58,7 @@ object Kafka2Websocket extends App {
 
   def createProducerSettings = {
     ProducerSettings(system, new StringSerializer, new StringSerializer)
-      .withBootstrapServers("localhost:9092")
+      .withBootstrapServers(bootstrapServers)
   }
 
   def initializeTopic(topic: String): Unit = {
@@ -138,8 +138,8 @@ object Kafka2Websocket extends App {
     printable(message).take(20).concat("...")
   }
 
-  sys.addShutdownHook{
-    println("Got control-c cmd from shell, about to shutdown...")
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     Await.result(streamControl.get.shutdown(), 10.seconds)
   }
 }
