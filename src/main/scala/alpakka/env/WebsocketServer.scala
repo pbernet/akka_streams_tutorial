@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
   * Websocket echo server
   *
   */
-object WebsocketServer extends App with WebSocketDirectives {
+class WebsocketServer extends WebSocketDirectives {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("WebsocketServer")
   implicit val executionContext = system.dispatcher
@@ -31,7 +31,7 @@ object WebsocketServer extends App with WebSocketDirectives {
     def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
         case tm: TextMessage =>
-          logger.info(s"Server received: $tm")
+          logger.info(s"WebsocketServer received: $tm")
           TextMessage(Source.single("Echo: ") ++ tm.textStream) :: Nil
         case bm: BinaryMessage =>
           // ignore binary messages but drain content to avoid the stream being clogged
@@ -47,7 +47,7 @@ object WebsocketServer extends App with WebSocketDirectives {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
     bindingFuture.onComplete {
       case Success(b) =>
-        logger.info("Server started, listening on: " + b.localAddress)
+        logger.info("WebsocketServer started, listening on: " + b.localAddress)
       case Failure(e) =>
         logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
@@ -63,4 +63,9 @@ object WebsocketServer extends App with WebSocketDirectives {
       }
     }
   }
+}
+
+object WebsocketServer extends App {
+  val server = new WebsocketServer()
+  def apply() = new WebsocketServer()
 }

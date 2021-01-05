@@ -91,6 +91,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
+  "org.testcontainers" % "kafka" % testContainersVersion,
 
   "junit" % "junit" % "4.13.1"
 )

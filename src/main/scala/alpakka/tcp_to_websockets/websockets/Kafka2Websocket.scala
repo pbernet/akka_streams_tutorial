@@ -34,12 +34,12 @@ import scala.concurrent.{Await, Future}
   * https://github.com/akka/alpakka/pull/856
   *
   */
-object Kafka2Websocket extends App {
+class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   implicit val system = ActorSystem("Kafka2Websocket")
   implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val bootstrapServers = "127.0.0.1:9092"
+  val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
 
   val clientID = "1"
   val webSocketEndpoint = "ws://127.0.0.1:6002/echo"
@@ -58,7 +58,7 @@ object Kafka2Websocket extends App {
 
   def createProducerSettings = {
     ProducerSettings(system, new StringSerializer, new StringSerializer)
-      .withBootstrapServers("localhost:9092")
+      .withBootstrapServers(bootstrapServers)
   }
 
   def initializeTopic(topic: String): Unit = {
@@ -138,8 +138,13 @@ object Kafka2Websocket extends App {
     printable(message).take(20).concat("...")
   }
 
-  sys.addShutdownHook{
-    println("Got control-c cmd from shell, about to shutdown...")
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     Await.result(streamControl.get.shutdown(), 10.seconds)
   }
+}
+
+object Kafka2Websocket extends App {
+  val server = new Kafka2Websocket()
+  def apply(mappedPortKafka: Int) = new Kafka2Websocket(mappedPortKafka)
 }

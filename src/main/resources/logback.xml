@@ -8,6 +8,7 @@
     </appender>
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>logs/application.log</file>
+        <append>false</append> <!-- The LogFileScanner needs an empty file on each run -->
         <encoder>
             <pattern>%d{yyyy-MM-dd} | %d{HH:mm:ss.SSS} | %-20.20thread | %5p | %-25.25logger{25} | %m%n</pattern>
             <charset>utf8</charset>
@@ -18,7 +19,7 @@
         <queueSize>8192</queueSize>
         <neverBlock>true</neverBlock>
         <!-- Can only point to one ref, for now just STDOUT -->
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
     </appender>
 
     <!-- Turn down Kafka noise -->
@@ -32,5 +33,6 @@
 
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
+        <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
