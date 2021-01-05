@@ -44,7 +44,7 @@ object GreeterClient extends App {
   (1 to 1).par.foreach(each => runStreamingReplyExample(each))
 
 
-  // Send single message and wait for ACK (to get application backpressure). Retry on failure
+  // Send single message and wait for ACK (to get message serialisation). Retry on failure
   def runSingleRequestReplyExample(id: Int): Unit = {
 
     def sendAndReceive(i: Int): Future[Done] = {
