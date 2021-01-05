@@ -5,21 +5,28 @@ import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.utility.DockerImageName
 
 /**
-  * Use testcontainers.org
+  * Uses testcontainers.org to run the
+  * latest Kafka-Version from confluentinc
   *
+  * Alternatives:
+  *  - [[KafkaServer]]
+  *
+  * Doc:
+  * https://www.testcontainers.org/modules/kafka
   */
 class KafkaServerTestcontainers {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val kafkaVersion = "latest"
+  val imageName = s"confluentinc/cp-kafka:$kafkaVersion"
   val originalPort = 9093
   var mappedPort = 1111
-  val kafkaContainer = new KafkaContainer(DockerImageName.parse(s"confluentinc/cp-kafka:$kafkaVersion")).
+  val kafkaContainer = new KafkaContainer(DockerImageName.parse(imageName)).
     withExposedPorts(originalPort)
 
   def run() = {
     kafkaContainer.start()
     mappedPort = kafkaContainer.getMappedPort(originalPort)
-    logger.info(s"Running Kafka version: $kafkaVersion on port: $mappedPort")
+    logger.info(s"Running Kafka: $imageName on mapped port: $mappedPort")
   }
 
   def stop() = {

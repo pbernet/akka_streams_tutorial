@@ -67,4 +67,6 @@ This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_we
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
-The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost. 
+The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost.
+
+Start the stages separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/AlpakkaTrophySpec.scala)  
