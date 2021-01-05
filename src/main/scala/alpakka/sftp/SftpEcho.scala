@@ -2,7 +2,7 @@ package alpakka.sftp
 
 import java.io.File
 import java.net.InetAddress
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 
 import akka.actor.ActorSystem
 import akka.stream.alpakka.ftp.scaladsl.Sftp
@@ -13,8 +13,6 @@ import akka.util.ByteString
 import akka.{Done, NotUsed}
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
-import net.schmizz.sshj.userauth.method.AuthPassword
-import net.schmizz.sshj.userauth.password.{PasswordFinder, Resource}
 import net.schmizz.sshj.xfer.FileSystemFile
 import net.schmizz.sshj.{DefaultConfig, SSHClient}
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -131,42 +129,38 @@ object SftpEcho extends App {
     val localPath = localFile.toPath
     logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
 
-    val fetchFile: Future[IOResult] = retrieveFromPath(ftpFile.path)
-      .runWith(FileIO.toPath(localPath))
-    fetchFile.map { ioResult =>
-      //TODO This fails silently: the file is not moved
-      //Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
-
-      moveFileNative(ftpFile)
+    val fetchedFile = retrieveFromPath(ftpFile.path).runWith(FileIO.toPath(localPath))
+    fetchedFile.map { ioResult =>
+      logger.debug(s"Fetched file status: ${ioResult.status}")
+      try {
+        // TODO This fails silently: the file is not moved
+        Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
+        // Alternative: Use SFTP function
+        moveFileNative(ftpFile)
+      } catch {
+        case ex: RuntimeException => logger.error("Exception", ex)
+      }
       ftpFile.path
     }
   }
 
-  // This may be a bit faster
+  // This may be a bit faster, but the reuse of the ssh client does not work here
   def getFileNativeAndMoveNative(ftpFile: FtpFile) = {
-    val ssh = new SSHClient(new DefaultConfig)
-    ssh.addHostKeyVerifier(new PromiscuousVerifier)
-    ssh.connect(hostname, port)
-    val passwordAuth: AuthPassword = new AuthPassword(new PasswordFinder() {
-      def reqPassword(resource: Resource[_]): Array[Char] = password.toCharArray
-
-      def shouldRetry(resource: Resource[_]) = false
-    })
-    ssh.auth(username, passwordAuth)
-
+    val ssh = createSshClientAndConnect()
 
     val start = System.currentTimeMillis()
-    val destFileLocal: Path = Files.createTempFile("downloaded", "tmp")
-
-    ssh.newSFTPClient().get(ftpFile.path, new FileSystemFile(destFileLocal.toFile))
+    val localPath = Files.createTempFile(ftpFile.name, ".tmp.client")
+    logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
+    ssh.newSFTPClient().get(ftpFile.path, new FileSystemFile(localPath.toFile))
     val end = System.currentTimeMillis()
     logger.debug(s"SFTP get native get processed file: ${ftpFile.path} in: ${end - start} seconds")
+
     moveFileNative(ftpFile)
     Future(ftpFile.path)
   }
 
 
-  //TODO This hangs after n elements
+  //TODO This hangs after n files
   def processAndMove(sourcePath: String,
                      destinationPath: FtpFile => String,
                      sftpSettings: SftpSettings): RunnableGraph[NotUsed] =
@@ -215,7 +209,7 @@ object SftpEcho extends App {
     val sftpClient = newSftpClient()
 
     try {
-      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj after around 60 elements
+      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj after around 60 files
       //sftpClient.rename(ftpFile.path, s"/$sftpRootDir/$processedDir/${ftpFile.name}")
 
       //rm native works
@@ -250,7 +244,7 @@ object SftpEcho extends App {
   }
 
   private def createSshClientAndConnect(): SSHClient = {
-    val sshClient = new SSHClient
+    val sshClient = new SSHClient(new DefaultConfig)
     sshClient.addHostKeyVerifier(new PromiscuousVerifier) // to skip host verification
 
     sshClient.loadKnownHosts()
@@ -259,12 +253,11 @@ object SftpEcho extends App {
     sshClient
   }
 
-  // Avoid overhead of generating n test files on local filesystem
   private def genFileContent(id: Int): ByteString = {
     val payloadFactor = 1000
     val payload = "1234567890" * payloadFactor
 
-    logger.info(s"Upload file with TRACE_ID: $id and size: ${payload.length} bytes")
+    logger.info(s"Upload file with TRACE_ID: $id and approx. size: ${payload.length} bytes")
     ByteString(s"$payload for: $id")
   }
 }
