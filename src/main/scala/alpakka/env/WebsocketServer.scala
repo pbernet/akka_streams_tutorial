@@ -9,8 +9,8 @@ import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
@@ -24,9 +24,23 @@ class WebsocketServer extends WebSocketDirectives {
   implicit val executionContext = system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6002)
-  server(address, port)
+  var serverBinding: Future[Http.ServerBinding] = _
 
-  def server(address: String, port: Int) = {
+  def run() = {
+    server(address, port)
+  }
+
+  def stop() = {
+    logger.info("About to shutdown...")
+    val fut = serverBinding.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+    logger.info("Waiting for connections to terminate...")
+    val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+    logger.info("Connections terminated")
+    onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+    }
+  }
+
+  private def server(address: String, port: Int) = {
 
     def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
@@ -48,24 +62,22 @@ class WebsocketServer extends WebSocketDirectives {
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("WebsocketServer started, listening on: " + b.localAddress)
+        serverBinding = bindingFuture
       case Failure(e) =>
         logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
-        system.terminate()
+        stop()
     }
+  }
 
-    sys.addShutdownHook {
-      logger.info("About to shutdown...")
-      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-      logger.info("Waiting for connections to terminate...")
-      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-      logger.info("Connections terminated")
-      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
-      }
-    }
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
+    stop()
   }
 }
 
 object WebsocketServer extends App {
   val server = new WebsocketServer()
+  server.run()
   def apply() = new WebsocketServer()
+  def stop() = server.stop()
 }

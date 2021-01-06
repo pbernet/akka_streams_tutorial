@@ -45,7 +45,15 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   val webSocketEndpoint = "ws://127.0.0.1:6002/echo"
   val (websocketClientActor, websocketConnectionStatus) = websocketClient(clientID, webSocketEndpoint)
 
-  val streamControl = createAndRunConsumer(clientID)
+  var streamControl: AtomicReference[Control] = _
+
+  def run() = {
+    streamControl = createAndRunConsumer(clientID)
+  }
+
+  def stop() = {
+     streamControl.get.shutdown()
+  }
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
@@ -140,11 +148,13 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
 
   sys.ShutdownHookThread{
     logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
-    Await.result(streamControl.get.shutdown(), 10.seconds)
+    stop()
   }
 }
 
 object Kafka2Websocket extends App {
   val server = new Kafka2Websocket()
+  server.run()
   def apply(mappedPortKafka: Int) = new Kafka2Websocket(mappedPortKafka)
+  def stop() = server.stop()
 }

@@ -20,7 +20,7 @@ class LogFileScanner {
   private val fs: FileSystem = FileSystems.getDefault
 
   // The patterns are case sensitive
-  def run(scanDelaySeconds: Int, searchAfterPattern: String, pattern: String): List[String] = {
+  def run(scanDelaySeconds: Int = 0, searchAfterPattern: String, pattern: String): List[String] = {
     val localLogFilePath: String = "./logs/application.log"
     val path: Path = fs.getPath(localLogFilePath)
     val pollingInterval = 250.millis
