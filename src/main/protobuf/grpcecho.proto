@@ -18,7 +18,7 @@ service GreeterService {
   // unary call
   rpc SayHello (HelloRequest) returns (HelloReply) {}
 
-  // client streaming cal
+  // client streaming call
   rpc ItKeepsTalking (stream HelloRequest) returns (HelloReply) {}
 
   // server streaming call
@@ -28,7 +28,7 @@ service GreeterService {
   rpc StreamHellos (stream HelloRequest) returns (stream HelloReply) {}
 }
 
-// The request message containing the user's name and client_id (= metadata)
+// The request message containing the user's name and a client_id (= metadata)
 message HelloRequest {
   string name = 1;
   uint32 client_id = 2;

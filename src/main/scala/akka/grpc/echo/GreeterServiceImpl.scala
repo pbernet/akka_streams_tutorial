@@ -14,7 +14,7 @@ import scala.concurrent.duration.DurationInt
 
 
 /**
-  * For simplicity reasons all the grpc sources are kept here
+  * For simplicity reasons all the grpc server sources are kept here
   *
   * @param mat
   */

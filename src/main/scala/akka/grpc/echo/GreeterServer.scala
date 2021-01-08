@@ -11,10 +11,8 @@ import scala.util.{Failure, Success}
 
 /**
   * gRPC server for [[GreeterClient]]
-  * For simplicity reasons all the grpc sources are kept in one place
   *
   */
-
 object GreeterServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("GreeterServer")
