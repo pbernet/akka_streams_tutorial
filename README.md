@@ -4,14 +4,16 @@
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) docs, tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
-* HTTP file download with local cache
-* Windturbine example
-* Apache Kafka WordCount
-* HL7 V2 over TCP via Kafka to Websockets
+* [HTTP file download with local cache](#HTTP-file-download-with-local-cache)
+* [Windturbine example](#Windturbine-example) 
+* [Apache Kafka WordCount](#Apache-Kafka-WordCount)
+* [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
 
 These examples all deal with some kind of shared state. 
 
 Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
+
+Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `/grpc`. 
 
 Remarks:
 * Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
