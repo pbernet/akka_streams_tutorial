@@ -80,6 +80,10 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
 
+  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
+  "org.testcontainers" % "postgresql" % testContainersVersion,
+  "org.postgresql" % "postgresql" % "42.2.18",
+
   "junit" % "junit" % "4.13.1"
 )
 
