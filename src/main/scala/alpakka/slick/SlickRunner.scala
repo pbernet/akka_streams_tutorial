@@ -7,7 +7,8 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.GetResult
 
-import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 /**
   * DB access via Slick
@@ -62,11 +63,10 @@ class SlickRunner(urlWithMappedPortSlick: String) {
     val users = (1 to noOfUsers).map(i => User(i, s"Name$i")).toSet
     val actions = users.map(insertUser)
 
-    // This uses the standard Slick API exposed by the Slick session
-    // on purpose, just to double-check that inserting data through
-    // our Alpakka connectors is equivalent to inserting it the Slick way.
-    session.db.run(DBIO.seq(actions.toList: _*))
+    // Insert via standard Slick API
+    val done: Future[Unit] = session.db.run(DBIO.seq(actions.toList: _*))
     logger.info("Populated with: {} users", users.size)
+    done
   }
 
   def close() = {
@@ -75,8 +75,9 @@ class SlickRunner(urlWithMappedPortSlick: String) {
 
   def read() = {
     logger.info("About to read...")
-    val done = getAllUsersFromDb
-    done.onComplete(result => logger.info(s"Done: ${result}"))
+    val result = Await.result(getAllUsersFromDb, 10.seconds)
+    logger.info(s"Successfully read: ${result.size} users")
+    result
   }
 }
 

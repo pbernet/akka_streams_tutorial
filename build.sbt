@@ -17,6 +17,7 @@ val testContainersVersion = "1.15.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
+  "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -84,7 +85,8 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.postgresql" % "postgresql" % "42.2.18",
 
-  "junit" % "junit" % "4.13.1"
+  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "junit" % "junit" % "4.13.1" % Test
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"

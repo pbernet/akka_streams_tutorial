@@ -5,6 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static scala.compat.java8.FutureConverters.globalExecutionContext;
+
 /**
  * We use JUnit as testrunner because of "type trouble"
  * using testcontainers.org with Scala
@@ -43,11 +46,17 @@ public class SlickIT {
     //TODO
     }
 
+    /**
+     * We need an additional lib to provide interop between Scala Futures and Java 8 lambdas
+     * https://github.com/scala/scala-java8-compat
+     *
+     * @throws InterruptedException
+     */
     @Test
     public void writeAndReadTestData() {
         int noOfUsers = 100;
-        runner.populate(noOfUsers);
-        //TODO return and assert
-        runner.read();
+        runner.populate(noOfUsers).onComplete(
+                each -> assertThat(noOfUsers).isEqualTo(runner.read().size()),
+                globalExecutionContext());
     }
 }
