@@ -1,3 +1,5 @@
+package alpakka.tcp_to_websockets
+
 import alpakka.env.{KafkaServerTestcontainers, WebsocketServer}
 import alpakka.tcp_to_websockets.hl7mllp.{Hl7Tcp2Kafka, Hl7TcpClient}
 import alpakka.tcp_to_websockets.websockets.Kafka2Websocket

@@ -12,6 +12,7 @@ import scala.concurrent.{Await, Future}
 
 /**
   * DB access via Slick
+  * Run with alpakka.slick.SlickIT
   *
   * @param urlWithMappedPortSlick
   */

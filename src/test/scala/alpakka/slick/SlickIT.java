@@ -1,4 +1,5 @@
-import alpakka.slick.SlickRunner;
+package alpakka.slick;
+
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.ClassRule;

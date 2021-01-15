@@ -47,6 +47,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
@@ -74,17 +76,15 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
-
-  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.postgresql" % "postgresql" % "42.2.18",
 
+  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
   "org.assertj" % "assertj-core" % "3.18.1" % Test,
   "junit" % "junit" % "4.13.1" % Test
 )
