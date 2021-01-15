@@ -20,6 +20,11 @@ class SlickRunner(urlWithMappedPortSlick: String) {
   implicit val system = ActorSystem("SlickRunner")
   implicit val executionContext = system.dispatcher
 
+  system.registerOnTermination(() => {
+    logger.info("About to close session...")
+    session.close()
+  })
+
   //Tweak config url param dynamically with mapped port from testontainer
   val tweakedConf =  ConfigFactory.empty()
     .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPortSlick))
@@ -69,8 +74,8 @@ class SlickRunner(urlWithMappedPortSlick: String) {
     done
   }
 
-  def close() = {
-    system.registerOnTermination(() => session.close())
+  def terminate() = {
+    system.terminate()
   }
 
   def read() = {
