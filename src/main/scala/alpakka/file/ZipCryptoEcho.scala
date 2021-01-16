@@ -15,9 +15,9 @@ import javax.crypto._
 import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
 /** File echo flow with Zip archive/un-archive and AES 256 CBC/GCM encryption/decryption:

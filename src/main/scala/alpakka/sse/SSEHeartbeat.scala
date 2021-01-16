@@ -18,8 +18,8 @@ import scala.util.{Failure, Success}
 
 /**
   * Basic heartbeat example, enhanced with an additional backoffClient which is recovering
-  * thanks to the new RestartSource feature in akka 2.5.4 - see:
-  * http://doc.akka.io/docs/akka/current/scala/stream/stream-error.html#delayed-restarts-with-a-backoff-stage
+  * after RuntimeException on server, see Doc RestartSource:
+  * https://doc.akka.io/docs/akka/current/stream/stream-error.html?language=scala#delayed-restarts-with-a-backoff-operator
   *
   * An even more resilient sse server->client implementation is here:
   * http://developer.lightbend.com/docs/alpakka/current/sse.html
@@ -29,7 +29,7 @@ object SSEHeartbeat {
   implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
     val (address, port) = ("127.0.0.1", 6000)
     server(address, port)
     simpleClient(address, port) //is not recovering after RuntimeException on server
@@ -91,11 +91,8 @@ object SSEHeartbeat {
 
     import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    val restartSource = RestartSource.withBackoff(
-      minBackoff = 3.seconds,
-      maxBackoff = 30.seconds,
-      randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-    ) { () =>
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
       Source.futureSource {
         Http()
           .singleRequest(HttpRequest(

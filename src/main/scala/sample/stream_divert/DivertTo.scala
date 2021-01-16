@@ -22,7 +22,7 @@ object DivertTo extends App {
 
   val source = Source(1 to 10)
 
-  val sink = Sink.foreach[Either[Valid[Int], Invalid[Int]]](each => println(s"Reached sink: ${each.left.get}"))
+  val sink = Sink.foreach[Either[Valid[Int], Invalid[Int]]](each => println(s"Reached sink: ${each.swap.getOrElse(0)}"))
 
   val errorSink = Flow[Invalid[Int]]
     .map(each => println(s"Reached errorSink: $each"))
@@ -43,8 +43,8 @@ object DivertTo extends App {
       case right@Right(_) => right
     }
     //Divert invalid elements
-    //contramap: apply "right.get" to each incoming upstream element *before* it is passed to the errorSink
-    .divertTo(errorSink.contramap(_.right.get), _.isRight)
+    //contramap: apply "getOrElse" to each incoming upstream element *before* it is passed to the errorSink
+    .divertTo(errorSink.contramap(_.getOrElse(Invalid(0, Some(new Exception("N/A"))))), _.isRight)
 
   private def businessLogicOn(left: Left[Valid[Int], Invalid[Int]]) = {
     if (left.value.payload > 5) left

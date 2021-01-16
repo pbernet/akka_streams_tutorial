@@ -6,6 +6,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.stage._
 
 import scala.concurrent.duration._
+import scala.language.reflectiveCalls
 
 /**
   * Source -> Flow(Blacklist) -> Sink

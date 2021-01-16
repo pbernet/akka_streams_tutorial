@@ -37,7 +37,7 @@ object SampleRoutes extends App {
   }
 
   def parseFormData: Route = path("post") {
-    formFields('color, 'age.as[Int]) { (color, age) =>
+    formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
       complete(s"The color is '$color' and the age is $age")
     }
   }

@@ -39,11 +39,12 @@ import scala.util.{Failure, Success}
   * https://github.com/akka/alpakka-kafka/issues/1101
   *
   */
-object Hl7Tcp2Kafka extends App with MllpProtocol {
+class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val system = ActorSystem("Hl7Tcp2Kafka")
+  implicit val system = ActorSystem("Hl7Tcp2Kafka")
+  implicit val executionContext = system.dispatcher
 
-  val bootstrapServers = "localhost:9092"
+  val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
   val topic = "hl7-input"
   //initial msg in topic, required to create the topic before any consumer subscribes to it
   val InitialMsg = "InitialMsg"
@@ -54,12 +55,22 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
   val adminClient = initializeAdminClient(bootstrapServers)
 
   val (address, port) = ("127.0.0.1", 6160)
-  val serverBinding = server(system, address, port)
+  var serverBinding: Future[Tcp.ServerBinding] = _
+
+  def run() = {
+    serverBinding = server(address, port)
+  }
+
+  def stop() = {
+    serverBinding.map { b =>
+      b.unbind().onComplete {
+        case _ => logger.info("TCP server stopped")
+      }
+    }
+  }
 
 
-  def server(system: ActorSystem, address: String, port: Int): Future[Tcp.ServerBinding] = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+  def server(address: String, port: Int): Future[Tcp.ServerBinding] = {
 
     val deciderFlow: Supervision.Decider = {
       case NonFatal(e) =>
@@ -82,6 +93,11 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
 
     val kafkaProducer: Flow[String, Either[Valid[String], Invalid[String]], NotUsed] = Flow[String]
       .map(each => {
+        //Retry handling for Kafka producers is now built-in, see:
+        //https://doc.akka.io/docs/alpakka-kafka/current/errorhandling.html#failing-producer
+        //When using the built-in strategy, the buffers are filled when Kafka goes down and then messages are sent once Kafka recovers.
+        //However, for this HL7 use case handling errors on the MLLP protocol level (by replying with a NACK) might be
+        //a better strategy to give the HL7 sender a chance to re-send in-flight messages in case THIS client goes down as well.
         val topicExists = adminClient.listTopics.names.get.contains(topic)
         if (topicExists) {
           producer.send(new ProducerRecord(topic, partition0, null: String, each))
@@ -183,6 +199,18 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
     prop.setProperty("bootstrap.servers", bootstrapServers)
     AdminClient.create(prop)
   }
+
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
+    stop()
+  }
+}
+
+object Hl7Tcp2Kafka extends App {
+  val server = new Hl7Tcp2Kafka()
+  server.run()
+  def apply(mappedPort: Int) = new Hl7Tcp2Kafka(mappedPort)
+  def stop() = server.stop()
 }
 
 case class Valid[T](payload: T)

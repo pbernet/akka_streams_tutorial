@@ -41,7 +41,7 @@ object CustomCacheRunner extends App {
     .runWith(Sink.ignore)
 
   //Request with tell
-  Source(Stream.continually(java.util.UUID.randomUUID.toString).take(100))
+  Source(LazyList.continually(java.util.UUID.randomUUID.toString).take(100))
     .throttle(10, 1.second, 10, ThrottleMode.shaping)
     .mapAsync(parallelism = 10)(each => Future(cache ! AddDevices(List(DeviceId(each)))))
     .runWith(Sink.ignore)

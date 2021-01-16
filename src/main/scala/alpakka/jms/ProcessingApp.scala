@@ -20,9 +20,11 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * ProcessingApp is an Alpakka JMS client which consumes messages from an
-  * embedded ActiveMQ queue [[alpakka.env.JMSServer]]. The server may be restarted manually
-  * Generate messages with [[JMSTextMessageProducerClient]]
+  * An Alpakka JMS client which consumes text messages from:
+  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
+  *  - Artemis JMS Broker on docker: /docker/docker-compose.yml
+  *
+  * Generate text messages with [[JMSTextMessageProducerClient]]
   *
   * Up to Alpakka 1.0-M1 there was an issue discussed here:
   * Alpakka JMS connector restart behaviour
@@ -32,7 +34,6 @@ import scala.util.{Failure, Success}
   * This example has been "upcycled" to demonstrate a realistic consumer scenario,
   * where non deliverable messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
   *
-  * Alternative Artemis JMS Broker: /docker/docker-compose.yml
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -46,7 +47,7 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) : Unit = {
 
     val control: JmsConsumerControl = jmsConsumerSource
       .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
@@ -75,7 +76,7 @@ object ProcessingApp {
       // Maximum number of messages to prefetch before applying backpressure. Default value is: 100
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
-      .withBufferSize(100)
+      .withBufferSize(0)
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
   )
 
@@ -91,8 +92,9 @@ object ProcessingApp {
   private def simulateFaultyDeliveryToExternalSystem(ackEnvelope: AckEnvelope) = {
     try {
       val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
+      val payload = ackEnvelope.message.asInstanceOf[TextMessage].getText
       val randomTime = ThreadLocalRandom.current.nextInt(0, 5) * 100
-      logger.info(s"RECEIVED Msg with TRACE_ID: $traceID - Working for: $randomTime ms")
+      logger.info(s"RECEIVED Msg with TRACE_ID: $traceID and payload: $payload - Working for: $randomTime ms")
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < randomTime) {
         if (randomTime >= 400) throw new RuntimeException("BOOM") //comment out for "happy path"
@@ -116,6 +118,7 @@ object ProcessingApp {
     val traceID = origMessage.getIntProperty("TRACE_ID")
 
     val errorMessage = JmsTextMessage(origMessage.getText)
+      .withHeader(JmsCorrelationId.create(traceID.toString))
       .withProperty("TRACE_ID", traceID)
       .withProperty("errorType", e.getClass.getName)
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
@@ -141,6 +144,10 @@ object ProcessingApp {
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 
+      //Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
+      //The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
+      //After another restart of the JMS server these messages are then consumed
+      //If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }

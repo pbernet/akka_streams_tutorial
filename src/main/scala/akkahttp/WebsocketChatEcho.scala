@@ -9,9 +9,9 @@ import akka.stream.scaladsl.{BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
 import akka.{Done, NotUsed}
 import akkahttp.WebsocketEcho.handleWebSocketMessages
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 /**
   * A simple WebSocket chat system using only akka streams with the help of MergeHub Source and BroadcastHub Sink
   *

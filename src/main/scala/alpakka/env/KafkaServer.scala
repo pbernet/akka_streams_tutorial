@@ -11,18 +11,16 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig
 import org.apache.zookeeper.server.{ServerConfig, ZooKeeperServerMain}
 
 /**
-  * KafkaServer which embedded Zookeeper, inspired by:
+  * Kafka server which embedded Zookeeper, inspired by:
   * https://github.com/jamesward/koober/blob/master/kafka-server/src/main/scala/KafkaServer.scala
   *
   * Remarks:
+  *  - The version is bound to the Kafka-Version in build.sbt
   *  - Zookeeper starts an admin server on http://localhost:8080/commands
-  *  - Shut down gracefully via exit (so that shutdown hook runs)
+  *  - Shut down gracefully via SIGTERM (so that shutdown hook runs)
   *
   * Alternatives:
-  *  - Use "Embedded Kafka", see: https://github.com/manub/scalatest-embedded-kafka
-  *  - Run Kafka in docker
-  *    see: https://github.com/wurstmeister/kafka-docker
-  *    or together with kafdrop admin console: https://towardsdatascience.com/kafdrop-e869e5490d62
+  *  - [[KafkaServerTestcontainers]]
   *  - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
   *  - Use Confluent Cloud, see: https://www.confluent.io/confluent-cloud/#view-pricing
   */
@@ -89,7 +87,7 @@ object KafkaServer extends App {
   println("About to start...")
   kafka.startup()
 
-  scala.sys.addShutdownHook{
+  sys.addShutdownHook{
     println("About to shutdown...")
     kafka.shutdown()
     kafka.awaitShutdown()

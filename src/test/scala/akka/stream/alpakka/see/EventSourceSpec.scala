@@ -18,19 +18,21 @@ import akka.stream.ThrottleMode
 import akka.stream.alpakka.sse.scaladsl.EventSource
 import akka.stream.scaladsl.{Sink, Source}
 import akka.testkit.SocketUtil
-import org.scalatest.{AsyncWordSpec, BeforeAndAfterAll, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
 /**
-  * Show the alpakka sse connector:
+  * Show the Alpakka SSE connector:
   * http://developer.lightbend.com/docs/alpakka/current/sse.html
   *
   * Shamelessly stolen from:
   * https://github.com/akka/alpakka/blob/master/sse/src/test/scala/akka/stream/alpakka/sse/scaladsl/EventSourceSpec.scala
   *
-  * in order to show the advanced possibilities over home grown client implementations such as in SSEHeartbeat in this repo
+  * in order to show the advanced possibilities over home grown client implementations such as in [[alpakka.sse.SSEHeartbeat]] in this repo
   *
   */
 object EventSourceSpec {
@@ -83,7 +85,7 @@ object EventSourceSpec {
 
     private def unbound: Receive = {
       case Bind =>
-        Http(context.system).bindAndHandle(route(size, shouldSetEventId), address, port).pipeTo(self)
+        Http().newServerAt(address, port).bindFlow(route(size, shouldSetEventId)).pipeTo(self)
         context.become(binding)
     }
 

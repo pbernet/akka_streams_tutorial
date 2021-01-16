@@ -8,6 +8,7 @@ import akka.kafka._
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.scaladsl.{Consumer, Transactional}
 import akka.pattern.{BackoffOpts, BackoffSupervisor}
+import akka.stream.RestartSettings
 import akka.stream.scaladsl.{RestartSource, Sink}
 import akka.util.Timeout
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.SendMessage
@@ -22,29 +23,33 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 /**
-  * Tries to deliver all messages from the Kafka "hl7-input" topic to the [[WebsocketServer]]
+  * Tries to deliver all messages from the Kafka "hl7-input" topic to the [[alpakka.env.WebsocketServer]]
   *
   * Uses the recovery from failure approach:
   * https://doc.akka.io/docs/alpakka-kafka/current/transactions.html#recovery-from-failure
-  * to restart the kafka consumer after a websocket connection issue.
-  *
-  * Alpakka does currently not support the STOMP protocol, see:
-  * https://github.com/akka/alpakka/issues/514
-  * https://github.com/akka/alpakka/pull/856
+  * to restart the Kafka consumer after a websocket connection issue.
   *
   */
-object Kafka2Websocket extends App {
+class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   implicit val system = ActorSystem("Kafka2Websocket")
   implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val bootstrapServers = "127.0.0.1:9092"
+  val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
 
   val clientID = "1"
   val webSocketEndpoint = "ws://127.0.0.1:6002/echo"
   val (websocketClientActor, websocketConnectionStatus) = websocketClient(clientID, webSocketEndpoint)
 
-  val streamControl = createAndRunConsumer(clientID)
+  var streamControl: AtomicReference[Control] = _
+
+  def run() = {
+    streamControl = createAndRunConsumer(clientID)
+  }
+
+  def stop() = {
+     streamControl.get.shutdown()
+  }
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
@@ -57,7 +62,7 @@ object Kafka2Websocket extends App {
 
   def createProducerSettings = {
     ProducerSettings(system, new StringSerializer, new StringSerializer)
-      .withBootstrapServers("localhost:9092")
+      .withBootstrapServers(bootstrapServers)
   }
 
   def initializeTopic(topic: String): Unit = {
@@ -87,38 +92,13 @@ object Kafka2Websocket extends App {
   }
 
   private def createAndRunConsumer(transactionalId: String) = {
-
     val innerControl = new AtomicReference[Control](Consumer.NoopControl)
 
-    val stream = RestartSource.onFailuresWithBackoff(
-      minBackoff = 1.seconds,
-      maxBackoff = 60.seconds,
-      randomFactor = 0.2
-    ) { () =>
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    val stream = RestartSource.onFailuresWithBackoff(restartSettings ) { () =>
       Transactional
         .source(createConsumerSettings("hl7-input consumer group"), Subscriptions.topics("hl7-input"))
-        .mapAsync(1) { msg =>
-          logger.info(s"TransactionalID: $transactionalId - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")
-
-          import akka.pattern.ask
-          implicit val askTimeout: Timeout = Timeout(10.seconds)
-
-          // With this blocking behaviour we avoid loosing messages when the websocket connection is down.
-          // However, the current in-flight message will be lost.
-          // To not loose any messages, we may:
-          //  - In WebSocketClient check the async ACK before the commit below
-          //  - use the STOMP protocol, see: stomp.github.io
-          val isConnectedFuture = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]
-          val isConnected = Await.result(isConnectedFuture, 10.seconds)
-
-          if (isConnected) {
-            websocketClientActor ! SendMessage(printableShort(msg.record.value()))
-            Future(msg)
-          } else {
-            logger.warn("WebSocket connection failure, going to restart Kafka consumer")
-            throw new RuntimeException("WebSocket connection failure")
-          }
-        }
+        .mapAsync(1) { msg => safeSendToWebsocket(transactionalId, msg)}
         .map { msg =>
           ProducerMessage.single(new ProducerRecord(transactionalProducerTopic, msg.record.key, msg.record.value), msg.partitionOffset)
         }
@@ -131,7 +111,32 @@ object Kafka2Websocket extends App {
     innerControl
   }
 
-  // The HAPI parser needs /r as segment terminator, but this is not printable
+  /**
+    * With this blocking behaviour we avoid loosing messages when the websocket connection is down.
+    * However, the current inflight message will be lost.
+    *
+    */
+  private def safeSendToWebsocket(transactionalId: String, msg: ConsumerMessage.TransactionalMessage[String, String]) = {
+    logger.info(s"TransactionalID: $transactionalId - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")
+
+    import akka.pattern.ask
+    implicit val askTimeout: Timeout = Timeout(10.seconds)
+
+    val isConnectedFuture = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]
+    val isConnected = Await.result(isConnectedFuture, 10.seconds)
+
+    if (isConnected) {
+      websocketClientActor ! SendMessage(printableShort(msg.record.value()))
+      Future(msg)
+    } else {
+      logger.warn("WebSocket connection failure, going to restart Kafka consumer")
+      throw new RuntimeException("WebSocket connection failure")
+    }
+  }
+
+  /**
+    * The HAPI parser needs /r as segment terminator, but this is not printable
+    */
   private def printable(message: String): String = {
     message.replace("\r", "\n")
   }
@@ -140,8 +145,15 @@ object Kafka2Websocket extends App {
     printable(message).take(20).concat("...")
   }
 
-  sys.addShutdownHook{
-    println("Got control-c cmd from shell, about to shutdown...")
-    Await.result(streamControl.get.shutdown(), 10.seconds)
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
+    stop()
   }
+}
+
+object Kafka2Websocket extends App {
+  val server = new Kafka2Websocket()
+  server.run()
+  def apply(mappedPortKafka: Int) = new Kafka2Websocket(mappedPortKafka)
+  def stop() = server.stop()
 }
