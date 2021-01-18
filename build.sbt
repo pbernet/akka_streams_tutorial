@@ -68,6 +68,10 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.8.2",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
+  // needed for guradrail example
+  "io.circe" %% "circe-core" % "0.14.0-M3",
+  "io.circe" %% "circe-jawn" % "0.14.0-M3",
+
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
   "org.apache.commons" % "commons-lang3" % "3.11",
@@ -100,5 +104,23 @@ val workaround = {
 
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
+
+// Needed for guardrail example
+guardrailTasks in Compile := List(
+  ScalaServer(
+    specPath = (Compile / resourceDirectory).value / "events.yaml",
+    pkg = "akkahttp.guardrail",
+    framework = "akka-http",
+    tracing = false
+  ),
+
+  ScalaClient(
+      specPath = (Compile / resourceDirectory).value / "events.yaml",
+      pkg = "akkahttp.guardrail",
+      framework = "akka-http",
+      tracing = false
+    )
+)
+
 
 fork in run := true
