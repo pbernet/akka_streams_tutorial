@@ -106,6 +106,9 @@ scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
 // Needed for guardrail example
+// This does work on OSX but NOT on Windows 10
+// Created issue:
+// https://github.com/twilio/guardrail/issues/942
 guardrailTasks in Compile := List(
   ScalaServer(
     specPath = (Compile / resourceDirectory).value / "events.yaml",
