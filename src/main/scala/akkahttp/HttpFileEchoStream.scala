@@ -1,9 +1,5 @@
 package akkahttp
 
-import java.io.File
-import java.nio.file.Paths
-
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -14,9 +10,11 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
+import akka.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
 import spray.json.DefaultJsonProtocol
 
+import java.io.File
+import java.nio.file.Paths
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
@@ -94,14 +92,15 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
     }
   }
 
-  def filesToUpload(): Source[FileHandle, NotUsed] =
-    //Unbounded stream. Limit for testing purposes by appending eg .take(5)
-    Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
 
 
   def roundtripClient(address: String, port: Int) = {
 
-    val poolClientFlowUpload =
+    val filesToUpload =
+    //Unbounded stream. Limit for testing purposes by appending eg .take(5)
+      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
+
+    val hostConnectionPoolUpload =
       Http().cachedHostConnectionPool[FileHandle](address, port)
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
@@ -141,10 +140,10 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
     def download(fileHandle: HttpFileEchoStream.FileHandle) = {
       val queueSize = 1
-      val poolClientFlowDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
+      val hostConnectionPoolDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
       val queue =
         Source.queue[(HttpRequest, Promise[HttpResponse])](queueSize, OverflowStrategy.backpressure, 10)
-          .via(poolClientFlowDownload)
+          .via(hostConnectionPoolDownload)
           .toMat(Sink.foreach({
             case (Success(resp), p) => p.success(resp)
             case (Failure(e), p) => p.failure(e)
@@ -174,13 +173,14 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       }
     }
 
-    filesToUpload()
+    filesToUpload
+      .throttle(1, 1.second, 10, ThrottleMode.shaping)
       // The stream will "pull out" these requests when capacity is available.
       // When that is the case we create one request concurrently
       // (the pipeline will still allow multiple requests running at the same time)
       .mapAsync(1)(createUploadRequest)
       // then dispatch the request to the connection pool
-      .via(poolClientFlowUpload)
+      .via(hostConnectionPoolUpload)
       // report each response
       // Note: responses will NOT come in in the same order as requests. The requests will be run on one of the
       // multiple pooled connections and may thus "overtake" each other!
@@ -192,11 +192,11 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         val fileHandle = Await.result(fileHandleFuture, 1.second)
         response.discardEntityBytes()
 
-        //Finish the roundtrip
+        // Finish the roundtrip
         download(fileHandle)
 
       case (Failure(ex), fileToUpload) =>
-        println(s"Uploading file $fileToUpload failed with: $ex")
+        println(s"Uploading file: $fileToUpload failed with: $ex")
     }
   }
 }
