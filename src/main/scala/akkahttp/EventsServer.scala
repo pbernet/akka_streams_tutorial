@@ -1,7 +1,5 @@
 package akkahttp
 
-import java.time.LocalDate
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
@@ -12,19 +10,24 @@ import akkahttp.guardrail.events.EventsResource.PostEventsResponse
 import akkahttp.guardrail.events.{EventsClient, EventsHandler, EventsResource}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.time.LocalDate
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Server (route) and client are generated with guardrail,
-  * see: https://guardrail.dev/scala/akka-http
+  * Server (route) and client are generated with sbt guardrail plugin,
+  * https://github.com/twilio/sbt-guardrail
   *
   * Remarks:
-  *  - `sbt compile` generates files in folder /target/src_managed
-  *  - Declarations in /resources/events.yaml and in build.sbt
+  *  - Guardrail declarations are in /resources/events.yaml and in build.sbt
+  *  - `sbt compile` kicks off generator plugin, gen. files are in folder /target/src_managed
+  *  - Sometimes the target folder needs to be cleaned manually
   *  - JSON serialisation is done with circe
   *
   * No streams here
+  *
+  * Doc:
+  * https://guardrail.dev/scala/akka-http
   *
   */
 object EventsServer extends App {
@@ -39,6 +42,7 @@ object EventsServer extends App {
     // This is the implementation
     override def postEvents(respond: EventsResource.PostEventsResponse.type)(body: Vector[Event]): Future[PostEventsResponse] = {
       logger.info(s"Received events: ${body.size}")
+      //throw new RuntimeException("Boom server error")
       Future(respond.OK)
     }
   })
@@ -54,15 +58,16 @@ object EventsServer extends App {
 
   def client() = {
 
-    // TODO try this
     val retryingHttpClient = { nextClient: (HttpRequest => Future[HttpResponse]) =>
-      req: HttpRequest => nextClient(req).flatMap(resp => if (resp.status.intValue >= 500) nextClient(req) else Future.successful(resp))
+      req: HttpRequest => nextClient(req).flatMap(resp => if (resp.status.intValue >= 500) {
+        logger.info("Retry...")
+        nextClient(req)
+      } else Future.successful(resp))
     }
 
-    // Use this for now
     val singleRequestHttpClient = { (req: HttpRequest) => Http().singleRequest(req)}
 
-    val client = EventsClient.httpClient(singleRequestHttpClient, s"http://$address:$port")
+    val client = EventsClient.httpClient(retryingHttpClient(singleRequestHttpClient), s"http://$address:$port")
     val event =  Event(Some("name"), Some(10), Some(LocalDate.now()))
     val events = List(event).toVector
 
