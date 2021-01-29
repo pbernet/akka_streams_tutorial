@@ -8,7 +8,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model.{HttpRequest, MediaTypes, RequestEntity, _}
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
@@ -33,8 +32,8 @@ import scala.util.{Failure, Success}
   *
   *
   * TODOs
-  *  - When ex is thrown on server during download: The download retry does not seem to work as expected
   *  - When ex is thrown on server during download: The responseFuture is always a Success
+  *    and probably because of this the download retry does work as expected
   *  - Cleanup on pool shutdown
   *
   */
@@ -105,16 +104,24 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
     val poolClientFlowUpload =
       Http().cachedHostConnectionPool[FileHandle](address, port)
 
-    def createUploadRequest(fileToUpload: FileHandle): Future[(HttpRequest, FileHandle)] = {
-      val bodyPart =
-        FormData.BodyPart.fromPath("binary", ContentTypes.`application/octet-stream`, Paths.get(fileToUpload.absolutePath))
+    def createEntityFrom(file: File): Future[RequestEntity] = {
+      require(file.exists())
+      val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
+      val formData = Multipart.FormData(Multipart.FormData.BodyPart(
+        "binary",
+        HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
+        Map("filename" -> file.getName)))
 
-      val body = FormData(bodyPart) // only one file per upload
-      Marshal(body).to[RequestEntity].map { entity => // use marshalling to create multipart/formdata entity
-        val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
-        HttpRequest(method = HttpMethods.POST, uri = target, entity = entity) -> fileToUpload
-      }
+      Marshal(formData).to[RequestEntity]
     }
+
+    def createUploadRequest(fileToUpload: FileHandle): Future[(HttpRequest, FileHandle)] = {
+      val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
+
+      createEntityFrom(new File(fileToUpload.absolutePath))
+        .map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
+        .map(each => (each, fileToUpload))
+      }
 
 
     def createDownloadRequest(fileToDownload: FileHandle): Future[HttpRequest] = {
@@ -124,10 +131,10 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       }
     }
 
-    def createDownloadRequestNoFuture(fileToDownload: FileHandle) ={
+    def createDownloadRequestBlocking(fileToDownload: FileHandle) ={
       val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
       val entityFuture = Marshal(fileToDownload).to[MessageEntity]
-      val entity = Await.result(entityFuture, 1.second) //TODO Do it without blocking
+      val entity = Await.result(entityFuture, 1.second)
       HttpRequest(HttpMethods.GET, target, entity = entity)
     }
 
@@ -154,7 +161,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         }
       }
 
-      val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestNoFuture(fileHandle))
+      val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestBlocking(fileHandle))
       responseFuture.onComplete {
         case Success(resp) =>
           val localFile = File.createTempFile("downloadLocal", ".tmp.client")
@@ -182,14 +189,14 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         println(s"Client: Upload for file: $fileToUpload was successful: ${response.status}")
 
         val fileHandleFuture = Unmarshal(response).to[FileHandle]
-        val fileHandle = Await.result(fileHandleFuture, 1.second)  //TODO Do it without blocking
+        val fileHandle = Await.result(fileHandleFuture, 1.second)
         response.discardEntityBytes()
 
         //Finish the roundtrip
         download(fileHandle)
 
       case (Failure(ex), fileToUpload) =>
-        println(s"Uploading file $fileToUpload failed with $ex")
+        println(s"Uploading file $fileToUpload failed with: $ex")
     }
   }
 }
