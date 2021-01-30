@@ -1,8 +1,5 @@
 package akkahttp
 
-import java.io.File
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -12,9 +9,12 @@ import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.stream.RestartSettings
+import akka.stream.scaladsl.{FileIO, RestartSource, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
+import java.io.File
+import java.nio.file.Paths
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -33,9 +33,15 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   *
   * It's possible to upload/download files up to 60MB:
   *  - Check settings in application.conf
+  *     akka.http.server.parsing.max-content-length
+  *     akka.http.client.parsing.max-content-length
   *  - Replace testfile.jpg with a large file
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
+  *
+  * Remarks:
+  *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams/
+  *  - TODO Retry on download
   */
 object HttpFileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("HttpFileEcho")
@@ -111,6 +117,27 @@ object HttpFileEcho extends App with JsonProtocol {
       Marshal(formData).to[RequestEntity]
     }
 
+    def getResponse(request: HttpRequest): Future[FileHandle] = {
+      val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+      RestartSource.withBackoff(restartSettings) { () =>
+        val responseFuture = Http().singleRequest(request)
+
+        Source.future(responseFuture)
+          .mapAsync(parallelism = 1) {
+            case HttpResponse(StatusCodes.OK, _, entity, _) =>
+              Unmarshal(entity).to[FileHandle]
+            case HttpResponse(StatusCodes.InternalServerError, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: ${StatusCodes.InternalServerError}")
+            case HttpResponse(statusCode, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: $statusCode")
+          }
+      }
+        .runWith(Sink.head)
+        .recover {
+          case ex => throw new RuntimeException(s"Exception occurred: $ex")
+        }
+    }
+
     def upload(file: File): Future[FileHandle] = {
 
       def delayRequestSoTheServerIsNotHammered() = {
@@ -127,7 +154,7 @@ object HttpFileEcho extends App with JsonProtocol {
       val result: Future[FileHandle] =
         for {
           request <- createEntityFrom(file).map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
-          response <- Http().singleRequest(request)
+          response <- getResponse(request)
           responseBodyAsString <- Unmarshal(response).to[FileHandle]
         } yield responseBodyAsString
 
