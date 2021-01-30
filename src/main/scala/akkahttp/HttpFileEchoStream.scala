@@ -1,5 +1,6 @@
 package akkahttp
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -23,16 +24,15 @@ import scala.util.{Failure, Success}
   * Differences to [[HttpFileEcho]]:
   *  - The upload client is processing a stream of FileHandle
   *  - The download client is using the host-level API with a SourceQueue
-  *  - Number of retries set via config param max-retries in application.conf
   *
   * Doc:
+  * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html#using-the-host-level-api-with-a-queue
   * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
   *
   *
-  * TODOs
-  *  - When ex is thrown on server during download: The responseFuture is always a Success
-  *    and probably because of this the download retry does work as expected
-  *  - Cleanup on pool shutdown
+  * Remarks:
+  *  - No retry on upload because POST request is non-idempotent
+  *  - Homegrown retry on download, because this does somehow not work yet via the cachedHostConnectionPool
   *
   */
 object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
@@ -57,6 +57,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
+            //throw new RuntimeException("Boom server error during upload")
             println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
             complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
         }
@@ -64,8 +65,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
-              //TODO see class comment
-              //throw new RuntimeException("Boom server error")
+              //throw new RuntimeException("Boom server error during download")
               println(s"Server: Received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
@@ -93,15 +93,13 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
   }
 
 
-
   def roundtripClient(address: String, port: Int) = {
 
     val filesToUpload =
-    //Unbounded stream. Limit for testing purposes by appending eg .take(5)
-      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString)))
+    // Unbounded stream. Limited for testing purposes by appending eg .take(5)
+      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString))).take(5)
 
-    val hostConnectionPoolUpload =
-      Http().cachedHostConnectionPool[FileHandle](address, port)
+    val hostConnectionPoolUpload = Http().cachedHostConnectionPool[FileHandle](address, port)
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
@@ -120,7 +118,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       createEntityFrom(new File(fileToUpload.absolutePath))
         .map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
         .map(each => (each, fileToUpload))
-      }
+    }
 
 
     def createDownloadRequest(fileToDownload: FileHandle): Future[HttpRequest] = {
@@ -130,7 +128,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       }
     }
 
-    def createDownloadRequestBlocking(fileToDownload: FileHandle) ={
+    def createDownloadRequestBlocking(fileToDownload: FileHandle) = {
       val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
       val entityFuture = Marshal(fileToDownload).to[MessageEntity]
       val entity = Await.result(entityFuture, 1.second)
@@ -160,17 +158,30 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         }
       }
 
-      val responseFuture: Future[HttpResponse] = queueRequest(createDownloadRequestBlocking(fileHandle))
-      responseFuture.onComplete {
-        case Success(resp) =>
-          val localFile = File.createTempFile("downloadLocal", ".tmp.client")
-          val result = resp.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
-          result.map {
-            ioresult =>
-              println(s"Client: Download file: $resp finished: ${ioresult.count} bytes!")
+      def downloadRetry(fileHandle: FileHandle): Future[NotUsed] = {
+        queueRequest(createDownloadRequestBlocking(fileHandle)).flatMap(response =>
+
+          if (response.status.isSuccess()) {
+            val localFile = File.createTempFile("downloadLocal", ".tmp.client")
+            val result = response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+            result.map {
+              ioresult =>
+                println(s"Client: Download file: $response finished: ${ioresult.count} bytes!")
+            }
+          } else {
+            println(s"About to retry, because of: $response")
+            throw new RuntimeException("Retry")
           }
-        case Failure(exception) => println(s"Boom $exception while downloading")
+        ).recoverWith {
+          case ex: RuntimeException =>
+            println(s"About to retry, because of: $ex")
+            downloadRetry(fileHandle)
+          case e: Throwable => Future.failed(e)
+        }
+        Future(NotUsed)
       }
+
+      downloadRetry(fileHandle)
     }
 
     filesToUpload
@@ -185,18 +196,18 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       // Note: responses will NOT come in in the same order as requests. The requests will be run on one of the
       // multiple pooled connections and may thus "overtake" each other!
       .runForeach {
-      case (Success(response: HttpResponse), fileToUpload) =>
-        println(s"Client: Upload for file: $fileToUpload was successful: ${response.status}")
+        case (Success(response: HttpResponse), fileToUpload) =>
+          println(s"Client: Upload for file: $fileToUpload was successful: ${response.status}")
 
-        val fileHandleFuture = Unmarshal(response).to[FileHandle]
-        val fileHandle = Await.result(fileHandleFuture, 1.second)
-        response.discardEntityBytes()
+          val fileHandleFuture = Unmarshal(response).to[FileHandle]
+          val fileHandle = Await.result(fileHandleFuture, 1.second)
+          response.discardEntityBytes()
 
-        // Finish the roundtrip
-        download(fileHandle)
+          // Finish the roundtrip
+          download(fileHandle)
 
-      case (Failure(ex), fileToUpload) =>
-        println(s"Uploading file: $fileToUpload failed with: $ex")
-    }
+        case (Failure(ex), fileToUpload) =>
+          println(s"Uploading file: $fileToUpload failed with: $ex")
+      }
   }
 }
