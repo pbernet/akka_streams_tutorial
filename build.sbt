@@ -69,6 +69,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
+  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
