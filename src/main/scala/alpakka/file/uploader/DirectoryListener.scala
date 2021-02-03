@@ -1,13 +1,12 @@
 package alpakka.file.uploader
 
-import java.nio.file.{FileSystems, Files, Path, StandardCopyOption}
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.file.DirectoryChange
 import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
 import akka.stream.scaladsl.Sink
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file.{FileSystems, Files, Path, StandardCopyOption}
 import scala.concurrent.duration.DurationInt
 
 /**
@@ -19,7 +18,7 @@ import scala.concurrent.duration.DurationInt
   * and finally move them to `processedDir`
   *
   * TODO
-  *  - Combine the two sources with merge operator
+  *  - Try to use Source.combine
   *  - Pass actor system to Uploader
   *  - Handle not happy path scenarios
   */
@@ -67,7 +66,7 @@ object DirectoryListener extends App {
   }
 
   private def move(sourcePath: Path): Unit = {
-    val fileToMove = processedDir.resolve(sourcePath.getFileName)
-    Files.move(sourcePath, fileToMove, StandardCopyOption.REPLACE_EXISTING)
+    val targetPath = processedDir.resolve(sourcePath.getFileName)
+    Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING)
   }
 }
