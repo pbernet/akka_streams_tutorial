@@ -3,7 +3,6 @@ package alpakka.file.uploader
 import akka.actor.ActorSystem
 import akka.stream.alpakka.file.DirectoryChange
 import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
-import akka.stream.scaladsl.Sink
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{FileSystems, Files, Path, StandardCopyOption}
@@ -17,9 +16,10 @@ import scala.concurrent.duration.DurationInt
   * do a HTTP file upload via [[Uploader]]
   * and finally move them to `processedDir`
   *
+  * Similar example (regarding directory listening):
+  * https://akka.io/alpakka-samples/file-to-elasticsearch/index.html
+  *
   * TODO
-  *  - Try to use Source.combine
-  *  - Pass actor system to Uploader
   *  - Handle not happy path scenarios
   */
 object DirectoryListener extends App {
@@ -27,7 +27,7 @@ object DirectoryListener extends App {
   implicit val system = ActorSystem("DirectoryListener")
   implicit val executionContext = system.dispatcher
 
-  val uploader = Uploader()
+  val uploader = Uploader(system)
 
   val fs = FileSystems.getDefault
   val rootDir = fs.getPath("./uploader")
@@ -38,27 +38,19 @@ object DirectoryListener extends App {
   Files.createDirectories(uploadDir)
   Files.createDirectories(processedDir)
 
-  sourceDirInitial()
-  sourceDirChanges()
+  uploadAllFilesFromSourceDir()
 
-  def sourceDirInitial() = {
-    Directory.ls(uploadDir)
-      .mapAsync(1)(each => {
-        logger.info(s"Source file initial: $each")
-        uploadAndMove(each)
+  def uploadAllFilesFromSourceDir() = {
+    DirectoryChangesSource(uploadDir, pollInterval = 1.second, maxBufferSize = 1000)
+       // Files added to the dir
+      .collect { case (path, DirectoryChange.Creation) => path }
+       // Include files encountered on startup
+      .merge(Directory.ls(uploadDir))
+      .mapAsync(1)(path => {
+        logger.info(s"Upload and move: $path")
+        uploadAndMove(path)
       })
-      .runWith(Sink.ignore)
-  }
-
-  def sourceDirChanges() = {
-    val changes = DirectoryChangesSource(uploadDir, pollInterval = 1.second, maxBufferSize = 1000)
-    changes.runForeach {
-      case (path, change: DirectoryChange) =>
-        if (change == DirectoryChange.Creation) {
-          logger.info("Source file listener: " + path + ", Change: " + change)
-          uploadAndMove(path)
-        }
-    }
+      .run()
   }
 
   private def uploadAndMove(each: Path) = {

@@ -1,7 +1,5 @@
 package alpakka.file.uploader
 
-import java.io.File
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
@@ -13,6 +11,7 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.stream.scaladsl.FileIO
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.File
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
@@ -20,10 +19,12 @@ import scala.util.{Failure, Success}
 /**
   * Upload file, eg from file system
   * Works together with [[DirectoryListener]]
+  *
+  * Starts a mock server to handle the files
   */
-class Uploader() {
+class Uploader(system: ActorSystem) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("Uploader")
+  implicit val systemImpl = system
   implicit val executionContext = system.dispatcher
 
   val (protocol, address, port) = ("http", "localhost", 6000)
@@ -112,5 +113,5 @@ class Uploader() {
 }
 
 object Uploader extends App {
-  def apply() = new Uploader()
+  def apply(system: ActorSystem) = new Uploader(system)
 }
