@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial)
+[![Build Status](https://travis-ci.com/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.com/pbernet/akka_streams_tutorial)
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
