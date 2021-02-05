@@ -1,7 +1,5 @@
 package alpakka.slick
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.slick.scaladsl.{SlickSession, _}
 import akka.stream.scaladsl._
@@ -9,6 +7,7 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.{GetResult, ResultSetConcurrency, ResultSetType}
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
@@ -45,7 +44,7 @@ class SlickRunner(urlWithMappedPortSlick: String) {
     def * = (id, name)
   }
 
-  implicit val getUserResult = GetResult(r => User(r.nextInt, r.nextString))
+  implicit val getUserResult = GetResult(r => User(r.nextInt(), r.nextString()))
 
   val createTable = sqlu"""CREATE TABLE public.users(id INTEGER, name VARCHAR(50))"""
   val dropTable = sqlu"""DROP TABLE public.users"""
