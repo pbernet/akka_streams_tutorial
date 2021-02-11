@@ -13,7 +13,7 @@ val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.16.0"
 val streamzVersion = "0.13-RC4"
 val camelVersion = "2.25.2"
-val testContainersVersion = "1.15.1"
+val testContainersVersion = "1.15.2"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
