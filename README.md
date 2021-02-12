@@ -19,7 +19,10 @@ Remarks:
 * Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo. 
+
+Other resources:
+* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo.
+* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams).
 
 ## HTTP file download with local cache ##
 Use case with shared state:
