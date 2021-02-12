@@ -11,7 +11,7 @@ See the class comment on how to run each example. These more complex examples ar
 
 These examples all deal with some kind of shared state. 
 
-Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
+The `*Echo` examples implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
 
 Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources. 
 
@@ -19,7 +19,7 @@ Remarks:
 * Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* No unit tests and quirky package names
+* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo. 
 
 ## HTTP file download with local cache ##
 Use case with shared state:
