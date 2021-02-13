@@ -87,7 +87,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
   "org.assertj" % "assertj-core" % "3.18.1" % Test,
-  "junit" % "junit" % "4.13.1" % Test
+  "junit" % "junit" % "4.13.2" % Test
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
