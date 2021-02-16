@@ -39,12 +39,12 @@ import scala.util.{Failure, Success}
   * https://github.com/akka/alpakka-kafka/issues/1101
   *
   */
-object Hl7Tcp2Kafka extends App with MllpProtocol {
+class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("Hl7Tcp2Kafka")
   implicit val executionContext = system.dispatcher
 
-  val bootstrapServers = "localhost:9092"
+  val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
   val topic = "hl7-input"
   //initial msg in topic, required to create the topic before any consumer subscribes to it
   val InitialMsg = "InitialMsg"
@@ -55,7 +55,19 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
   val adminClient = initializeAdminClient(bootstrapServers)
 
   val (address, port) = ("127.0.0.1", 6160)
-  val serverBinding = server(address, port)
+  var serverBinding: Future[Tcp.ServerBinding] = _
+
+  def run() = {
+    serverBinding = server(address, port)
+  }
+
+  def stop() = {
+    serverBinding.map { b =>
+      b.unbind().onComplete {
+        case _ => logger.info("TCP server stopped")
+      }
+    }
+  }
 
 
   def server(address: String, port: Int): Future[Tcp.ServerBinding] = {
@@ -187,6 +199,18 @@ object Hl7Tcp2Kafka extends App with MllpProtocol {
     prop.setProperty("bootstrap.servers", bootstrapServers)
     AdminClient.create(prop)
   }
+
+  sys.ShutdownHookThread{
+    logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
+    stop()
+  }
+}
+
+object Hl7Tcp2Kafka extends App {
+  val server = new Hl7Tcp2Kafka()
+  server.run()
+  def apply(mappedPort: Int) = new Hl7Tcp2Kafka(mappedPort)
+  def stop() = server.stop()
 }
 
 case class Valid[T](payload: T)

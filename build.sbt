@@ -12,11 +12,12 @@ val alpakkaKafkaConnector = "2.0.5"
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.16.0"
 val streamzVersion = "0.13-RC4"
-val camelVersion = "2.25.3"
-val testContainersVersion = "1.15.1"
+val camelVersion = "2.25.2"
+val testContainersVersion = "1.15.2"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
+  "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -46,6 +47,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
   "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
@@ -66,6 +69,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
+  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
   "org.apache.commons" % "commons-lang3" % "3.11",
   "org.apache.avro" % "avro" % "1.8.2",
@@ -73,13 +77,17 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
+  "org.testcontainers" % "kafka" % testContainersVersion,
+  "org.testcontainers" % "postgresql" % testContainersVersion,
+  "org.postgresql" % "postgresql" % "42.2.18",
 
-  "junit" % "junit" % "4.13.1"
+  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
+  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "junit" % "junit" % "4.13.1" % Test
 )
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"

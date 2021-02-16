@@ -11,7 +11,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-object Hl7TcpClient  extends App with MllpProtocol {
+class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("Hl7TcpClient")
   implicit val executionContext = system.dispatcher
@@ -19,7 +19,7 @@ object Hl7TcpClient  extends App with MllpProtocol {
   val (address, port) = ("127.0.0.1", 6160)
   val connection = Tcp().outgoingConnection(address, port)
 
-  (1 to 1).par.foreach(each => localSingleMessageClient(each, 100))
+  (1 to 1).par.foreach(each => localSingleMessageClient(each, numberOfMessages))
   //(1 to 1).par.foreach(each => localStreamingMessageClient(each, 1000))
 
   def localSingleMessageClient(client: Int, numberOfMessages: Int): Unit = {
@@ -79,4 +79,9 @@ object Hl7TcpClient  extends App with MllpProtocol {
       message.utf8String.contains(AcknowledgmentCode.CE.name()) ||
       message.utf8String.contains(AcknowledgmentCode.CR.name())
   }
+}
+
+object Hl7TcpClient extends App {
+  val client = new Hl7TcpClient()
+  def apply(numberOfMessages: Int) = new Hl7TcpClient(numberOfMessages)
 }
