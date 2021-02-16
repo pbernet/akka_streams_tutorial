@@ -11,9 +11,15 @@ import util.LogFileScanner
 
 /**
   * Integration-Test class for example "HL7 V2 over TCP via Kafka to Websockets"
-  * The focus is on log file scanning to check for processed messages and ERRORS
   *
-  * TODO Add more NOT happy paths
+  * Doc:
+  * https://github.com/pbernet/akka_streams_tutorial#hl7-v2-over-tcp-via-kafka-to-websockets
+  *
+  * The test focus is on log file scanning to check for processed messages and ERRORS
+  *
+  * TODO
+  *  - starting/stopping Kafka container has issues
+  *  - Add more NOT happy paths
   */
 final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAndAfterEachTestData {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -24,10 +30,10 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
   var kafka2Websocket: Kafka2Websocket = _
 
   "Happy path" should {
-    "find all processed messages WebsocketServer log" in {
+    "find all processed messages in WebsocketServer log" in {
       val numberOfMessages = 10
       Hl7TcpClient(numberOfMessages)
-      new LogFileScanner().run(10, "Starting test: Happy path should find all processed messages WebsocketServer log", "WebsocketServer received:").length should equal(numberOfMessages + 1)
+      new LogFileScanner().run(10, 10,"Starting test: Happy path should find all processed messages in WebsocketServer log", "WebsocketServer received:").length should equal(numberOfMessages + 1)
     }
   }
     "NOT Happy path" should {
@@ -36,24 +42,24 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
         Hl7TcpClient(numberOfMessages)
 
         Thread.sleep(10000)
+        logger.info("Re-starting Kafka container...")
         kafkaContainer.stop()
         kafkaContainer.run()
 
-        new LogFileScanner().run(10, "Starting test: NOT Happy path should recover after Kafka restart", "WebsocketServer received:").length should equal(numberOfMessages + 1)
+        new LogFileScanner().run(10, 10, "Starting test: NOT Happy path should recover after Kafka restart", "WebsocketServer received:").length should equal(numberOfMessages + 1)
       }
   }
 
   override protected def beforeEach(testData: TestData): Unit = {
-    // This is the start indicator for the LogFileScanner
+    // Start indicator for the LogFileScanner
     logger.info(s"Starting test: ${testData.name}")
 
-    println("Starting Kafka container...")
-    Thread.sleep(2000)
+    logger.info("Starting Kafka container...")
     kafkaContainer.run()
     val mappedPortKafka = kafkaContainer.mappedPort
-    println(s"Running Kafka on mapped port: $mappedPortKafka")
+    logger.info(s"Running Kafka on mapped port: $mappedPortKafka")
 
-    //Start other components
+    // Start other components
     websocketServer = WebsocketServer()
     websocketServer.run()
 
@@ -65,11 +71,13 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
   }
 
   override protected def afterEach(testData: TestData): Unit = {
-    println("Stopping Kafka container...")
+    logger.info("Stopping Kafka container...")
     kafkaContainer.stop()
-    println("Stopping other components...")
+    logger.info("Stopping other components...")
     websocketServer.stop()
     hl7Tcp2Kafka.stop()
     kafka2Websocket.stop()
+    // Grace time
+    Thread.sleep(5000)
   }
 }
