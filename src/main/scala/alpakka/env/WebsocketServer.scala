@@ -46,7 +46,7 @@ class WebsocketServer extends WebSocketDirectives {
       Flow[Message].mapConcat {
         case tm: TextMessage =>
           logger.info(s"WebsocketServer received: $tm")
-          TextMessage(Source.single("Echo: ") ++ tm.textStream) :: Nil
+          TextMessage(Source.single("ACK: ") ++ tm.textStream) :: Nil
         case bm: BinaryMessage =>
           // ignore binary messages but drain content to avoid the stream being clogged
           bm.dataStream.runWith(Sink.ignore)

@@ -1,8 +1,5 @@
 package alpakka.tcp_to_websockets.websockets
 
-import java.util.Locale
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.ActorSystem
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer.Control
@@ -19,6 +16,8 @@ import org.apache.kafka.common.requests.IsolationLevel
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -45,6 +44,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
 
   def run() = {
     streamControl = createAndRunConsumer(clientID)
+    logger.info(s"Receiving messages form Kafka on: $bootstrapServers")
   }
 
   def stop() = {

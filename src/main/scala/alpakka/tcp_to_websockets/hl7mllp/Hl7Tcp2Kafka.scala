@@ -1,7 +1,5 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
-import java.util.Properties
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.kafka.ProducerSettings
@@ -17,6 +15,7 @@ import org.apache.kafka.clients.producer.{Producer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.Properties
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -59,12 +58,15 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
 
   def run() = {
     serverBinding = server(address, port)
+    logger.info(s"Sending messages to Kafka on: $bootstrapServers")
   }
 
   def stop() = {
     serverBinding.map { b =>
       b.unbind().onComplete {
-        case _ => logger.info("TCP server stopped")
+        _ =>
+          logger.info("TCP server stopped, stopping producer flow...")
+          system.terminate()
       }
     }
   }
