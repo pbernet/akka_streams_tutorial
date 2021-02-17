@@ -71,6 +71,24 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       new LogFileScanner().run(10, 10, "Starting test: NOT Happy path should recover after Kafka2Websocket restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)
     }
 
+    "recover after WebsocketServer restart" in {
+      val numberOfMessages = 10
+      Hl7TcpClient(numberOfMessages)
+
+      // Stopping after half of the msg are processed
+      Thread.sleep(5000)
+
+      logger.info("Re-starting WebsocketServer...")
+      websocketServer.stop()
+      websocketServer = WebsocketServer()
+      websocketServer.run()
+
+      // The recovery of the ws connection needs some time
+      // Unfortunately, even with this pessimistic connection check approach,
+      // we loose an inflight message sometimes :-(
+      new LogFileScanner().run(20, 10, "Starting test: NOT Happy path should recover after WebsocketServer restart", "WebsocketServer received:").length should be >= (numberOfMessages)
+    }
+
     "recover after Kafka restart" in {
       val numberOfMessages = 10
       Hl7TcpClient(numberOfMessages)
