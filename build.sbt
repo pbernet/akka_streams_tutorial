@@ -82,7 +82,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.18",
+  "org.postgresql" % "postgresql" % "42.2.19",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
