@@ -1,8 +1,5 @@
 package alpakka.sse
 
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -12,6 +9,8 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream._
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
@@ -25,16 +24,14 @@ import scala.util.{Failure, Success}
   * http://developer.lightbend.com/docs/alpakka/current/sse.html
   * see EventSourceSpec in this repo for a working example
   */
-object SSEHeartbeat {
+object SSEHeartbeat extends App {
   implicit val system = ActorSystem("SSEHeartbeat")
   implicit val executionContext = system.dispatcher
 
-  def main(args: Array[String]) : Unit = {
-    val (address, port) = ("127.0.0.1", 6000)
-    server(address, port)
-    simpleClient(address, port) //is not recovering after RuntimeException on server
-    backoffClient(address, port) //is recovering after RuntimeException on server
-  }
+  val (address, port) = ("127.0.0.1", 6000)
+  server(address, port)
+  simpleClient(address, port)  // is not recovering after RuntimeException on server
+  backoffClient(address, port) // is recovering after RuntimeException on server
 
   private def server(address: String, port: Int) = {
 
@@ -45,7 +42,7 @@ object SSEHeartbeat {
       def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
       def events =
-        path("events" / Segment ){ clientName =>
+        path("events" / Segment) { clientName =>
           println(s"Server received request from $clientName")
           get {
             complete {
@@ -53,7 +50,9 @@ object SSEHeartbeat {
                 .tick(2.seconds, 2.seconds, NotUsed)
                 .map(_ => {
                   val time = LocalTime.now()
-                  if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
+                  if (time.getSecond > 50) {
+                    println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")
+                  }
                   println(s"Send to client: $time")
                   time
                 })
@@ -108,6 +107,8 @@ object SSEHeartbeat {
       .run()
 
     //See PrintMoreNumbers for correctly stopping the stream
-    done.map(_ => {println("Reached shutdown..."); killSwitch.shutdown()} )
+    done.map(_ => {
+      println("Reached shutdown..."); killSwitch.shutdown()
+    })
   }
 }
