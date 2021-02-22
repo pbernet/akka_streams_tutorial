@@ -2,7 +2,7 @@ package alpakka.tcp_to_websockets
 
 import alpakka.env.{KafkaServerTestcontainers, WebsocketServer}
 import alpakka.tcp_to_websockets.hl7mllp.{Hl7Tcp2Kafka, Hl7TcpClient}
-import alpakka.tcp_to_websockets.websockets.Kafka2Websocket
+import alpakka.tcp_to_websockets.websockets.{Kafka2SSE, Kafka2Websocket}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{BeforeAndAfterEachTestData, TestData}
@@ -29,6 +29,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
   var websocketServer: WebsocketServer = _
   var hl7Tcp2Kafka: Hl7Tcp2Kafka = _
   var kafka2Websocket: Kafka2Websocket = _
+  var kafka2SSE: Kafka2SSE = _
 
   "Happy path" should {
     "find all processed messages in WebsocketServer log" in {
@@ -118,7 +119,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
   }
 
   override protected def beforeEach(testData: TestData): Unit = {
-    // Start indicator for the LogFileScanner
+    // Write start indicator for the LogFileScanner
     logger.info(s"Starting test: ${testData.name}")
 
     logger.info("Starting Kafka container...")
@@ -135,6 +136,9 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
 
     kafka2Websocket = Kafka2Websocket(mappedPortKafka)
     kafka2Websocket.run()
+
+    kafka2SSE = Kafka2SSE(mappedPortKafka)
+    kafka2SSE.run()
   }
 
   override protected def afterEach(testData: TestData): Unit = {
@@ -144,6 +148,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
     websocketServer.stop()
     hl7Tcp2Kafka.stop()
     kafka2Websocket.stop()
+    kafka2SSE.stop()
     // Grace time
     Thread.sleep(5000)
   }

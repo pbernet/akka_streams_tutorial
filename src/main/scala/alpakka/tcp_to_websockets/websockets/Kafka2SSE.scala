@@ -3,6 +3,7 @@ package alpakka.tcp_to_websockets.websockets
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -22,9 +23,9 @@ import scala.util.{Failure, Success}
 
 /**
   * Additional Kafka consumer for topic `hl7-input`,
-  * which then pushes the msgs via SSE to a client
+  * which consumes msgs and then pushes them via SSE to a client
   *
-  * Can be run in parallel with [[Kafka2Websocket]]
+  * Can run in parallel with [[Kafka2Websocket]]
   *
   * @param mappedPortKafka
   */
@@ -34,10 +35,21 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val (address, port) = ("127.0.0.1", 6000)
-  server(address, port)
-  backoffClient(address, port)
-
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
+
+  var clientKillSwitch: UniqueKillSwitch = _
+  var serverBinding: ServerBinding = _
+
+  def run() = {
+    server(address, port)
+    clientKillSwitch = backoffClient(address, port)
+  }
+
+  def stop() = {
+    logger.info("Stopping...");
+    clientKillSwitch.shutdown()
+    serverBinding.terminate(10.seconds)
+  }
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
     ConsumerSettings(system, new StringDeserializer, new StringDeserializer)
@@ -57,9 +69,10 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
 
       def events =
         path("events" / Segment) { clientName =>
-          println(s"Server received request from: $clientName")
+          logger.info(s"Server received request from: $clientName")
           get {
             complete {
+              // No restarts upon connection failure
               Consumer
                 .plainSource(createConsumerSettings("hl7-input sse consumer"), Subscriptions.topics("hl7-input"))
                 .map(msg => ServerSentEvent(msg.value()))
@@ -72,10 +85,11 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
 
     val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
     bindingFuture.onComplete {
-      case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+      case Success(binding) =>
+        logger.info("Server started, listening on: " + binding.localAddress)
+        serverBinding = binding
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
   }
@@ -95,15 +109,11 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
       }
     }
 
-    val (killSwitch: UniqueKillSwitch, done) = restartSource
+    val (killSwitch: UniqueKillSwitch, _) = restartSource
       .viaMat(KillSwitches.single)(Keep.right)
-      .toMat(Sink.foreach(event => println(s"backoffClient got event: $event")))(Keep.both)
+      .toMat(Sink.foreach(event => logger.info(s"backoffClient got event: $event")))(Keep.both)
       .run()
-
-    done.map(_ => {
-      println("Reached shutdown...");
-      killSwitch.shutdown()
-    })
+    killSwitch
   }
 }
 

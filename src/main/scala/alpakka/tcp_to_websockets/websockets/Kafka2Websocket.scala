@@ -26,6 +26,7 @@ import scala.concurrent.{Await, Future}
   * https://doc.akka.io/docs/alpakka-kafka/current/transactions.html#recovery-from-failure
   * to restart the Kafka consumer after a websocket connection issue.
   *
+  * Can run in parallel with [[Kafka2SSE]]
   */
 class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   implicit val system = ActorSystem("Kafka2Websocket")
