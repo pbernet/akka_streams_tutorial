@@ -86,9 +86,9 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
 //      websocketServer = WebsocketServer()
 //      websocketServer.run()
 //
-//      // The recovery of the ws connection needs some time
-//      // Unfortunately, even with this pessimistic connection check approach,
-//      // due to the async sending we loose an inflight message sometimes :-(
+//      // The restart of the Kafka consumer and the recovery of the ws connection needs a long time...
+//      // Unfortunately, even with the pessimistic connection check approach in Kafka2Websocket>>safeSendToWebsocket,
+//      // due to the async sending via SourceQueue, we loose an in-flight message sometimes :-(
 //      new LogFileScanner().run(20, 10, "Starting test: NOT Happy path should recover after WebsocketServer restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)
 //    }
 
