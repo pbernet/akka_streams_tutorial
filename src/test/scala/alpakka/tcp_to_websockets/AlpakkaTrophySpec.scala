@@ -15,7 +15,12 @@ import util.LogFileScanner
   * Doc:
   * https://github.com/pbernet/akka_streams_tutorial#hl7-v2-over-tcp-via-kafka-to-websockets
   *
-  * The test focus is on log file scanning to check for processed messages and ERRORs
+  * Remarks:
+  *  - The test focus is on log file scanning to check for processed messages and ERRORs
+  *  - This setup restarts Kafka for each test, so they can run independently. The downside
+  *    of this is that we have to deal with a new mapped port on each restart.
+  *    A setup with one Kafka start for all tests is here:
+  *    https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
   *
   */
 final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAndAfterEachTestData {
@@ -104,7 +109,8 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       val newMappedPortKafka = kafkaContainer.mappedPort
       logger.info(s"Re-started Kafka on new mapped port: $newMappedPortKafka")
 
-      // Now we need to restart the components sending/receiving to/from Kafka as well
+      // Now we need to restart the components sending/receiving to/from Kafka as well,
+      // to connect to the new mapped port
       hl7Tcp2Kafka.stop()
       hl7Tcp2Kafka = Hl7Tcp2Kafka(newMappedPortKafka)
       hl7Tcp2Kafka.run()
@@ -112,6 +118,10 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       kafka2Websocket.stop()
       kafka2Websocket = Kafka2Websocket(newMappedPortKafka)
       kafka2Websocket.run()
+
+      kafka2SSE.stop()
+      kafka2SSE = Kafka2SSE(newMappedPortKafka)
+      kafka2SSE.run()
 
       // 10 + 1 Initial message
       new LogFileScanner().run(30, 10, "Starting test: NOT Happy path should recover after Kafka restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)

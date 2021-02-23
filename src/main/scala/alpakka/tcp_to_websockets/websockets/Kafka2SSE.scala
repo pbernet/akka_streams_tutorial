@@ -72,15 +72,17 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
           logger.info(s"Server received request from: $clientName")
           get {
             complete {
-              // No restarts upon connection failure
-              Consumer
-                .plainSource(createConsumerSettings("hl7-input sse consumer"), Subscriptions.topics("hl7-input"))
-                .map(msg => ServerSentEvent(msg.value()))
-                .keepAlive(1.second, () => ServerSentEvent.heartbeat)
+              val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+              RestartSource.withBackoff(restartSettings) { () =>
+                Consumer
+                  .plainSource(createConsumerSettings("hl7-input sse consumer"), Subscriptions.topics("hl7-input"))
+                  .map(msg => ServerSentEvent(msg.value()))
+                  .keepAlive(1.second, () => ServerSentEvent.heartbeat)
+              }
             }
           }
         }
-     events
+      events
     }
 
     val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
