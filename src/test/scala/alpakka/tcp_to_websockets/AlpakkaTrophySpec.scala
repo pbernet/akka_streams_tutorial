@@ -21,13 +21,11 @@ import util.LogFileScanner
   *    of this is that we have to deal with a new mapped port on each restart.
   *    A setup with one Kafka start for all tests is here:
   *    https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
-  *
+  *  - Since the shutdown of producers/consumers takes a long time, there are WARN msgs in the log
   */
 final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAndAfterEachTestData {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  // For now: No param, which means "confluentinc/cp-kafka:latest"
-  // Doc: https://www.testcontainers.org/modules/kafka/
   val kafkaContainer: KafkaServerTestcontainers = KafkaServerTestcontainers()
   var mappedPortKafka: Int = _
 

@@ -72,7 +72,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   }
 
 
-  val printSink = Sink.foreach[Person] { each: Person => println(s"Client processed element: $each") }
+  val printSink = Sink.foreach[Person] { each: Person => println(s"Client processed next element: $each") }
 
   val processorFlow: Flow[Person, Person, NotUsed] = Flow[Person].map {
     each: Person => {
@@ -92,7 +92,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
             val finishedWriting = r.discardEntityBytes().future
             onComplete(finishedWriting) { done =>
               //Limit response by appending eg .take(5)
-              val responseStream: LazyList[Person] = LazyList.continually(Person(s"request:$id"))
+              val responseStream: LazyList[Person] = LazyList.continually(Person(s"client with id:$id"))
               complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
             }
           }

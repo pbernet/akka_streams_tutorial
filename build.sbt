@@ -2,12 +2,12 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.5"
 
-val akkaVersion = "2.6.10"
-val akkaHTTPVersion = "10.2.4"
+val akkaVersion = "2.6.13"
+val akkaHTTPVersion = "10.2.2"
 val alpakkaVersion = "2.0.2"
-val alpakkaKafkaConnector = "2.0.5"
+val alpakkaKafkaConnector = "2.0.7"
 
 val kafkaVersion = "2.4.1"
 val activemqVersion =  "5.16.0"
