@@ -97,7 +97,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
     val filesToUpload =
     // Unbounded stream. Limited for testing purposes by appending eg .take(5)
-      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"./src/main/resources/$resourceFileName").toString))).take(5)
+      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"src/main/resources/$resourceFileName").toString))).take(5)
 
     val hostConnectionPoolUpload = Http().cachedHostConnectionPool[FileHandle](address, port)
 

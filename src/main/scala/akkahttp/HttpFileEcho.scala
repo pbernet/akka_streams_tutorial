@@ -162,7 +162,7 @@ object HttpFileEcho extends App with JsonProtocol {
       result
     }
 
-    upload(new File(getClass.getClassLoader.getResource(resourceFileName).toURI))
+    upload(Paths.get(s"src/main/resources/$resourceFileName").toFile)
   }
 
   def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
