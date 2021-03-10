@@ -13,6 +13,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.util.concurrent.ThreadLocalRandom
 import javax.jms.{ConnectionFactory, Message, TextMessage}
 import scala.collection.immutable
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
