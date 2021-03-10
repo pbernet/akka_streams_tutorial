@@ -27,6 +27,8 @@
     <!-- Turn down sshj noise in sftp -->
     <logger name="net.schmizz.sshj" level="ERROR"/>
     <logger name="com.hierynomus.sshj" level="ERROR"/>
+    <!-- Turn up Akka and control level in application.conf -->
+    <logger name="akka" level="DEBUG"/>
 
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
