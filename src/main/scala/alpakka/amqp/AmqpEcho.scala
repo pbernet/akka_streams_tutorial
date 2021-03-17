@@ -14,6 +14,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Random, Success}
+
 /**
   * Inspired by:
   * https://doc.akka.io/docs/alpakka/current/amqp.html
@@ -25,9 +26,9 @@ object AmqpEcho extends App {
   implicit val executionContext = system.dispatcher
 
   val (host, port) = ("127.0.0.1", 5672)
-  val queueName = "myQueue"
+  val queueName = "queue"
 
-  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8.9")
+  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8.14")
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
@@ -61,21 +62,17 @@ object AmqpEcho extends App {
     * @param rabbitMQContainer
     */
   def pubSubClient(id: Int, rabbitMQContainer: RabbitMQContainer) = {
-    val mappedPort = rabbitMQContainer.getAmqpPort
-    val amqpUri = s"amqp://$host:$mappedPort"
-
-    val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
-
-//    val connectionProvider =
-//      AmqpCachedConnectionProvider(
-//        AmqpDetailsConnectionProvider(
-//          host, rabbitMQContainer.getAmqpPort
-//        )
-//          .withAutomaticRecoveryEnabled(false)
-//          .withTopologyRecoveryEnabled(false)
-//          .withNetworkRecoveryInterval(10)
-//          .withRequestedHeartbeat(10)
-//      )
+    val connectionProvider =
+      AmqpCachedConnectionProvider(
+        AmqpDetailsConnectionProvider(
+          host, rabbitMQContainer.getAmqpPort
+        )
+          // see: https://github.com/akka/alpakka/issues/1270
+          .withAutomaticRecoveryEnabled(false)
+          .withTopologyRecoveryEnabled(false)
+          .withNetworkRecoveryInterval(10)
+          .withRequestedHeartbeat(10)
+      )
 
     val exchangeName = s"exchange-pub-sub-$id"
     val exchangeDeclaration = ExchangeDeclaration(exchangeName, "fanout")
@@ -121,7 +118,7 @@ object AmqpEcho extends App {
     val done = amqpSource
       .mapAsync(1)(cm => simulateRandomIssueWhileProcessing(cm))
       .collect { case Some(readResult) => readResult }
-      .wireTap(each => logger.info(s"Client: $id received and acked msg: ${each.bytes.utf8String} from queue: $queueNameFull"))
+      .wireTap(each => logger.info(s"Client: $id received and ACKed msg: ${each.bytes.utf8String} from queue: $queueNameFull"))
       .runWith(Sink.ignore)
 
     done.onComplete {
@@ -134,17 +131,17 @@ object AmqpEcho extends App {
     val payloadParsed = cm.message.bytes.utf8String.split("-").last.toInt
 
     if (payloadParsed % 2 == Random.nextInt(2)) {
-      logger.debug(s"Reply with ack: $payloadParsed")
+      logger.info(s"Processing OK  - reply with ACK: $payloadParsed")
       cm.ack().map(_ => Some(cm.message))
     } else {
-      //Reject the message and ask server to requeue (= place to its original position, if possible)
-      logger.debug(s"Reply with nack: $payloadParsed")
+      // Reject the message and ask server to re-queue (= place to its original position, if possible)
+      logger.warn(s"Processing NOK - reply with NACK: $payloadParsed")
       cm.nack(multiple = false, requeue = true).map(_ => None)
     }
   }
 
   private def sendToExchange(id: Int, connectionProvider: AmqpCachedConnectionProvider, exchangeName: String, exchangeDeclaration: ExchangeDeclaration) = {
-    //Wait until the receiver has registered
+    // Wait until the receiver has registered
     Thread.sleep(1000)
     logger.info(s"Starting sendToExchange: $exchangeName...")
 
@@ -160,7 +157,7 @@ object AmqpEcho extends App {
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartFlow = RestartFlow.onFailuresWithBackoff(restartSettings)(() => amqpFlow)
 
-    val done: Future[Done] =  Source(1 to 100)
+    val done: Future[Done] =  Source(1 to 10)
         .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
         .map(each => s"$id-$each")
         .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
@@ -169,8 +166,8 @@ object AmqpEcho extends App {
         .runWith(Sink.ignore)
 
     done.onComplete {
-      case Success(_) => logger.info("Done sending")
-      case Failure(exception) => logger.info(s"Exception during sending:", exception)
+      case Success(_) => logger.info("Done sending to exchange")
+      case Failure(exception) => logger.info(s"Exception during sending to exchange:", exception)
     }
   }
 
@@ -179,7 +176,7 @@ object AmqpEcho extends App {
 
     val fanoutSize = 4
 
-    //Add the index of the source to all incoming messages, to distinguish which source the incoming message came from
+    // Add the index of the source to all incoming messages, to distinguish the sending source
     val mergedSources = (0 until fanoutSize).foldLeft(Source.empty[(Int, String)]) {
       case (source, fanoutBranch) =>
         source.merge(
