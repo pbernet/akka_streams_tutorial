@@ -14,6 +14,7 @@ import scala.collection.immutable.Seq
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.sys.process.Process
 
 
 /**
@@ -49,6 +50,7 @@ object MqttPahoEcho extends App {
 
   (1 to 1).par.foreach(each => clientPublisher(each))
   (1 to 2).par.foreach(each => clientSubscriber(each))
+  browserClientAdminConsole()
 
   def clientPublisher(clientId: Int)= {
     val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$clientId-$i"))))
@@ -99,5 +101,10 @@ object MqttPahoEcho extends App {
     RestartSource.withBackoff(restartSettings) {
       () => source.mapMaterializedValue(mat => fut.completeWith(mat))
     }.mapMaterializedValue(_ => fut.future)
+  }
+
+  private def browserClientAdminConsole() = {
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") Process(s"open http://localhost:8080").!
   }
 }
