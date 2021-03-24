@@ -18,6 +18,7 @@ import scala.concurrent.{Future, Promise}
 
 /**
   * Roundtrip with the Alpakka connector based on Eclipse Paho
+  * Assumes that we have a tcp connection
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/mqtt.html
@@ -40,41 +41,41 @@ object MqttPahoEcho extends App {
 
   val connectionSettings = MqttConnectionSettings(
     s"tcp://$host:$port",
-    "test-scala-client",
+    "N/A",
     new MemoryPersistence
   ).withAutomaticReconnect(true)
 
-  val topic = "source-spec/topic"
+  val topic = "myTopic"
 
   (1 to 1).par.foreach(each => clientPublisher(each))
-  (1 to 1).par.foreach(each => clientSubscriber())
+  (1 to 2).par.foreach(each => clientSubscriber(each))
 
-  def clientPublisher(each: Int)= {
-    val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$each-$i"))))
+  def clientPublisher(clientId: Int)= {
+    val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$clientId-$i"))))
 
     val sink: Sink[MqttMessage, Future[Done]] =
-      MqttSink(connectionSettings, MqttQoS.AtLeastOnce)
+      MqttSink(connectionSettings.withClientId(s"Pub: $clientId"), MqttQoS.AtLeastOnce)
 
     Source(messages)
       .throttle(1, 1.second, 1, ThrottleMode.shaping)
-      .wireTap(each => logger.info(s"Sending: ${each.payload.utf8String}"))
+      .wireTap(each => logger.info(s"Pub: $clientId sending payload: ${each.payload.utf8String}"))
       .runWith(sink)
   }
 
-    def clientSubscriber()= {
-      //Wait with the Subscribe to get a "last known good value"
+    def clientSubscriber(clientId: Int)= {
+      // Wait with the subscribe to get a "last known good value"
       Thread.sleep(5000)
       val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
 
       val restartingMqttSource = wrapWithAsRestartSource(
-        MqttSource.atMostOnce(connectionSettings.withClientId("source-spec/source"), subscriptions, 8))
+        MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8))
 
       val (subscribed, streamCompletion) = restartingMqttSource
-        .wireTap(each => logger.info("Received: " + each.payload.utf8String))
+        .wireTap(each => logger.info(s"Sub: $clientId received payload: ${each.payload.utf8String}"))
       .toMat(Sink.ignore)(Keep.both)
       .run()
 
-      subscribed.onComplete(each => logger.info(s"Subscribed: $each"))
+      subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
 
       //TODO We do not get a signal when the connection to the broker is lost
       streamCompletion
