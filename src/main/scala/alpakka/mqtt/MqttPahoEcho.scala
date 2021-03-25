@@ -69,7 +69,7 @@ object MqttPahoEcho extends App {
       Thread.sleep(5000)
       val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
 
-      val restartingMqttSource = wrapWithAsRestartSource(
+      val restartingMqttSource = wrapWithRestartSource(
         MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8))
 
       val (subscribed, streamCompletion) = restartingMqttSource
@@ -79,7 +79,8 @@ object MqttPahoEcho extends App {
 
       subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
 
-      //TODO We do not get a signal when the connection to the broker is lost
+      //TODO We do not get an ex here when the connection to the broker is lost
+      //However, the logs shows that paho is trying to re-connect
       streamCompletion
         .recover {
           case exception =>
@@ -95,7 +96,7 @@ object MqttPahoEcho extends App {
     * Wrap a source with restart logic and expose an equivalent materialized value.
     * Tries to restart clientSubscriber on initial connection problem, but has not the desired effect
     */
-  private def wrapWithAsRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
+  private def wrapWithRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
     val fut = Promise[Done]()
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     RestartSource.withBackoff(restartSettings) {

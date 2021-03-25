@@ -29,6 +29,9 @@
     <!-- Turn up Akka and control level in application.conf -->
     <logger name="akka" level="DEBUG"/>
 
+    <!-- Turn up Paho logging -->
+    <logger name="org.eclipse.paho" level="DEBUG"/>
+
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
         <appender-ref ref="STDOUT"/>
