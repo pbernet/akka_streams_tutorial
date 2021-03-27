@@ -13,10 +13,10 @@ import scala.concurrent.{Await, Future}
 
 /**
   * DB access via Slick
-  * Run with [[alpakka.slick.SlickIT]]
+  * Run with integration test: alpakka.slick.SlickIT
   *
   */
-class SlickRunner(urlWithMappedPortSlick: String) {
+class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SlickRunner")
   implicit val executionContext = system.dispatcher
@@ -30,7 +30,7 @@ class SlickRunner(urlWithMappedPortSlick: String) {
 
   // Tweak config url param dynamically with mapped port from container
   val tweakedConf =  ConfigFactory.empty()
-    .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPortSlick))
+    .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPort))
     .withFallback(ConfigFactory.load())
 
   implicit val session = SlickSession.forConfig("slick-postgres", tweakedConf)
@@ -111,5 +111,5 @@ class SlickRunner(urlWithMappedPortSlick: String) {
 }
 
 object SlickRunner extends App {
-  def apply(urlWithMappedPortSlick: String) = new SlickRunner(urlWithMappedPortSlick)
+  def apply(urlWithMappedPort: String) = new SlickRunner(urlWithMappedPort)
 }

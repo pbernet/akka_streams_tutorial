@@ -18,8 +18,10 @@ import scala.sys.process.Process
 
 
 /**
-  * Roundtrip with the Alpakka connector based on Eclipse Paho
-  * Assumes that we have a tcp connection
+  * Roundtrip with the Alpakka MQTT connector based on Eclipse Paho,
+  * which works only via tcp.
+  * Implements Publisher/Subscriber(s), which handle initial connection failures
+  * as well as subsequent connection failures.
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/mqtt.html
@@ -27,11 +29,14 @@ import scala.sys.process.Process
   * https://akka.io/alpakka-samples/mqtt-to-kafka/full-source.html
   *
   * Prerequisite:
-  * Start the docker MQTT broker from: /docker/docker-compose.yml
+  * Start the docker MQTT Broker from: /docker/docker-compose.yml
   * eg by cmd line: docker-compose up -d mosquitto
   *
-  * Works, but has recover issues both on startup and during operation
-  *
+  * Simulate failure scenarios by manually re-starting mosquitto container:
+  * docker-compose down
+  * docker-compose up -d mosquitto
+  * OR
+  * docker-compose restart mosquitto
   */
 object MqttPahoEcho extends App {
   val logger = LoggerFactory.getLogger(this.getClass)
@@ -44,7 +49,9 @@ object MqttPahoEcho extends App {
     s"tcp://$host:$port",
     "N/A",
     new MemoryPersistence
-  ).withAutomaticReconnect(true)
+    // One might think that this setting should be set to `true`. However, for yet unknown reasons
+    // setting this to `false` works better (especially in case of lost subscriber connections).
+  ).withAutomaticReconnect(false)
 
   val topic = "myTopic"
 
@@ -55,8 +62,8 @@ object MqttPahoEcho extends App {
   def clientPublisher(clientId: Int)= {
     val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$clientId-$i"))))
 
-    val sink: Sink[MqttMessage, Future[Done]] =
-      MqttSink(connectionSettings.withClientId(s"Pub: $clientId"), MqttQoS.AtLeastOnce)
+    val sink = wrapWithRestartSink(
+      MqttSink(connectionSettings.withClientId(s"Pub: $clientId"), MqttQoS.AtLeastOnce))
 
     Source(messages)
       .throttle(1, 1.second, 1, ThrottleMode.shaping)
@@ -64,43 +71,49 @@ object MqttPahoEcho extends App {
       .runWith(sink)
   }
 
-    def clientSubscriber(clientId: Int)= {
-      // Wait with the subscribe to get a "last known good value"
-      Thread.sleep(5000)
-      val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
+  def clientSubscriber(clientId: Int): Unit= {
+    // Wait with the subscribe to show the behaviour reading of the "last known good value" of retained messages
+    Thread.sleep(5000)
+    val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
 
-      val restartingMqttSource = wrapWithRestartSource(
-        MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8))
+    val subscriberSource =
+      MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8)
 
-      val (subscribed, streamCompletion) = restartingMqttSource
-        .wireTap(each => logger.info(s"Sub: $clientId received payload: ${each.payload.utf8String}"))
+    val (subscribed, streamCompletion) = subscriberSource
+      .wireTap(each => logger.info(s"Sub: $clientId received payload: ${each.payload.utf8String}"))
       .toMat(Sink.ignore)(Keep.both)
       .run()
 
-      subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
+    subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
 
-      //TODO We do not get an ex here when the connection to the broker is lost
-      //However, the logs shows that paho is trying to re-connect
-      streamCompletion
-        .recover {
-          case exception =>
-            exception.printStackTrace()
-            null
-        }
-        .foreach(_ => system.terminate())
-    }
-
+    streamCompletion
+      .recover {
+        case ex =>
+          logger.error(s"Sub stream failed with: ${ex.getCause} retry...")
+          clientSubscriber(clientId)
+      }
+  }
 
 
   /**
-    * Wrap a source with restart logic and expose an equivalent materialized value.
-    * Tries to restart clientSubscriber on initial connection problem, but has not the desired effect
+    * Wrap the Source with restart logic and expose an equivalent materialized value
     */
   private def wrapWithRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
     val fut = Promise[Done]()
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     RestartSource.withBackoff(restartSettings) {
       () => source.mapMaterializedValue(mat => fut.completeWith(mat))
+    }.mapMaterializedValue(_ => fut.future)
+  }
+
+  /**
+    * Wrap the Sink with restart logic and expose an equivalent materialized value
+    */
+  private def wrapWithRestartSink[M](sink: => Sink[M, Future[Done]]): Sink[M, Future[Done]] = {
+    val fut = Promise[Done]()
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+    RestartSink.withBackoff(restartSettings) {
+      () => sink.mapMaterializedValue(mat => fut.completeWith(mat))
     }.mapMaterializedValue(_ => fut.future)
   }
 
