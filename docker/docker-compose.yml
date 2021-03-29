@@ -43,7 +43,7 @@ services:
   mqtt-admin:
     image: dersimn/mqtt-admin
     ports:
-      - 8080:80
+      - 8090:80
     environment:
       - MQTT_HOST=localhost:9001
 

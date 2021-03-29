@@ -119,6 +119,6 @@ object MqttPahoEcho extends App {
 
   private def browserClientAdminConsole() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://localhost:8080").!
+    if (os == "mac os x") Process(s"open http://localhost:8090").!
   }
 }
