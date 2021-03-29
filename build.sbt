@@ -58,13 +58,11 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-mllp" % camelVersion,
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
-  //Wait, wait, there is more...
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  //https://github.com/akka/akka/issues/29351
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
@@ -72,7 +70,6 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
-  "org.apache.avro" % "avro" % "1.8.2",        //TODO Bump to latest 1.10.2, creates issue
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
