@@ -10,7 +10,7 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.RestartSettings
-import akka.stream.scaladsl.{FileIO, RestartSource, Sink, Source}
+import akka.stream.scaladsl.{Compression, FileIO, RestartSource, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
 import java.io.File
@@ -31,16 +31,21 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * This HTTP file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
-  * It's possible to upload/download files up to 60MB:
-  *  - Check settings in application.conf
-  *     akka.http.server.parsing.max-content-length
-  *     akka.http.client.parsing.max-content-length
+  * It's possible to upload/download files up to the configured size in application.conf:
+  *  - akka.http.server.parsing.max-content-length
+  *  - akka.http.client.parsing.max-content-length
+  *
+  * Added:
+  *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
+  *  - On the fly gzip compression on upload and gunzip decompression on download,
+  *    Doc: https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dealing-with-compressed-data-streams
+  *
+  * To prove that the streaming works:
   *  - Replace testfile.jpg with a large file
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
   *
   * Remarks:
-  *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams/
   *  - TODO Retry on download
   */
 object HttpFileEcho extends App with JsonProtocol {
@@ -49,6 +54,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
+  val chuckSizeBytes = 10000
 
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
@@ -108,10 +114,11 @@ object HttpFileEcho extends App with JsonProtocol {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
-      val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
+
+      val compressedFileSource = FileIO.fromPath(file.toPath, chuckSizeBytes).via(Compression.gzip)
       val formData = Multipart.FormData(Multipart.FormData.BodyPart(
         "binary",
-        HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
+        HttpEntity(MediaTypes.`application/octet-stream`, file.length(), compressedFileSource),
         Map("filename" -> file.getName)))
 
       Marshal(formData).to[RequestEntity]
@@ -171,10 +178,12 @@ object HttpFileEcho extends App with JsonProtocol {
     val httpClient = Http(system).outgoingConnection(address, port)
 
     def saveResponseToFile(response: HttpResponse, localFile: File) = {
-      response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+      response.entity.dataBytes
+        .via(Compression.gunzip(chuckSizeBytes))
+        .runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
     }
 
-    def download(remoteFileHandle: FileHandle, localFile: File): Future[Unit] = {
+    def download(remoteFileHandle: FileHandle, localFile: File) = {
 
       val result = for {
         reqEntity <- Marshal(remoteFileHandle).to[RequestEntity]
@@ -182,15 +191,12 @@ object HttpFileEcho extends App with JsonProtocol {
         downloaded <- saveResponseToFile(response, localFile)
       } yield downloaded
 
-      result.map {
-        ioresult =>
-          println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes!")
-      }
+      val ioresult = Await.result(result, 10.seconds)
+      println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
     }
 
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
-    println(s"Download client with id: $id going to store file to: ${localFile.getAbsolutePath}")
     Future(localFile)
   }
 }
