@@ -63,7 +63,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "com.typesafe.play" %% "play" % "2.8.7",
+  "com.typesafe.play" %% "play" % "2.8.8",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
