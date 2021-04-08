@@ -4,7 +4,7 @@ version := "1.0"
 
 scalaVersion := "2.13.5"
 
-val akkaVersion = "2.6.13"
+val akkaVersion = "2.6.14"
 val akkaHTTPVersion = "10.2.2"
 val alpakkaVersion = "2.0.2"
 val alpakkaKafkaConnector = "2.0.7"
@@ -87,6 +87,7 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13.1" % Test
 )
 
+// TODO https://github.com/krasserm/streamz/issues/88
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
@@ -99,4 +100,4 @@ val workaround = {
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
-fork in run := true
+run / fork := true
