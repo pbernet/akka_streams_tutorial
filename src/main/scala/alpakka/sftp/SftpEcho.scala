@@ -220,7 +220,7 @@ object SftpEcho extends App {
   //works
   private def uploadFileNative() = {
     val resourceFileName = "testfile.jpg"
-    val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
+    val resourceFilePath = Paths.get(s"src/main/resources/$resourceFileName")
     val sftpClient = newSftpClient()
 
     try {

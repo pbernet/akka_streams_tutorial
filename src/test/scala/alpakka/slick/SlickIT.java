@@ -43,7 +43,7 @@ public class SlickIT {
 
     @Before
     public void before() {
-        SLICK_RUNNER = new SlickRunner(URL_WITH_MAPPED_PORT);
+        SLICK_RUNNER = SlickRunner.apply(URL_WITH_MAPPED_PORT);
         SLICK_RUNNER.createTableOnSession();
     }
 
@@ -76,7 +76,7 @@ public class SlickIT {
                 each -> assertThat(SLICK_RUNNER.counter().get()).isEqualTo(noOfUsers),
          globalExecutionContext());
 
-        // We need to keep the main thread waiting to initiate shutdown
+        // Delay initiate shutdown and thus give the async Slick operation time to complete
         Thread.sleep(10000);
     }
 }

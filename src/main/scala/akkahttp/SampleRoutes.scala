@@ -2,12 +2,11 @@ package akkahttp
 
 import java.io.File
 import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ContentTypes
+import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{RejectionHandler, Route, ValidationRejection}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Await
@@ -26,6 +25,10 @@ object SampleRoutes extends App {
   implicit val system = ActorSystem("SampleRoutes")
   implicit val executionContext = system.dispatcher
 
+  val rejectionHandler = RejectionHandler.newBuilder()
+    .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }
+    .handleNotFound { complete(StatusCodes.NotFound, "Page not found") }
+    .result()
 
   def getFromBrowsableDir: Route = {
     val dirToBrowse = File.separator + "tmp"
@@ -36,11 +39,21 @@ object SampleRoutes extends App {
     }
   }
 
-  def parseFormData: Route = path("post") {
-    formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
-      complete(s"The color is '$color' and the age is $age")
+  def parseFormData: Route =
+      path("post") {
+        handleRejections(rejectionHandler) {
+        val minAge = 18
+        formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
+          if (age > minAge) {
+            logger.info(s"Age: $age is older than: $minAge")
+            complete(s"The color is: $color and the age is: $age")
+          } else {
+            logger.error(s"Age: $age is younger than: $minAge")
+            reject(ValidationRejection(s"Age: $age is too low"))
+          }
+        }
+      }
     }
-  }
 
   def getFromDocRoot: Route =
     get {
