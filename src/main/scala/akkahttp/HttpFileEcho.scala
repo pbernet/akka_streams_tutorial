@@ -165,7 +165,7 @@ object HttpFileEcho extends App with JsonProtocol {
           responseBodyAsString <- Unmarshal(response).to[FileHandle]
         } yield responseBodyAsString
 
-      result.onComplete(res => println(s"Upload client with id: $id received result: $res"))
+      result.onComplete(res => println(s"UploadClient with id: $id received result: $res"))
       result
     }
 
@@ -192,7 +192,7 @@ object HttpFileEcho extends App with JsonProtocol {
       } yield downloaded
 
       val ioresult = Await.result(result, 10.seconds)
-      println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
+      println(s"DownloadClient with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
     }
 
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
