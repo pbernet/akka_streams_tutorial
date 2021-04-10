@@ -12,6 +12,7 @@ import akka.util.Timeout
 import play.api.libs.json._
 import sample.stream_actor.Total.Increment
 
+import java.time.LocalTime
 import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,7 +30,7 @@ import scala.util.{Failure, Success}
 object WindTurbineServer {
   protected implicit val system = ActorSystem("WindTurbineServer")
   implicit def executor: ExecutionContext = system.dispatcher
-  protected val log = Logging(system.eventStream, "WindTurbineServer-main")
+  protected val log = Logging(system.eventStream, "WindTurbineServer")
 
   object Messages  {
 
@@ -51,7 +52,8 @@ object WindTurbineServer {
       (math floor avg * 100) / 100
     }
 
-    //compute intermediate sums (= number of measurements) and send them to the Total actor, at least every second
+    // compute intermediate sums (= max 100 measurements at least every second)
+    // and send them to the Total actor
     val measurementsWebSocketFlow: Flow[Message, Message, Any] =
       Flow[Message]
         .collect {
@@ -61,7 +63,7 @@ object WindTurbineServer {
             textStream.runFold("")(_ + _)
               .flatMap(Future.successful)
         }
-        .mapAsync(1)(x => x) //identity function
+        .mapAsync(1)(identity)
         .groupedWithin(100, 1.second)
         .map(messages => (messages.last, Messages.parse(messages)))
         .map { elem => println(s"After parsing size: ${elem._2.size}"); elem}
@@ -70,21 +72,15 @@ object WindTurbineServer {
             import akka.pattern.ask
             implicit val askTimeout = Timeout(30.seconds)
 
-            // Optional: generate server errors at 1/6 of the time
-            // Clients receive:
-            // akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
-            // and are able to recover due to the RestartSource
+            //generateRandomServerError()
 
-            //val time = LocalTime.now()
-            //if (time.getSecond > 50) {println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")}
-
-            //only send a single message at a time to the Total actor, backpressure otherwise
+            // only send a single message at a time to the Total actor, backpressure otherwise
             val windSpeeds = measurements.map(each => each.measurements.wind_speed)
             (total ? Increment(measurements.size, average(windSpeeds), measurements.head.id))
               .mapTo[Done]
               .map(_ => lastMessage)
         }
-        .map(Messages.ack) //ack the last message only
+        .map(Messages.ack) // ack the last message only
 
 
     val route =
@@ -117,6 +113,20 @@ object WindTurbineServer {
       //actor system termination in 2.6.x is now implicit, see:
       //https://github.com/akka/akka/issues/28310
       log.info("Terminated... Bye")
+    }
+  }
+
+  /**
+    * Generate server errors at 1/6 of the time
+    * Clients will receive:
+    * akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
+    * and are able to recover due to the RestartSource used
+    */
+  private def generateRandomServerError() = {
+    val time = LocalTime.now()
+    if (time.getSecond > 50) {
+      println(s"Server RuntimeException at: $time");
+      throw new RuntimeException("Boom!")
     }
   }
 }
