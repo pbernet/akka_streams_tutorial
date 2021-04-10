@@ -28,13 +28,16 @@ import scala.util.control.NonFatal
 
 /**
   * Read Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]])
-  * and write them to Elasticsearch version 7.x
-  * [[SSEtoElasticsearch.Change]] acts as a data bridge between the two worlds
+  * and write them to Elasticsearch version 7.x server
   *
-  * Note that alpakka 2.0.1 has this dependency. Output from cmd dependencyTree:
+  * Alpakka 2.x uses the elasticsearch-rest-client:6.x
+  * Output from sbt cmd `dependencyTree`:
   * [info]   +-com.lightbend.akka:akka-stream-alpakka-elasticsearch_2.12:2.0.1 [S]
   * ..
   * [info]   | +-org.elasticsearch.client:elasticsearch-rest-client:6.3.1
+  *
+  * This example runs elasticsearch-rest-client:6.x against elasticsearch 7.x server.
+  * In Alpakka 3.x the elasticsearch-rest-client:6.x will be replaced with an Akka HTTP client
   *
   */
 object SSEtoElasticsearch {
@@ -48,6 +51,7 @@ object SSEtoElasticsearch {
       Supervision.Restart
   }
 
+  // Data bridge between SSE and elasticsearch
   case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
   implicit val format: JsonFormat[Change] = jsonFormat8(Change)
