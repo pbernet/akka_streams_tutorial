@@ -18,7 +18,7 @@ import scala.util.{Failure, Success}
 
 /**
   * Upload file, eg from file system
-  * Works together with [[DirectoryListener]]
+  * Is used by [[DirectoryListener]]
   *
   * Starts a mock server to handle the files
   */
@@ -66,27 +66,6 @@ class Uploader(system: ActorSystem) {
     }
   }
 
-
-  private def createEntityFrom(file: File): Future[RequestEntity] = {
-    require(file.exists())
-    val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
-
-    // akka-http server is easy regarding the MediaType
-    // Other HTTP servers need an explicit MediaType, to be able to process the multipart POST request
-//    val paramMapFile = Map("type" -> "text/csv", "filename" -> file.getName)
-//
-//    val formData = Multipart.FormData(Multipart.FormData.BodyPart(
-//      "uploadedFile",
-//      //HttpEntity(MediaTypes.`multipart/form-data`, file.length(), fileSource), paramMapFile))
-//      HttpEntity(MediaTypes.`text/csv`.toContentType(HttpCharset.apply("UTF-8")(Seq.empty)), file.length(), fileSource), paramMapFile))
-
-    val formData = Multipart.FormData(Multipart.FormData.BodyPart(
-      "uploadedFile",
-      HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
-      Map("filename" -> file.getName)))
-    Marshal(formData).to[RequestEntity]
-  }
-
   def upload(file: File): Future[HttpResponse] = {
     val target = Uri(s"$protocol://$address:$port")
       .withPath(akka.http.scaladsl.model.Uri.Path("/api/upload"))
@@ -110,6 +89,27 @@ class Uploader(system: ActorSystem) {
     result.onComplete(res => logger.info(s"Upload client received result: $res"))
     result
   }
+
+  private def createEntityFrom(file: File): Future[RequestEntity] = {
+    require(file.exists())
+    val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
+
+    // akka-http server is easy regarding the MediaType
+    // Other HTTP servers need an explicit MediaType, to be able to process the multipart POST request
+    //    val paramMapFile = Map("type" -> "text/csv", "filename" -> file.getName)
+    //
+    //    val formData = Multipart.FormData(Multipart.FormData.BodyPart(
+    //      "uploadedFile",
+    //      //HttpEntity(MediaTypes.`multipart/form-data`, file.length(), fileSource), paramMapFile))
+    //      HttpEntity(MediaTypes.`text/csv`.toContentType(HttpCharset.apply("UTF-8")(Seq.empty)), file.length(), fileSource), paramMapFile))
+
+    val formData = Multipart.FormData(Multipart.FormData.BodyPart(
+      "uploadedFile",
+      HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
+      Map("filename" -> file.getName)))
+    Marshal(formData).to[RequestEntity]
+  }
+
 }
 
 object Uploader extends App {

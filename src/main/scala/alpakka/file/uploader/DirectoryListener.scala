@@ -9,18 +9,13 @@ import java.nio.file.{FileSystems, Files, Path, StandardCopyOption}
 import scala.concurrent.duration.DurationInt
 
 /**
-  * Pick up files from directory in `uploadDir` on:
-  *  - startup
-  *  - when new files are added
-  *
-  * do a HTTP file upload via [[Uploader]]
-  * and finally move them to `processedDir`
+  * Pick up (new/changed) files in directory `uploadDir`
+  * Do a HTTP file upload via [[Uploader]]
+  * Finally move them to `processedDir`
   *
   * Similar example (regarding directory listening):
   * https://akka.io/alpakka-samples/file-to-elasticsearch/index.html
   *
-  * TODO
-  *  - Handle not happy path scenarios
   */
 object DirectoryListener extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -30,7 +25,7 @@ object DirectoryListener extends App {
   val uploader = Uploader(system)
 
   val fs = FileSystems.getDefault
-  val rootDir = fs.getPath("./uploader")
+  val rootDir = fs.getPath("uploader")
   val uploadDir = rootDir.resolve("upload")
   val processedDir = rootDir.resolve("processed")
 
@@ -41,13 +36,14 @@ object DirectoryListener extends App {
   uploadAllFilesFromSourceDir()
 
   def uploadAllFilesFromSourceDir() = {
+    logger.info(s"About to start listening for changes in `uploadDir`: $uploadDir")
     DirectoryChangesSource(uploadDir, pollInterval = 1.second, maxBufferSize = 1000)
        // Files added to the dir
       .collect { case (path, DirectoryChange.Creation) => path }
        // Include files encountered on startup
       .merge(Directory.ls(uploadDir))
       .mapAsync(1)(path => {
-        logger.info(s"Upload and move: $path")
+        logger.info(s"About to upload and move file: $path")
         uploadAndMove(path)
       })
       .run()
