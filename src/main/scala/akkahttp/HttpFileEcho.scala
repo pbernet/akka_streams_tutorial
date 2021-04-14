@@ -119,6 +119,8 @@ object HttpFileEcho extends App with JsonProtocol {
       val formData = Multipart.FormData(Multipart.FormData.BodyPart(
         "binary",
         HttpEntity(MediaTypes.`application/octet-stream`, file.length(), compressedFileSource),
+        // Set the Content-Disposition header
+        // see: https://www.w3.org/Protocols/HTTP/Issues/content-disposition.txt
         Map("filename" -> file.getName)))
 
       Marshal(formData).to[RequestEntity]
