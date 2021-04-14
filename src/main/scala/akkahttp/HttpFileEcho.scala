@@ -64,12 +64,16 @@ object HttpFileEcho extends App with JsonProtocol {
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
 
-        def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+        formFields(Symbol("payload")) { payload =>
+          println(s"Server received request with additional payload: $payload")
 
-        storeUploadedFile("binary", tempDestination) {
-          case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
-            complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+          def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+
+          storeUploadedFile("binary", tempDestination) {
+            case (metadataFromClient: FileInfo, uploadedFile: File) =>
+              println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+              complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+          }
         }
       } ~
         path("download") {
@@ -121,7 +125,10 @@ object HttpFileEcho extends App with JsonProtocol {
         HttpEntity(MediaTypes.`application/octet-stream`, file.length(), compressedFileSource),
         // Set the Content-Disposition header
         // see: https://www.w3.org/Protocols/HTTP/Issues/content-disposition.txt
-        Map("filename" -> file.getName)))
+        Map("filename" -> file.getName)),
+        // Pass additional (json) payload in a form field
+        Multipart.FormData.BodyPart.Strict("payload", "{\"payload\": \"bla\"}", Map.empty)
+      )
 
       Marshal(formData).to[RequestEntity]
     }
