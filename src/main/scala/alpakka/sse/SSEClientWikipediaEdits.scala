@@ -1,7 +1,5 @@
 package alpakka.sse
 
-import java.time.{Instant, ZoneId}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -13,13 +11,14 @@ import akka.stream.{ActorAttributes, RestartSettings, Supervision}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 
+import java.time.{Instant, ZoneId}
 import scala.concurrent.duration._
 import scala.sys.process._
 import scala.util.Try
 import scala.util.control.NonFatal
 
 
-case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
   override def toString = {
     val localDateTime = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime
     s"$localDateTime - $cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
@@ -33,7 +32,7 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   * https://www.matthowlett.com/2017-12-23-exploring-wikipedia-ksql.html
   *
   */
-object SSEClientWikipediaEdits {
+object SSEClientWikipediaEdits extends App {
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
   implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -43,14 +42,12 @@ object SSEClientWikipediaEdits {
       Supervision.Restart
   }
 
-  def main(args: Array[String]) : Unit = {
-    browserClient()
-    sseClient()
-  }
+  browserClient()
+  sseClient()
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/SSEClientWikipediaEdits.html").!
+    if (os == "mac os x") Process("open src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
   private def sseClient() = {
@@ -68,14 +65,14 @@ object SSEClientWikipediaEdits {
       }.withAttributes(ActorAttributes.supervisionStrategy(decider))
     }
 
-    val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString())}
+    val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString()) }
 
     val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
 
         def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
 
-        def isNamedBot(bot: Boolean, user: String) : Boolean = {
+        def isNamedBot(bot: Boolean, user: String): Boolean = {
           if (bot) user.toLowerCase().contains("bot") else false
         }
 
@@ -87,7 +84,7 @@ object SSEClientWikipediaEdits {
 
         val cmdType = (Json.parse(event.data) \ "type").as[String]
 
-        val bot =  (Json.parse(event.data) \ "bot").as[Boolean]
+        val bot = (Json.parse(event.data) \ "bot").as[Boolean]
 
         if (cmdType == "new" || cmdType == "edit") {
           val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()

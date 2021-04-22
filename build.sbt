@@ -2,21 +2,22 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.5"
 
-val akkaVersion = "2.6.10"
+val akkaVersion = "2.6.14"
 val akkaHTTPVersion = "10.2.2"
 val alpakkaVersion = "2.0.2"
-val alpakkaKafkaConnector = "2.0.5"
 
-val kafkaVersion = "2.4.1"
-val activemqVersion =  "5.16.1"
+val alpakkaKafkaConnector = "2.1.0-RC1"
+val kafkaVersion = "2.7.0"
+
+val activemqVersion =  "5.16.0"
 val streamzVersion = "0.13-RC4"
 val camelVersion = "2.25.2"
-val testContainersVersion = "1.15.1"
+val testContainersVersion = "1.15.2"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.1",
   "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -58,20 +59,18 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-mllp" % camelVersion,
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
-  //Wait, wait, there is more...
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  //https://github.com/akka/akka/issues/29351
-  "com.typesafe.play" %% "play" % "2.8.2",
+  "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
+  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
-  "org.apache.commons" % "commons-lang3" % "3.11",
-  "org.apache.avro" % "avro" % "1.8.2",
+  "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
@@ -81,7 +80,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.18",
+  "org.postgresql" % "postgresql" % "42.2.19",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
@@ -89,6 +88,7 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13.1" % Test
 )
 
+// TODO https://github.com/krasserm/streamz/issues/88
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
@@ -101,4 +101,4 @@ val workaround = {
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
-fork in run := true
+run / fork := true

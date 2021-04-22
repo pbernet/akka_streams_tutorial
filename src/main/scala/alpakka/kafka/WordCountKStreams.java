@@ -74,7 +74,8 @@ public class WordCountKStreams {
         try {
             addShutdownHook(app, latch);
             app.start();
-            interactiveQuery(app);
+            // TODO This does work differently in Kafka 2.7.0
+            //interactiveQuery(app);
             latch.await();
         } catch (Throwable e) {
             System.out.println("Exception occurred: " + e.getMessage());

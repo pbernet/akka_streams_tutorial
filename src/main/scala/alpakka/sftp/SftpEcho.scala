@@ -1,9 +1,5 @@
 package alpakka.sftp
 
-import java.io.File
-import java.net.InetAddress
-import java.nio.file.{Files, Paths}
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.ftp.scaladsl.Sftp
 import akka.stream.alpakka.ftp.{FtpCredentials, FtpFile, SftpSettings}
@@ -18,6 +14,9 @@ import net.schmizz.sshj.{DefaultConfig, SSHClient}
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.File
+import java.net.InetAddress
+import java.nio.file.{Files, Paths}
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -131,7 +130,7 @@ object SftpEcho extends App {
 
     val fetchedFile = retrieveFromPath(ftpFile.path).runWith(FileIO.toPath(localPath))
     fetchedFile.map { ioResult =>
-      logger.debug(s"Fetched file status: ${ioResult.status}")
+      logger.debug(s"Fetched file: $ioResult")
       try {
         // TODO This fails silently: the file is not moved
         Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
@@ -221,7 +220,7 @@ object SftpEcho extends App {
   //works
   private def uploadFileNative() = {
     val resourceFileName = "testfile.jpg"
-    val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
+    val resourceFilePath = Paths.get(s"src/main/resources/$resourceFileName")
     val sftpClient = newSftpClient()
 
     try {
