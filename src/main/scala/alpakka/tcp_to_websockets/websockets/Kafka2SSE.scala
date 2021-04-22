@@ -12,7 +12,7 @@ import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.stream._
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.requests.IsolationLevel
+import org.apache.kafka.common.IsolationLevel
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.{Logger, LoggerFactory}
 
