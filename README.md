@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.com/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.com/pbernet/akka_streams_tutorial)
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
@@ -54,7 +53,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 
 ## Apache Kafka WordCount ##
-The ubiquitous word count with additional message count (A message is a sequence of words).
+The ubiquitous word count with an additional message count. A message is a sequence of words.
 Start the classes in the order below and watch the console output.
 
 | Class               | Description      |
