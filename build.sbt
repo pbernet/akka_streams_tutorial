@@ -11,8 +11,7 @@ val alpakkaVersion = "2.0.2"
 val alpakkaKafkaConnector = "2.1.0-RC1"
 val kafkaVersion = "2.7.0"
 
-val activemqVersion =  "5.16.2"
-val streamzVersion = "0.13-RC4"
+val activemqVersion =  "5.16.0"
 val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.2"
 
@@ -51,7 +50,6 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
-  "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
   "org.apache.camel" % "camel-netty4" % camelVersion,
   "org.apache.camel" % "camel-jetty" % camelVersion,
   "org.apache.camel" % "camel-core" % camelVersion,
@@ -88,8 +86,6 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.13.1" % Test
 )
 
-// TODO https://github.com/krasserm/streamz/issues/88
-resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618

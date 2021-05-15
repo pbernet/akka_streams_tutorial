@@ -2,17 +2,12 @@ package alpakka.kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
@@ -31,7 +26,7 @@ import java.util.concurrent.CountDownLatch;
  * https://docs.confluent.io/current/streams/concepts.html#ktable
  * <p>
  * Interactive query for the local state store:
- * https://docs.confluent.io/current/streams/developer-guide/interactive-queries.html#id4
+ * https://docs.confluent.io/current/streams/developer-guide/interactive-queries.html
  */
 public class WordCountKStreams {
 
@@ -57,15 +52,15 @@ public class WordCountKStreams {
                 .filter((key, value) -> (!(value.equals(""))))
                 //.peek((key, value) -> System.out.println("Processing WORD count key: " + key + " with value: " + value))
                 .groupBy((key, word) -> word)
-                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-word-store"));
+                .count(Materialized.as("count-word-store"));
         wordCount.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         KTable<String, Long> messageCount = textLines
                 .filter((key, value) -> ((value.contains("fakeNews"))))
                 //.peek((key, value) -> System.out.println("Processing MESSAGE count key: " + key + " with value: " + value))
-                .map((key, value) -> new KeyValue<String, String>("total", value))
+                .map((key, value) -> new KeyValue<>("total", value))
                 .groupByKey()
-                .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("count-message-store"));
+                .count(Materialized.as("count-message-store"));
         messageCount.toStream().to("messagecount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         final KafkaStreams app = new KafkaStreams(builder.build(), config);
@@ -74,8 +69,7 @@ public class WordCountKStreams {
         try {
             addShutdownHook(app, latch);
             app.start();
-            // TODO This does work differently in Kafka 2.7.0
-            //interactiveQuery(app);
+            interactiveQuery(app);
             latch.await();
         } catch (Throwable e) {
             System.out.println("Exception occurred: " + e.getMessage());
@@ -88,15 +82,8 @@ public class WordCountKStreams {
         Thread thread = new Thread("fakenews-interactive-queries") {
             @Override
             public void run() {
-                ReadOnlyKeyValueStore<String, Long> keyValueStoreWords = null;
-                ReadOnlyKeyValueStore<String, Long> keyValueStoreMessages = null;
-
-                try {
-                    keyValueStoreWords = WordCountKStreams.waitUntilStoreIsQueryable("count-word-store", QueryableStoreTypes.keyValueStore(), app);
-                    keyValueStoreMessages = WordCountKStreams.waitUntilStoreIsQueryable("count-message-store", QueryableStoreTypes.keyValueStore(), app);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                ReadOnlyKeyValueStore<String, Long> keyValueStoreWords = WordCountKStreams.waitUntilStoreIsQueryable("count-word-store", QueryableStoreTypes.keyValueStore(), app, "fakenews");
+                ReadOnlyKeyValueStore<String, Long> keyValueStoreMessages = WordCountKStreams.waitUntilStoreIsQueryable("count-message-store", QueryableStoreTypes.keyValueStore(), app, "total");
 
                 while (true) {
                     System.out.println("Query WORD count fakenews total: " + keyValueStoreWords.get("fakenews"));
@@ -104,7 +91,7 @@ public class WordCountKStreams {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        // ignore
                     }
                 }
             }
@@ -139,15 +126,24 @@ public class WordCountKStreams {
         });
     }
 
-    private static <T> T waitUntilStoreIsQueryable(final String storeName,
-                                                   final QueryableStoreType<T> queryableStoreType,
-                                                   final KafkaStreams streams) throws InterruptedException {
+    private static ReadOnlyKeyValueStore<String, Long> waitUntilStoreIsQueryable(final String storeName,
+                                                                                 final QueryableStoreType<ReadOnlyKeyValueStore<String, Long>> queryableStoreType,
+                                                                                 final KafkaStreams streams,
+                                                                                 final String key) {
         while (true) {
             try {
-                return streams.store(storeName, queryableStoreType);
+                System.out.println("Start checking if local store: " + storeName + " is reachable");
+                ReadOnlyKeyValueStore<String, Long> keyValueStore = streams.store(StoreQueryParameters.fromNameAndType(storeName, queryableStoreType));
+                keyValueStore.get(key);
+                return keyValueStore;
+
             } catch (InvalidStateStoreException ignored) {
                 System.out.println("Local store: " + storeName + " not yet ready for querying - sleep");
-                Thread.sleep(1000);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    // ignore
+                }
             }
         }
     }
