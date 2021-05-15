@@ -11,7 +11,7 @@ val alpakkaVersion = "2.0.2"
 val alpakkaKafkaConnector = "2.1.0-RC1"
 val kafkaVersion = "2.7.0"
 
-val activemqVersion =  "5.16.0"
+val activemqVersion =  "5.16.2"
 val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.2"
 
