@@ -2,21 +2,21 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.5"
+scalaVersion := "2.13.6"
 
 val akkaVersion = "2.6.14"
 val akkaHTTPVersion = "10.2.2"
 val alpakkaVersion = "2.0.2"
 
-val alpakkaKafkaConnector = "2.1.0-RC1"
+val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
 
 val activemqVersion =  "5.16.0"
-val camelVersion = "2.25.2"
 val testContainersVersion = "1.15.2"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.1",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
+  // Latest is 1.0.0 but several dependencies still point to 0.9.1
   "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -49,12 +49,6 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
-
-  "org.apache.camel" % "camel-netty4" % camelVersion,
-  "org.apache.camel" % "camel-jetty" % camelVersion,
-  "org.apache.camel" % "camel-core" % camelVersion,
-  "org.apache.camel" % "camel-stream" % camelVersion,
-  "org.apache.camel" % "camel-mllp" % camelVersion,
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
