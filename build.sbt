@@ -17,7 +17,7 @@ val testContainersVersion = "1.15.2"
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
   // Latest is 1.0.0 but several dependencies still point to 0.9.1
-  "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
+  "org.scala-lang.modules" %% "scala-java8-compat" % "1.0.0",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
