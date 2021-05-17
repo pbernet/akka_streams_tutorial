@@ -1,14 +1,14 @@
 package akkahttp
 
-import java.io.File
-import java.nio.file.Paths
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route, ValidationRejection}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.File
+import java.nio.file.Paths
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.sys.process.Process
@@ -27,7 +27,9 @@ object SampleRoutes extends App {
 
   val rejectionHandler = RejectionHandler.newBuilder()
     .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }
-    .handleNotFound { complete(StatusCodes.NotFound, "Page not found") }
+    .handleNotFound {
+      complete(StatusCodes.NotFound, "Page not found")
+    }
     .result()
 
   def getFromBrowsableDir: Route = {
@@ -39,17 +41,22 @@ object SampleRoutes extends App {
     }
   }
 
+  def requestMethod(req: HttpRequest): String = req.method.name
+
   def parseFormData: Route =
+  // Set akka.loglevel to "DEBUG" to see log output
+    logRequest("log post request") {
       path("post") {
         handleRejections(rejectionHandler) {
-        val minAge = 18
-        formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
-          if (age > minAge) {
-            logger.info(s"Age: $age is older than: $minAge")
-            complete(s"The color is: $color and the age is: $age")
-          } else {
-            logger.error(s"Age: $age is younger than: $minAge")
-            reject(ValidationRejection(s"Age: $age is too low"))
+          val minAge = 18
+          formFields(Symbol("color"), Symbol("age").as[Int]) { (color, age) =>
+            if (age > minAge) {
+              logger.info(s"Age: $age is older than: $minAge")
+              complete(s"The color is: $color and the age is: $age")
+            } else {
+              logger.error(s"Age: $age is younger than: $minAge")
+              reject(ValidationRejection(s"Age: $age is too low"))
+            }
           }
         }
       }
@@ -59,14 +66,15 @@ object SampleRoutes extends App {
     get {
       val static = "src/main/resources"
       concat(
-      pathSingleSlash {
-        val appHtml = Paths.get(static, "SampleRoutes.html").toFile
-        getFromFile(appHtml, ContentTypes.`text/html(UTF-8)`)
-      },
-      pathPrefix("static") {
-        getFromDirectory(static)
-      }
-    )}
+        pathSingleSlash {
+          val appHtml = Paths.get(static, "SampleRoutes.html").toFile
+          getFromFile(appHtml, ContentTypes.`text/html(UTF-8)`)
+        },
+        pathPrefix("static") {
+          getFromDirectory(static)
+        }
+      )
+    }
 
   def routes: Route = {
     getFromBrowsableDir ~ parseFormData ~ getFromDocRoot
