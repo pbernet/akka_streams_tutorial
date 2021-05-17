@@ -11,8 +11,8 @@ import static scala.compat.java8.FutureConverters.globalExecutionContext;
 
 
 /**
- * We use JUnit as test runner because of "type trouble"
- * when using testcontainers.org with Scala
+ * Her we use JUnit as test runner because of "type trouble"
+ * when using this testcontainer with Scala
  *
  */
 public class SlickIT {
