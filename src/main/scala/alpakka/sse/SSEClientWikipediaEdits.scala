@@ -31,11 +31,13 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   * https://wikitech.wikimedia.org/wiki/EventStreams
   * https://www.matthowlett.com/2017-12-23-exploring-wikipedia-ksql.html
   *
+  * see also [[alpakka.sse_to_elasticsearch.SSEtoElasticsearch]])
+  *
   */
 object SSEClientWikipediaEdits extends App {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SSEClientWikipediaEdits")
   implicit val executionContext = system.dispatcher
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")

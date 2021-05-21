@@ -6,13 +6,13 @@ scalaVersion := "2.13.6"
 
 val akkaVersion = "2.6.14"
 val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "2.0.2"
+val alpakkaVersion = "3.0.0"
 
 val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
 
-val activemqVersion =  "5.16.2"
-val testContainersVersion = "1.15.2"
+val activemqVersion =  "5.16.0"
+val testContainersVersion = "1.15.3"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
