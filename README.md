@@ -2,7 +2,7 @@
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) docs, tutorials, blogs and postings to provide you with exactly this feeling.
+This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * [HTTP file download with local cache](#HTTP-file-download-with-local-cache)
 * [Windturbine example](#Windturbine-example) 
