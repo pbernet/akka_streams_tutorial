@@ -16,6 +16,9 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v10
         with:
-          java-version: "adopt@1.8"
+          # Because of Alpakka 3.x
+          distribution: 'adopt'
+          java-version: '11'
+          check-latest: true
       - name: Build and Test
         run: sbt -v +test
