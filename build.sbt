@@ -61,7 +61,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
-  "commons-io" % "commons-io" % "2.8.0",
+  "commons-io" % "commons-io" % "2.9.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.2",
