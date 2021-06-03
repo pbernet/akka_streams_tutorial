@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.{HttpEntity, HttpRequest, MediaTypes, Multipart,
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
+import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.scaladsl.FileIO
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,7 +21,7 @@ import scala.util.{Failure, Success}
   * Upload file, eg from file system
   * Is used by [[DirectoryListener]]
   *
-  * Starts a mock server to handle the files
+  * Also starts a mock server to handle the files
   */
 class Uploader(system: ActorSystem) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -72,6 +73,15 @@ class Uploader(system: ActorSystem) {
 
     val headers: Seq[HttpHeader] = Seq(RawHeader("accept", "*/*"))
 
+    // Doc ConnectionPoolSettings
+    // https://doc.akka.io/docs/akka-http/current/client-side/configuration.html#pool-settings
+    val connectionPoolSettings = ConnectionPoolSettings(system)
+      .withUpdatedConnectionSettings({ settings =>
+        settings
+          .withConnectingTimeout(10.seconds)
+          .withIdleTimeout(2.minutes)
+      })
+
     val result: Future[HttpResponse] =
       for {
         request <- createEntityFrom(file).map(entity => {
@@ -83,7 +93,7 @@ class Uploader(system: ActorSystem) {
           logger.debug(s"Request method: ${req.method}")
           req
         })
-        response <- Http().singleRequest(request)
+        response <- Http().singleRequest(request = request, settings = connectionPoolSettings)
       } yield response
 
     result.onComplete(res => logger.info(s"Upload client received result: $res"))

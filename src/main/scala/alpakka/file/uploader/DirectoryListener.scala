@@ -10,11 +10,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
-  * Pick up (new/changed) files in the directory `uploadDir`
+  * Pick up (new/changed) files in the directory `./uploader/upload`
   * Do a HTTP file upload via [[Uploader]]
-  * Finally move the file to `processedDir`
+  * Finally move the file to `./uploader/processed`
   *
-  * Remarks
+  * Remarks:
   *  - DirectoryChangesSource does not work for files in sub folders
   *  - Similar example: https://akka.io/alpakka-samples/file-to-elasticsearch/index.html
   */
