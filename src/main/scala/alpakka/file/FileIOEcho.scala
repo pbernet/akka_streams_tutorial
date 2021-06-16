@@ -1,11 +1,10 @@
 package alpakka.file
 
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.stream.IOResult
 import akka.stream.scaladsl.FileIO
 
+import java.nio.file.Paths
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -23,7 +22,7 @@ object FileIOEcho extends App {
   implicit val system = ActorSystem("FileIOEcho")
   implicit val executionContext = system.dispatcher
 
-  val sourceFileName = "./src/main/resources/testfile.jpg"
+  val sourceFileName = "src/main/resources/testfile.jpg"
   val encFileName = "testfile.enc"
   val resultFileName = "testfile_result.jpg"
 

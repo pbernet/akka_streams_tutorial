@@ -1,7 +1,5 @@
 package alpakka.slick
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.slick.scaladsl.{SlickSession, _}
 import akka.stream.scaladsl._
@@ -9,15 +7,16 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.{GetResult, ResultSetConcurrency, ResultSetType}
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
 /**
   * DB access via Slick
-  * Run with [[alpakka.slick.SlickIT]]
+  * Run with integration test: alpakka.slick.SlickIT
   *
   */
-class SlickRunner(urlWithMappedPortSlick: String) {
+class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("SlickRunner")
   implicit val executionContext = system.dispatcher
@@ -31,7 +30,7 @@ class SlickRunner(urlWithMappedPortSlick: String) {
 
   // Tweak config url param dynamically with mapped port from container
   val tweakedConf =  ConfigFactory.empty()
-    .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPortSlick))
+    .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPort))
     .withFallback(ConfigFactory.load())
 
   implicit val session = SlickSession.forConfig("slick-postgres", tweakedConf)
@@ -45,7 +44,7 @@ class SlickRunner(urlWithMappedPortSlick: String) {
     def * = (id, name)
   }
 
-  implicit val getUserResult = GetResult(r => User(r.nextInt, r.nextString))
+  implicit val getUserResult = GetResult(r => User(r.nextInt(), r.nextString()))
 
   val createTable = sqlu"""CREATE TABLE public.users(id INTEGER, name VARCHAR(50))"""
   val dropTable = sqlu"""DROP TABLE public.users"""
@@ -112,5 +111,5 @@ class SlickRunner(urlWithMappedPortSlick: String) {
 }
 
 object SlickRunner extends App {
-  def apply(urlWithMappedPortSlick: String) = new SlickRunner(urlWithMappedPortSlick)
+  def apply(urlWithMappedPort: String) = new SlickRunner(urlWithMappedPort)
 }

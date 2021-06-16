@@ -1,8 +1,5 @@
 package alpakka.tcp_to_websockets.websockets
 
-import java.util.Locale
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.ActorSystem
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer.Control
@@ -15,10 +12,10 @@ import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.SendMessage
 import alpakka.tcp_to_websockets.websockets.WebsocketConnectionStatusActor.ConnectionStatus
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.requests.IsolationLevel
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -29,6 +26,7 @@ import scala.concurrent.{Await, Future}
   * https://doc.akka.io/docs/alpakka-kafka/current/transactions.html#recovery-from-failure
   * to restart the Kafka consumer after a websocket connection issue.
   *
+  * Can run in parallel with [[Kafka2SSE]]
   */
 class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   implicit val system = ActorSystem("Kafka2Websocket")
@@ -45,6 +43,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
 
   def run() = {
     streamControl = createAndRunConsumer(clientID)
+    logger.info(s"Receiving messages form Kafka on: $bootstrapServers")
   }
 
   def stop() = {
@@ -55,9 +54,8 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
     ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
       .withBootstrapServers(bootstrapServers)
       .withGroupId(group)
-      //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
+      // Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-      .withProperty(ConsumerConfig.ISOLATION_LEVEL_CONFIG, IsolationLevel.READ_COMMITTED.toString.toLowerCase(Locale.ENGLISH))
   }
 
   def createProducerSettings = {
@@ -91,6 +89,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
     (websocketClientActor, websocketConnectionStatusActor)
   }
 
+  // Doc: https://doc.akka.io/docs/alpakka-kafka/current/transactions.html
   private def createAndRunConsumer(transactionalId: String) = {
     val innerControl = new AtomicReference[Control](Consumer.NoopControl)
 
@@ -112,9 +111,8 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   }
 
   /**
-    * With this blocking behaviour we avoid loosing messages when the websocket connection is down.
-    * However, the current inflight message will be lost.
-    *
+    * With this blocking behaviour we try to avoid loosing messages when the websocket connection is down.
+    * However, the current inflight message may get lost, due to the async sending in websocketClientActor via SourceQueue
     */
   private def safeSendToWebsocket(transactionalId: String, msg: ConsumerMessage.TransactionalMessage[String, String]) = {
     logger.info(s"TransactionalID: $transactionalId - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")

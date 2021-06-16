@@ -23,6 +23,8 @@ import scala.concurrent.duration._
   * Use the offset storage in Kafka:
   * https://doc.akka.io/docs/akka-stream-kafka/current/consumer.html#offset-storage-in-kafka-committing
   *
+  * Use DrainingControl:
+  * https://doc.akka.io/docs/alpakka-kafka/current/consumer.html#draining-control
   */
 object WordCountConsumer extends App {
   implicit val system = ActorSystem("WordCountConsumer")
@@ -36,7 +38,9 @@ object WordCountConsumer extends App {
     ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
-      //Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
+      // Because we use DrainingControl
+      .withStopTimeout(Duration.Zero)
+      // Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
   }
 

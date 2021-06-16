@@ -10,6 +10,7 @@ import org.testcontainers.utility.DockerImageName
   *
   * Alternatives:
   *  - [[KafkaServer]]
+  *  - https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
   *
   * Doc:
   * https://www.testcontainers.org/modules/kafka

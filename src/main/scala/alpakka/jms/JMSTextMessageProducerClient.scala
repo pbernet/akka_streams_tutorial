@@ -7,6 +7,7 @@ import akka.stream.alpakka.jms._
 import akka.stream.alpakka.jms.scaladsl.JmsProducer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
+
 import javax.jms.ConnectionFactory
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.slf4j.{Logger, LoggerFactory}
@@ -14,6 +15,12 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+/**
+  * Works together with [[ProcessingApp]]
+  * Implements the new ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector,
+  * together with the failover meccano provided by ActiveMQ
+  *
+  */
 object JMSTextMessageProducerClient {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("JMSTextMessageProducerClient")
@@ -33,8 +40,8 @@ object JMSTextMessageProducerClient {
     .withMaxBackoff(500.millis)
     .withMaxRetries(10)
 
-  //The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
-  //Seems to work together with the new connection and send retry settings on the connector
+  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
+  // Seems to work together with the new ConnectionRetrySettings/SendRetrySettings
   val connectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   def main(args: Array[String]): Unit = {

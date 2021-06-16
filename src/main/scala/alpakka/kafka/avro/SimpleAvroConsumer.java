@@ -15,6 +15,11 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
 
+/**
+ * Prerequisite:
+ * Run alpakka.env.KafkaServer
+ *
+ */
 public class SimpleAvroConsumer {
 
     public static void main(String[] args) throws IOException {
@@ -23,8 +28,8 @@ public class SimpleAvroConsumer {
         props.put("group.id", "mygroup");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-
-        String schemaFile = new String(Files.readAllBytes(Paths.get("./src/main/java/kafka/avro/record.avsc")));
+        
+        String schemaFile = new String(Files.readAllBytes(Paths.get("src/main/scala/alpakka/kafka/avro/record.avsc")));
 
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Arrays.asList("avro-topic"));
