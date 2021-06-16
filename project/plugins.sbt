@@ -3,4 +3,4 @@ addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.21")
 //https://www.scala-sbt.org/1.x/docs/sbt-1.4-Release-Notes.html#sbt-dependency-graph+is+in-sourced
 //addDependencyTreePlugin
 
-addSbtPlugin("com.twilio" % "sbt-guardrail" % "0.62.0")
+addSbtPlugin("com.twilio" % "sbt-guardrail" % "0.64.1")

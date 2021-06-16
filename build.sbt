@@ -59,9 +59,9 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
-  // needed for guradrail example
-  "io.circe" %% "circe-core" % "0.14.0-M3",
-  "io.circe" %% "circe-jawn" % "0.14.0-M3",
+  // needed for guardrail example
+  "io.circe" %% "circe-core" % "0.14.1",
+  "io.circe" %% "circe-jawn" % "0.14.1",
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
@@ -116,6 +116,3 @@ guardrailTasks in Compile := List(
       tracing = false
     )
 )
-
-
-fork in run := true
