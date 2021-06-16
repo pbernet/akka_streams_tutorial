@@ -43,7 +43,7 @@ trait ClientCommon {
 
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/WebsocketEcho.html").!
+    if (os == "mac os x") Process("open src/main/resources/WebsocketEcho.html").!
   }
 
 }

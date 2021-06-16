@@ -1,8 +1,5 @@
 package akkahttp
 
-import java.io.File
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -12,9 +9,12 @@ import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.stream.RestartSettings
+import akka.stream.scaladsl.{Compression, FileIO, RestartSource, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
+import java.io.File
+import java.nio.file.Paths
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -22,7 +22,7 @@ import scala.util.{Failure, Success}
 
 trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 
-  final case class FileHandle(fileName: String, absolutePath: String, length: Long)
+  case class FileHandle(fileName: String, absolutePath: String, length: Long)
 
   implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
 }
@@ -31,11 +31,22 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * This HTTP file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
-  * It's possible to upload/download files up to 60MB:
-  *  - Check settings in application.conf
+  * It's possible to upload/download files up to the configured size in application.conf:
+  *  - akka.http.server.parsing.max-content-length
+  *  - akka.http.client.parsing.max-content-length
+  *
+  * Added:
+  *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
+  *  - On the fly gzip compression on upload and gunzip decompression on download,
+  *    Doc: https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dealing-with-compressed-data-streams
+  *
+  * To prove that the streaming works:
   *  - Replace testfile.jpg with a large file
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
+  *
+  * Remarks:
+  *  - TODO Retry on download
   */
 object HttpFileEcho extends App with JsonProtocol {
   implicit val system = ActorSystem("HttpFileEcho")
@@ -43,6 +54,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
+  val chuckSizeBytes = 10000
 
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
@@ -52,12 +64,16 @@ object HttpFileEcho extends App with JsonProtocol {
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
 
-        def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+        formFields(Symbol("payload")) { payload =>
+          println(s"Server received request with additional payload: $payload")
 
-        storeUploadedFile("binary", tempDestination) {
-          case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
-            complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+          def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+
+          storeUploadedFile("binary", tempDestination) {
+            case (metadataFromClient: FileInfo, uploadedFile: File) =>
+              println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+              complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+          }
         }
       } ~
         path("download") {
@@ -102,13 +118,40 @@ object HttpFileEcho extends App with JsonProtocol {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
-      val fileSource = FileIO.fromPath(file.toPath, chunkSize = 1000000)
+
+      val compressedFileSource = FileIO.fromPath(file.toPath, chuckSizeBytes).via(Compression.gzip)
       val formData = Multipart.FormData(Multipart.FormData.BodyPart(
         "binary",
-        HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
-        Map("filename" -> file.getName)))
+        HttpEntity(MediaTypes.`application/octet-stream`, file.length(), compressedFileSource),
+        // Set the Content-Disposition header
+        // see: https://www.w3.org/Protocols/HTTP/Issues/content-disposition.txt
+        Map("filename" -> file.getName)),
+        // Pass additional (json) payload in a form field
+        Multipart.FormData.BodyPart.Strict("payload", "{\"payload\": \"bla\"}", Map.empty)
+      )
 
       Marshal(formData).to[RequestEntity]
+    }
+
+    def getResponse(request: HttpRequest): Future[FileHandle] = {
+      val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+      RestartSource.withBackoff(restartSettings) { () =>
+        val responseFuture = Http().singleRequest(request)
+
+        Source.future(responseFuture)
+          .mapAsync(parallelism = 1) {
+            case HttpResponse(StatusCodes.OK, _, entity, _) =>
+              Unmarshal(entity).to[FileHandle]
+            case HttpResponse(StatusCodes.InternalServerError, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: ${StatusCodes.InternalServerError}")
+            case HttpResponse(statusCode, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: $statusCode")
+          }
+      }
+        .runWith(Sink.head)
+        .recover {
+          case ex => throw new RuntimeException(s"Exception occurred: $ex")
+        }
     }
 
     def upload(file: File): Future[FileHandle] = {
@@ -127,15 +170,15 @@ object HttpFileEcho extends App with JsonProtocol {
       val result: Future[FileHandle] =
         for {
           request <- createEntityFrom(file).map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
-          response <- Http().singleRequest(request)
+          response <- getResponse(request)
           responseBodyAsString <- Unmarshal(response).to[FileHandle]
         } yield responseBodyAsString
 
-      result.onComplete(res => println(s"Upload client with id: $id received result: $res"))
+      result.onComplete(res => println(s"UploadClient with id: $id received result: $res"))
       result
     }
 
-    upload(new File(getClass.getClassLoader.getResource(resourceFileName).toURI))
+    upload(Paths.get(s"src/main/resources/$resourceFileName").toFile)
   }
 
   def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
@@ -144,10 +187,12 @@ object HttpFileEcho extends App with JsonProtocol {
     val httpClient = Http(system).outgoingConnection(address, port)
 
     def saveResponseToFile(response: HttpResponse, localFile: File) = {
-      response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
+      response.entity.dataBytes
+        .via(Compression.gunzip(chuckSizeBytes))
+        .runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
     }
 
-    def download(remoteFileHandle: FileHandle, localFile: File): Future[Unit] = {
+    def download(remoteFileHandle: FileHandle, localFile: File) = {
 
       val result = for {
         reqEntity <- Marshal(remoteFileHandle).to[RequestEntity]
@@ -155,15 +200,12 @@ object HttpFileEcho extends App with JsonProtocol {
         downloaded <- saveResponseToFile(response, localFile)
       } yield downloaded
 
-      result.map {
-        ioresult =>
-          println(s"Download client with id: $id finished downloading: ${ioresult.count} bytes!")
-      }
+      val ioresult = Await.result(result, 10.seconds)
+      println(s"DownloadClient with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
     }
 
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
-    println(s"Download client with id: $id going to store file to: ${localFile.getAbsolutePath}")
     Future(localFile)
   }
 }

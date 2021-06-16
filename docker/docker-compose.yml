@@ -1,6 +1,7 @@
 version: "3"
 # Start from cmd line: docker-compose up -d
 # Or directly from IntelliJ IDEA
+
 services:
   # https://github.com/vromero/activemq-artemis-docker
   artemis:
@@ -27,9 +28,24 @@ services:
     command: echouser:password:::echo
 
   mosquitto:
-    image: eclipse-mosquitto
+    depends_on:
+      - mqtt-admin
+    # Classic:
+    # image: eclipse-mosquitto
+    # Has websockets configured on port 9001
+    # https://hub.docker.com/r/toke/mosquitto
+    image: toke/mosquitto
     ports:
       - "1883:1883"
+      - "9001:9001"
+
+  # https://hub.docker.com/r/dersimn/mqtt-admin
+  mqtt-admin:
+    image: dersimn/mqtt-admin
+    ports:
+      - 8090:80
+    environment:
+      - MQTT_HOST=localhost:9001
 
 networks:
   runtime-net:

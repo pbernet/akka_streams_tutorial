@@ -1,14 +1,13 @@
 package alpakka.xml
 
-import java.nio.file.Paths
-import java.util.Base64
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.alpakka.xml.{EndElement, ParseEvent, StartElement, TextEvent}
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 
+import java.nio.file.Paths
+import java.util.Base64
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -29,7 +28,7 @@ object XmlProcessing extends App {
 
   val resultFileName = "testfile_result.jpg"
 
-  val done = FileIO.fromPath(Paths.get("./src/main/resources/xml_with_base64_embedded.xml"))
+  val done = FileIO.fromPath(Paths.get("src/main/resources/xml_with_base64_embedded.xml"))
     .via(XmlParsing.parser)
     .statefulMapConcat(() => {
 

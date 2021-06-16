@@ -83,5 +83,5 @@ class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
 
 object Hl7TcpClient extends App {
   val client = new Hl7TcpClient()
-  def apply(numberOfMessages: Int) = new Hl7TcpClient(numberOfMessages)
+  def apply(numberOfMessages: Int = 100) = new Hl7TcpClient(numberOfMessages)
 }

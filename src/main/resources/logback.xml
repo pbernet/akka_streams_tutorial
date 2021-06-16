@@ -25,8 +25,12 @@
     <!-- Turn down Kafka noise -->
     <logger name="kafka" level="WARN"/>
     <!-- Turn down sshj noise in sftp -->
-    <logger name="net.schmizz.sshj" level="ERROR"/>
     <logger name="com.hierynomus.sshj" level="ERROR"/>
+    <!-- Turn up Akka and control level in application.conf -->
+    <logger name="akka" level="DEBUG"/>
+
+    <!-- Turn up Eclipse Paho logging in MqttPahoEcho
+    <logger name="org.eclipse.paho" level="DEBUG"/>  -->
 
     <!-- Turn down noise from netty in gRPC example -->
     <logger name="io.grpc.netty" level="INFO"/>

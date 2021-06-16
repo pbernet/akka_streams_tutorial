@@ -2,21 +2,22 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.6"
 
-val akkaVersion = "2.6.10"
+val akkaVersion = "2.6.14"
 val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "2.0.2"
-val alpakkaKafkaConnector = "2.0.5"
+val alpakkaVersion = "3.0.1"
 
-val kafkaVersion = "2.4.1"
+val alpakkaKafkaConnector = "2.1.0"
+val kafkaVersion = "2.7.0"
+
 val activemqVersion =  "5.16.0"
-val streamzVersion = "0.13-RC4"
-val camelVersion = "2.25.2"
-val testContainersVersion = "1.15.1"
+val testContainersVersion = "1.15.3"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
+  // Latest is 1.0.0 but several dependencies still point to 0.9.1
+  "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -59,44 +60,39 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
-
-  "com.github.krasserm" %% "streamz-camel-akka" % streamzVersion,
-  "org.apache.camel" % "camel-netty4" % camelVersion,
-  "org.apache.camel" % "camel-jetty" % camelVersion,
-  "org.apache.camel" % "camel-core" % camelVersion,
-  "org.apache.camel" % "camel-stream" % camelVersion,
-  "org.apache.camel" % "camel-mllp" % camelVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
-  //Wait, wait, there is more...
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  //https://github.com/akka/akka/issues/29351
-  "com.typesafe.play" %% "play" % "2.8.2",
+  "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
+  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
   "commons-io" % "commons-io" % "2.8.0",
-  "org.apache.commons" % "commons-lang3" % "3.11",
-  "org.apache.avro" % "avro" % "1.8.2",
+  "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % "test",
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
+  "org.testcontainers" % "postgresql" % testContainersVersion,
+  "org.postgresql" % "postgresql" % "42.2.19",
 
-  "junit" % "junit" % "4.13.1"
+  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
+  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "junit" % "junit" % "4.13.1" % Test
 )
 
-resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618

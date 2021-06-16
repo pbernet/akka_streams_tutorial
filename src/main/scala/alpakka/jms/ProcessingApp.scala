@@ -1,7 +1,5 @@
 package alpakka.jms
 
-import java.util.concurrent.ThreadLocalRandom
-
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.alpakka.jms._
@@ -9,10 +7,11 @@ import akka.stream.alpakka.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsPro
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.config.Config
-import javax.jms.{ConnectionFactory, Message, TextMessage}
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.concurrent.ThreadLocalRandom
+import javax.jms.{ConnectionFactory, Message, TextMessage}
 import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -20,9 +19,9 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * An Alpakka JMS client which consumes text messages from:
+  * An Alpakka JMS client which consumes text messages from either:
   *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
-  *  - Artemis JMS Broker on docker: /docker/docker-compose.yml
+  *  - Or Artemis JMS Broker on docker image: /docker/docker-compose.yml
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
@@ -31,9 +30,11 @@ import scala.util.{Failure, Success}
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
   * This was fixed with 1.0-M2
   *
-  * This example has been "upcycled" to demonstrate a realistic consumer scenario,
-  * where non deliverable messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
+  * In the meantime this example has been "upcycled" regarding restart and retry scenarios:
+  *  - where non deliverable messages are written now to an error queue
+  *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
   *
+  * Failures in this client are simulated by throwing random java.lang.RuntimeException: BOOM
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -64,7 +65,8 @@ object ProcessingApp {
     pendingMessageWatcher(control)
   }
 
-  //The "failover:" part in the brokerURL instructs the ActiveMQ client lib to reconnect on network failure
+  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
+  // Seems to work together with the new connection and send retry settings on the connector
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
@@ -88,7 +90,7 @@ object ProcessingApp {
     .run()
 
 
-  //We may do a (blocking) retry in this method to handle recoverable conditions of the external system
+  // We may do a (blocking) retry in this method to handle recoverable conditions of the external system
   private def simulateFaultyDeliveryToExternalSystem(ackEnvelope: AckEnvelope) = {
     try {
       val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
@@ -144,10 +146,10 @@ object ProcessingApp {
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 
-      //Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
-      //The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
-      //After another restart of the JMS server these messages are then consumed
-      //If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
+      // Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
+      // The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
+      // After another re-start of the JMS server or this client, these messages are consumed
+      // If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }

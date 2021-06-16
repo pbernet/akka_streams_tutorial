@@ -1,25 +1,29 @@
-[![Build Status](https://travis-ci.org/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial)
+[![Build Status](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml/badge.svg)](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml)
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) docs, tutorials, blogs and postings to provide you with exactly this feeling.
+This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * [HTTP file download with local cache](#HTTP-file-download-with-local-cache)
 * [Windturbine example](#Windturbine-example) 
 * [Apache Kafka WordCount](#Apache-Kafka-WordCount)
 * [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
 
-These examples all deal with some kind of shared state. 
+These examples all deal with some kind of shared state.
 
-Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
-
-Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources. 
+Other noteworthy examples:
+* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
+* Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources. 
 
 Remarks:
 * Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* No unit tests and quirky package names
+* The use of [testcontainers](https://www.testcontainers.org) in different setups allows realistic runtime scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
+
+Other example resources:
+* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo.
+* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams).
 
 ## HTTP file download with local cache ##
 Use case with shared state:
@@ -51,24 +55,22 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 
 ## Apache Kafka WordCount ##
-The ubiquitous word count with additional message count (A message is a sequence of words).
-Start the classes in the order below and watch the console output.
+The ubiquitous word count with an additional message count. A message is a sequence of words.
+Start the classes in the order below and watch the console output. Restart to observe the recovery behaviour.
 
 | Class               | Description      |
 | ------------------- |-----------------|
-| [KafkaServer.scala](src/main/scala/alpakka/env/KafkaServer.scala)| Standalone Kafka/Zookeeper.  
-| [WordCountProducer.scala](src/main/scala/alpakka/kafka/WordCountProducer.scala)| Client which feeds words to topic `wordcount-input`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
-| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
-| [WordCountConsumer.scala](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| Client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
-| [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
-
-`WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
+| [KafkaServer.scala](src/main/scala/alpakka/env/KafkaServer.scala)| Standalone Kafka/Zookeeper| 
+| [WordCountProducer.scala](src/main/scala/alpakka/kafka/WordCountProducer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which feeds random words to topic `wordcount-input`|
+| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc") client to count words and messages and feed the results to `wordcount-output` and `messagecount-output` topics. Contains additional interactive queries which should yield the same results `WordCountConsumer.scala`|
+| [WordCountConsumer.scala](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`|
+| [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset|
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
 This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is some kind of Alpakka-Trophy with these stages:
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
-The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost.
+The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
-Start the stages separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/AlpakkaTrophySpec.scala)  
+Start each stage separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
