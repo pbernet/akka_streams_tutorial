@@ -4,19 +4,21 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws._
+import akka.http.scaladsl.model.ws.{TextMessage, _}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
+import akka.stream.{KillSwitches, OverflowStrategy, QueueOfferResult}
 
+import java.time.LocalDateTime
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
 import scala.sys.process.Process
 import scala.util.{Failure, Success}
+
 trait ClientCommon {
   implicit val system = ActorSystem("Websocket")
   implicit val executionContext = system.dispatcher
@@ -51,12 +53,14 @@ trait ClientCommon {
 /**
   * Websocket echo example with different client types
   * Each client instance produces it's own echoFlow on the server
-  * Clients do not close due to http.server.websocket.periodic-keep-alive-max-idle,
+  *
+  * Clients do not close implicitly due to config:
+  * http.server.websocket.periodic-keep-alive-max-idle
   * see application.conf for details
   *
-  * Please note that this basic example has no life cycle management nor fault-tolerance
-  * The "Windturbine Example" does show this
+  * However, serverHeartbeatStreamClient does close explicitly to show that the server is able to close
   *
+  * See the "Windturbine Example" for further life cycle management and fault-tolerance behaviour
   */
 object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
@@ -64,9 +68,11 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   server(address, port)
   browserClient()
   val maxClients = 2
+  // comment out to see behaviour of each client type
   (1 to maxClients).par.foreach(each => singleWebSocketRequestClient(each, address, port))
   (1 to maxClients).par.foreach(each => webSocketClientFlowClient(each, address, port))
   (1 to maxClients).par.foreach(each => singleWebSocketRequestSourceQueueClient(each, address, port))
+  (1 to maxClients).par.foreach(each => serverHeartbeatStreamClient(each, address, port))
 
   def server(address: String, port: Int) = {
 
@@ -80,13 +86,56 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
           bm.dataStream.runWith(Sink.ignore)
           Nil
       }
+        .watchTermination()((_, done) => done.onComplete {
+          case Failure(err) => println(s"Server flow failed: $err")
+          case _ => println(s"Server flow terminated for client:")
+        })
 
-    val websocketRoute: Route =
+    def getEcho: Route = {
       path("echo") {
-        handleWebSocketMessages(echoFlow)
+        extractRequest { request =>
+          println(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
+          handleWebSocketMessages(echoFlow)
+        }
       }
+    }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
+    def getEchoHeartbeat: Route = {
+      path("echo_heartbeat") {
+        extractRequest { request =>
+          println(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
+
+          // Because the sink and the source are independent, we need a kill switch
+          // to kill the source once we get a terminate signal from the sink
+          // https://stackoverflow.com/questions/54097587/stop-akka-stream-source-when-web-socket-connection-is-closed-by-the-client
+
+          val sharedKillSwitch = KillSwitches.shared("kill-switch")
+          val source =
+            Source
+              .repeat(s"Heartbeat response: ${LocalDateTime.now()}")
+              .throttle(1, 1.seconds)
+              .wireTap(msg => println(s"Sending to client: $msg"))
+              .map(TextMessage.Strict)
+              .via(sharedKillSwitch.flow)
+
+          extractWebSocketUpgrade { upgrade ⇒
+            val inSink = Sink.onComplete(_ => {
+              println("Streaming server flow terminated")
+              sharedKillSwitch.shutdown()
+            })
+            val outSource = source
+            val response = upgrade.handleMessagesWithSinkSource(inSink, outSource)
+            complete(response)
+          }
+        }
+      }
+    }
+
+    def routes: Route = {
+      getEcho ~ getEchoHeartbeat
+    }
+
+    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         println("Server started, listening on: " + b.localAddress)
@@ -155,6 +204,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         }
       }
     }
+
     send(s"$id-1 SourceQueue")
     send(s"$id-2 SourceQueue")
   }
@@ -173,6 +223,30 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
     closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
+  }
+
+  def serverHeartbeatStreamClient(id: Int, address: String, port: Int) = {
+    val sourceKickOff = Source
+      .single(TextMessage("kick off msg"))
+      .concatMat(Source.maybe[Message])(Keep.right)
+
+    val webSocketNonReusableFlow: Flow[Message, Message, Promise[Option[Message]]] = {
+      Flow.fromSinkAndSourceMat(
+        printSink,
+        sourceKickOff)(Keep.right)
+    }
+
+    val (upgradeResponse, sourceClosed: Promise[Option[Message]]) =
+      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo_heartbeat"), webSocketNonReusableFlow)
+
+    val connected = handleUpgrade(upgradeResponse)
+
+    connected.onComplete(done => println(s"Client: $id serverHeartbeatStreamClient connected: $done"))
+    sourceClosed.future.onComplete(closed => println(s"Client: $id serverHeartbeatStreamClient closed: $closed"))
+
+    Thread.sleep(10000)
+    println(s"About to close client: $id...")
+    sourceClosed.success(None)
   }
 
   private def handleUpgrade(upgradeResponse: Future[WebSocketUpgradeResponse]) = {
