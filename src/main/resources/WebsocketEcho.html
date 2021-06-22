@@ -40,13 +40,13 @@
         };
         echoWebSocket.onopen = function (evt) {
             $messages.prepend($("<li>OPEN</li>"))
-            console.log("onopen state client:" + echoWebSocket.readyState);
+            console.log("onopen state client: " + echoWebSocket.readyState);
         };
         echoWebSocket.onclose = function (evt) {
             $messages.prepend($("<li>CLOSED</li>"))
             // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
             // If the server closes correctly, we get a 1000 (= Normal Closure) code
-            console.log("onclose - state client:" + echoWebSocket.readyState + " Reason server:" + evt.code);
+            console.log("onclose - state client: " + echoWebSocket.readyState + " Reason server: " + evt.code);
         };
         echoWebSocket.onerror = function (evt) {
             console.log("Error!");
@@ -73,15 +73,15 @@
         };
         heartbeatWebSocket.onopen = function (evt) {
             $messages.prepend($("<li>OPEN</li>"))
-            console.log("onopen state client:" + heartbeatWebSocket.readyState);
+            console.log("onopen state client: " + heartbeatWebSocket.readyState);
             console.log("Requesting heartbeat stream...");
             heartbeatWebSocket.send("Start");
         };
         heartbeatWebSocket.onclose = function (evt) {
             $messages.prepend($("<li>CLOSED</li>"))
             // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
-            // If the server would not close, we get a 1006 (= Abnormal Closure) code
-            console.log("onclose - state client:" + heartbeatWebSocket.readyState + " Reason server: " + evt.code);
+            // If the server does not close, we would get a 1006 (= Abnormal Closure) code
+            console.log("onclose - state client: " + heartbeatWebSocket.readyState + " Reason server: " + evt.code);
         };
         heartbeatWebSocket.onerror = function (evt) {
             console.log("Error!");

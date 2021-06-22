@@ -55,20 +55,21 @@ trait ClientCommon {
   * Each client instance produces it's own echoFlow on the server
   *
   * Clients do not close implicitly due to config:
-  * http.server.websocket.periodic-keep-alive-max-idle
-  * see application.conf for details
+  * `http.server.websocket.periodic-keep-alive-max-idle`
+  * see file `application.conf` for details
   *
   * However, serverHeartbeatStreamClient does close explicitly to show that the server is able to close
   *
-  * See the "Windturbine Example" for further life cycle management and fault-tolerance behaviour
+  * See "Windturbine Example" in pkg {@link sample.stream_actor} for life cycle management and fault-tolerance behaviour
   */
 object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
   val (address, port) = ("127.0.0.1", 6002)
   server(address, port)
   browserClient()
+
+  // Comment out to see behaviour of each client type
   val maxClients = 2
-  // comment out to see behaviour of each client type
   (1 to maxClients).par.foreach(each => singleWebSocketRequestClient(each, address, port))
   (1 to maxClients).par.foreach(each => webSocketClientFlowClient(each, address, port))
   (1 to maxClients).par.foreach(each => singleWebSocketRequestSourceQueueClient(each, address, port))
@@ -82,19 +83,19 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
           println(s"Server received: $tm")
           TextMessage(Source.single("Hello ") ++ tm.textStream ++ Source.single("!")) :: Nil
         case bm: BinaryMessage =>
-          // ignore binary messages but drain content to avoid the stream being clogged
+          // Ignore binary messages but drain content to avoid the stream being clogged
           bm.dataStream.runWith(Sink.ignore)
           Nil
       }
         .watchTermination()((_, done) => done.onComplete {
-          case Failure(err) => println(s"Server flow failed: $err")
-          case _ => println(s"Server flow terminated for client:")
+          case Failure(err) => println(s"Echo server flow failed: $err")
+          case _ => println(s"Echo server flow terminated")
         })
 
     def getEcho: Route = {
       path("echo") {
         extractRequest { request =>
-          println(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
+          println(s"Got echo request from client: ${request.getHeader("User-Agent")}")
           handleWebSocketMessages(echoFlow)
         }
       }
@@ -105,27 +106,29 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         extractRequest { request =>
           println(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
 
-          // Because the sink and the source are independent, we need a kill switch
-          // to kill the source once we get a terminate signal from the sink
+          // Because the inSink and the outSource are independent, we need a kill-switch
+          // to kill the outSource once we get a terminate signal from the inSink
           // https://stackoverflow.com/questions/54097587/stop-akka-stream-source-when-web-socket-connection-is-closed-by-the-client
 
           val sharedKillSwitch = KillSwitches.shared("kill-switch")
-          val source =
+          val outSource =
             Source
               .repeat(s"Heartbeat response: ${LocalDateTime.now()}")
               .throttle(1, 1.seconds)
               .wireTap(msg => println(s"Sending to client: $msg"))
               .map(TextMessage.Strict)
               .via(sharedKillSwitch.flow)
+              .watchTermination()((_, done) => done.onComplete {
+                case Failure(err) => println(s"Heartbeat server flow failed: $err")
+                case _ => println(s"Heartbeat server flow terminated")
+              })
 
-          extractWebSocketUpgrade { upgrade ⇒
+          extractWebSocketUpgrade { upgrade =>
             val inSink = Sink.onComplete(_ => {
-              println("Streaming server flow terminated")
+              println("Client signaled termination, shutdown server flow...")
               sharedKillSwitch.shutdown()
             })
-            val outSource = source
-            val response = upgrade.handleMessagesWithSinkSource(inSink, outSource)
-            complete(response)
+            complete(upgrade.handleMessagesWithSinkSource(inSink, outSource))
           }
         }
       }
@@ -251,7 +254,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
   private def handleUpgrade(upgradeResponse: Future[WebSocketUpgradeResponse]) = {
     upgradeResponse.map { upgrade =>
-      // status code 101 (Switching Protocols) indicates that server support WebSockets
+      // Status code 101 (= Switching Protocols) indicates that server support WebSockets
       if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
         Done
       } else {
