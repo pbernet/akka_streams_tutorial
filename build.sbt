@@ -56,6 +56,8 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
+  "org.apache.opennlp" % "opennlp-tools" % "1.9.3",
+
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
