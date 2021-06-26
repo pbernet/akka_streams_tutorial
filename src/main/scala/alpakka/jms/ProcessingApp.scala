@@ -19,9 +19,9 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * An Alpakka JMS client which consumes text messages from:
+  * An Alpakka JMS client which consumes text messages from either:
   *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
-  *  - Artemis JMS Broker on docker image: /docker/docker-compose.yml
+  *  - Or Artemis JMS Broker on docker image: /docker/docker-compose.yml
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
@@ -30,10 +30,11 @@ import scala.util.{Failure, Success}
   * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
   * This was fixed with 1.0-M2
   *
-  * This example has been "upcycled" to demonstrate a realistic consumer scenario,
-  * where non deliverable messages are written to an error queue.
-  * Failures in this client are simulated by throwing random java.lang.RuntimeException: BOOM
+  * In the meantime this example has been "upcycled" regarding restart and retry scenarios:
+  *  - where non deliverable messages are written now to an error queue
+  *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
   *
+  * Failures in this client are simulated by throwing random java.lang.RuntimeException: BOOM
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -64,7 +65,8 @@ object ProcessingApp {
     pendingMessageWatcher(control)
   }
 
-  // The "failover:" part in the brokerURL instructs the ActiveMQ client lib to reconnect on network failure
+  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
+  // Seems to work together with the new connection and send retry settings on the connector
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
