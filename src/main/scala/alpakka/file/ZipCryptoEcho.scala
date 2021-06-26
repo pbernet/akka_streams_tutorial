@@ -1,9 +1,5 @@
 package alpakka.file
 
-import java.io.FileInputStream
-import java.nio.file.Paths
-import java.security._
-
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.alpakka.file.ArchiveMetadata
@@ -11,10 +7,13 @@ import akka.stream.alpakka.file.scaladsl.Archive
 import akka.stream.scaladsl._
 import akka.stream.stage._
 import akka.util.ByteString
-import javax.crypto._
-import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.FileInputStream
+import java.nio.file.Paths
+import java.security._
+import javax.crypto._
+import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -136,7 +135,6 @@ object ZipCryptoEcho extends App {
 
       doneDec.onComplete {
         case Success(_) =>
-          // Use ArchiveHelper, because we don't have support for un-archive in alpakka files
           logger.info("Start un-archiving...")
           val resultFileContentFut =
             FileIO.fromPath(Paths.get(decFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
