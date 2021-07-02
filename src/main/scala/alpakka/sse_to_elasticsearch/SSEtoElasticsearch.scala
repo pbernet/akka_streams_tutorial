@@ -76,7 +76,7 @@ object SSEtoElasticsearch extends App {
 
   val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
   val elasticsearchSource = ElasticsearchSource
-    .typed[Change](
+    .typed[Ctx](
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
@@ -199,19 +199,28 @@ object SSEtoElasticsearch extends App {
   // Wait for the index to populate
   Thread.sleep(10.seconds.toMillis)
   browserClient()
-  queryOnce()
 
+  Source.tick(1.seconds, 10.seconds, ())
+    .map(_ => query())
+    .runWith(Sink.ignore)
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*").!
+    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*"
+    if (os == "mac os x") {
+      Process(s"open $searchURL").!
+    }
+    else {
+      logger.info(s"Please open a browser at: $searchURL")
+    }
   }
 
   private def dateTimeFormatted(timestamp: Long) = {
     Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
   }
 
-  private def queryOnce() = {
+  private def query() = {
+    logger.info(s"About to execute read query...")
     for {
       result <- readFromElasticsearchTyped()
       resultRaw <- readFromElasticsearchRaw()
