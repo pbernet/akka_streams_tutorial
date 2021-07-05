@@ -80,6 +80,6 @@ Start each stage separate in the IDE, or together via the integration test [Alpa
 Find out whose Wikipedia articles were changed in (near) real time by tapping into the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
 The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API, eg for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
 Text processing on this content using [opennlp](https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html) yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
-The index it queried periodically and may also be viewed with a Browser, eg
+The index is queried periodically and the content may also be viewed with a Browser, eg
 
 `http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`
