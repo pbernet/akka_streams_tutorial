@@ -8,6 +8,7 @@ See the class comment on how to run each example. These more complex examples ar
 * [Windturbine example](#Windturbine-example) 
 * [Apache Kafka WordCount](#Apache-Kafka-WordCount)
 * [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
+* [Analyse Wikipedia edits live stream](#Analyse-Wikipedia-edits-live-stream)
 
 These examples all deal with some kind of shared state.
 
@@ -67,10 +68,18 @@ Start the classes in the order below and watch the console output. Restart to ob
 | [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset|
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is some kind of Alpakka-Trophy with these stages:
+This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
 The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
 Start each stage separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
+
+## Analyse Wikipedia edits live stream ##
+Find out whose Wikipedia articles were changed in (near) real time by tapping into the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
+The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API, eg for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
+Text processing on this content using [opennlp](https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html) yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
+The index it queried periodically and may also be viewed with a Browser, eg
+
+`http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`

@@ -5,18 +5,30 @@ import akka.stream.alpakka.file.DirectoryChange
 import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
 import org.slf4j.{Logger, LoggerFactory}
 
-import java.nio.file.{FileSystems, Files, Path, StandardCopyOption}
+import java.nio.file._
+import scala.compat.java8.StreamConverters.StreamHasToScala
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
-  * Pick up (new/changed) files in the directory `./uploader/upload`
+  * Pick up (new/changed) files in the directory structure under `./uploader/upload`
   * Do a HTTP file upload via [[Uploader]]
   * Finally move the file to `./uploader/processed`
   *
   * Remarks:
-  *  - DirectoryChangesSource does not work for files in sub folders
-  *  - Similar example: https://akka.io/alpakka-samples/file-to-elasticsearch/index.html
+  *  - Currently files are detected in root dir as well as in subdirs
+  *  - However, added dirs at runtime are currently not detected,
+  *    so if a "dir with files" is dropped at runtime, the dir is not detected
+  *  - Does probably not generate events for CIFS mounted shares either
+  *
+  *  Inspired by:
+  *  https://discuss.lightbend.com/t/using-directorychangessource-recursively/7630
+  *
+  * Ideas:
+  *  - Workaround: Restart Files.walk(uploadDir) periodically
+  *  - Find a way to get the changed event from the "dir with files"
+  *  - Use RecursiveDirectoryChangesSource from
+  *    https://github.com/sysco-middleware/alpakka-connectors
   */
 object DirectoryListener extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -36,15 +48,19 @@ object DirectoryListener extends App {
   Files.createDirectories(uploadSubDir)
   Files.createDirectories(processedDir)
 
-  uploadAllFilesFromSourceDir()
+  Files
+    .walk(uploadDir)
+    .filter(path => Files.isDirectory(path))
+    .toScala[List]
+    .map(path => uploadAllFilesFromSourceDir(path))
 
-  def uploadAllFilesFromSourceDir() = {
-    logger.info(s"About to start listening for changes in `uploadDir`: $uploadDir")
-    DirectoryChangesSource(uploadDir, pollInterval = 1.second, maxBufferSize = 1000)
-      // Detect changes in *this* dir
-      .collect { case (path, DirectoryChange.Creation) => path }
+  def uploadAllFilesFromSourceDir(path: Path) = {
+    logger.info(s"About to start listening for changes in dir: $path")
+    DirectoryChangesSource(path, pollInterval = 1.second, maxBufferSize = 1000)
+      // Detect changes in this dir
+      .collect { case (path, DirectoryChange.Creation) => path}
       // Merge with files found on startup
-      .merge(Directory.ls(uploadDir))
+      .merge(Directory.ls(path))
       .mapAsync(1)(path => uploadAndMove(path))
       .run()
   }
