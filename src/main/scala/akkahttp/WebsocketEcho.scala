@@ -54,13 +54,14 @@ trait ClientCommon {
   * Websocket echo example with different client types
   * Each client instance produces it's own echoFlow on the server
   *
-  * Clients do not close implicitly due to config:
+  * Clients do not close (implicitly) due to config:
   * `http.server.websocket.periodic-keep-alive-max-idle`
   * see file `application.conf` for details
   *
-  * However, serverHeartbeatStreamClient does close explicitly to show that the server is able to close
+  * However, [[akkahttp.WebsocketEcho.serverHeartbeatStreamClient]] shows explicit closing
+  * see: https://discuss.lightbend.com/t/websocket-connection-does-not-terminate-even-when-client-tries-to-close-it/8285
   *
-  * See "Windturbine Example" in pkg {@link sample.stream_actor} for life cycle management and fault-tolerance behaviour
+  * See "Windturbine Example" in pkg [[sample.stream_actor]] for more life cycle management and fault-tolerance behaviour
   */
 object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
