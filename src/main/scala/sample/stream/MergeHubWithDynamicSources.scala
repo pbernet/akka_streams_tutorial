@@ -11,7 +11,7 @@ import scala.concurrent.duration._
   * Inspired by:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-broadcasthub-and-partitionhub
   *
-  * Similar example: PublishToSourceQueueFromStream
+  * Similar example: [[PublishToSourceQueueFromMultipleThreads]]
   *
   */
 object MergeHubWithDynamicSources {
