@@ -4,9 +4,9 @@ version := "1.0"
 
 scalaVersion := "2.13.6"
 
-val akkaVersion = "2.6.14"
+val akkaVersion = "2.6.15"
 val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "3.0.1"
+val alpakkaVersion = "3.0.2"
 
 val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
@@ -63,7 +63,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
-  "commons-io" % "commons-io" % "2.8.0",
+  "commons-io" % "commons-io" % "2.10.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
   "com.github.blemale" %% "scaffeine" % "4.0.2",
@@ -74,7 +74,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.19",
+  "org.postgresql" % "postgresql" % "42.2.23",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
