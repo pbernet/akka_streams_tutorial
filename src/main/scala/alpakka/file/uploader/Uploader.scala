@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
   * Upload file, eg from file system
   * Is used by [[DirectoryListener]]
   *
-  * Also starts a mock server to handle the files
+  * Also starts a mock server to handle the uploaded files
   */
 class Uploader(system: ActorSystem) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)

@@ -19,36 +19,36 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
   var processedDir: Path = _
 
   "DirectoryListener" should {
-
-    "detect_files_onstartup_in_upload_dir" in {
+    "detect_files_on_startup" in {
 
       Thread.sleep(3000)
       listener.countFilesProcessed() shouldEqual 2
     }
 
-    "detect_added_file_in_upload_dir" in {
-      copyTestFileToDir(listener, uploadDir)
-      
-      Thread.sleep(3000)
-      listener.countFilesProcessed() shouldEqual 2 + 1
-    }
-
-    "detect_added_file_in_uploadSubDir" in {
-      copyTestFileToDir(listener, uploadDir.resolve("subdir"))
+    "detect_added_files_at_runtime" in {
+      copyTestFileToDir(uploadDir)
 
       Thread.sleep(3000)
       listener.countFilesProcessed() shouldEqual 2 + 1
     }
 
-    // TODO Add test with nested dropped dirs
-    "detect_added_dir_with_files" in {
+    "detect_added_files_at_runtime_in_subdir" in {
+      copyTestFileToDir(uploadDir.resolve("subdir"))
+
+      Thread.sleep(3000)
+      listener.countFilesProcessed() shouldEqual 2 + 1
+    }
+
+    "detect_added_nested_dir_with_files_in_subdir" in {
       val tmpDir = Files.createTempDirectory("tmp")
       val sourcePath = Paths.get("src/main/resources/testfile.jpg")
       val targetPath = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
       val targetPath2 = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
       Files.copy(sourcePath, targetPath)
       Files.copy(sourcePath, targetPath2)
-      FileUtils.copyDirectory(tmpDir.toFile, uploadDir.resolve("dirWithFiles").toFile)
+
+      val targetDir = Files.createDirectories(uploadDir.resolve("subdir").resolve("nestedDirWithFiles"))
+      FileUtils.copyDirectory(tmpDir.toFile, targetDir.toFile)
 
       Thread.sleep(3000)
       listener.countFilesProcessed() shouldEqual 2 + 2
@@ -67,13 +67,9 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
     Files.createDirectories(uploadDir.resolve("subdir"))
     Files.createDirectories(processedDir)
 
-    // Populate dir BEFORE startup
-    val sourcePath = Paths.get("src/main/resources/testfile.jpg")
-    val targetPath = tmpRootDir.resolve("upload").resolve(createUniqueFileName(sourcePath.getFileName))
-    Files.copy(sourcePath, targetPath)
-
-    val targetPathSubDir = tmpRootDir.resolve("upload/subdir").resolve(createUniqueFileName(sourcePath.getFileName))
-    Files.copy(sourcePath, targetPathSubDir)
+    // Populate dirs BEFORE startup
+    copyTestFileToDir(tmpRootDir.resolve("upload"))
+    copyTestFileToDir(tmpRootDir.resolve("upload/subdir"))
 
     listener = DirectoryListener(uploadDir, processedDir)
   }
@@ -84,13 +80,13 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
     FileUtils.deleteDirectory(tmpRootDir.toFile)
   }
 
-  private def copyTestFileToDir(listener: DirectoryListener, target: Path) = {
+  private def copyTestFileToDir(target: Path) = {
     val sourcePath = Paths.get("src/main/resources/testfile.jpg")
     val targetPath = target.resolve(createUniqueFileName(createUniqueFileName(sourcePath.getFileName)))
     Files.copy(sourcePath, targetPath)
   }
 
-  private def createUniqueFileName(fileName: Path)  = {
+  private def createUniqueFileName(fileName: Path) = {
     val splitted = fileName.toString.split('.').map(_.trim)
     Paths.get(splitted.head + Random.nextInt() + "." + splitted.reverse.head)
   }
