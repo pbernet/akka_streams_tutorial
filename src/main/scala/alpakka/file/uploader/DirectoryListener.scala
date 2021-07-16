@@ -65,16 +65,16 @@ class DirectoryListener(uploadDir: Path, processedDir: Path) {
     val monitor = new FileAlterationMonitor(1000)
     val listener = new FileAlterationListenerAdaptor() {
 
-      override def onFileCreate(file: File) {
+      override def onFileCreate(file: File) = {
         logger.info(s"CREATED: $file")
         addToUploadQueue(file.toPath: Path)
       }
 
-      override def onFileDelete(file: File) {
+      override def onFileDelete(file: File) = {
         logger.info(s"DELETED: $file")
       }
 
-      override def onFileChange(file: File) {
+      override def onFileChange(file: File) = {
         logger.info(s"CHANGED: $file")
       }
     }
