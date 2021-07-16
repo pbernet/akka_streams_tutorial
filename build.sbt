@@ -63,9 +63,10 @@ libraryDependencies ++= Seq(
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
-  "commons-io" % "commons-io" % "2.10.0",
+  "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
+  // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
 
