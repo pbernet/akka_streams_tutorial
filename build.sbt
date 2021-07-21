@@ -12,7 +12,7 @@ val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
 
 val activemqVersion =  "5.16.0"
-val testContainersVersion = "1.15.3"
+val testContainersVersion = "1.16.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
