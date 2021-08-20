@@ -75,8 +75,14 @@ object SSEtoElasticsearch extends App {
   val matchAllQuery = """{"match_all": {}}"""
 
   val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
-  val elasticsearchSource = ElasticsearchSource
+  val elasticsearchSourceTyped = ElasticsearchSource
     .typed[Ctx](
+      elasticsearchParamsV7,
+      query = matchAllQuery,
+      settings = sourceSettings
+    )
+  val elasticsearchSourceRaw = ElasticsearchSource
+    .create(
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
@@ -141,8 +147,7 @@ object SSEtoElasticsearch extends App {
   }
 
   def fetchContent(ctx: Ctx): Future[Ctx] = {
-
-    logger.info(s"About to read text for Wikipedia entry with title: ${ctx.change.title}")
+    logger.info(s"About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
 
     val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
@@ -151,12 +156,12 @@ object SSEtoElasticsearch extends App {
       // Doc: https://doc.akka.io/docs/akka-http/current/client-side/request-level.html
       .flatMap(_.entity.toStrict(2.seconds))
       .map(_.data.utf8String.split("\"extract\":").reverse.head)
-      .map { content => ctx.copy(content = content) }
+      .map(content => ctx.copy(content = content))
   }
 
 
-  def doNerProcessing(ctx: Ctx) = {
-    logger.info(s"About to do ner processing with title: ${ctx.change.title}")
+  def findPersons(ctx: Ctx) = {
+    logger.info(s"About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     // We need a new instance because the access to TokenizerME is not thread safe
@@ -181,7 +186,7 @@ object SSEtoElasticsearch extends App {
     .filter(change => !change.isBot)
     .map(change => Ctx(change, List.empty, ""))
     .mapAsync(3)(ctx => fetchContent(ctx))
-    .mapAsync(3)(ctx => doNerProcessing(ctx))
+    .mapAsync(3)(ctx => findPersons(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
 
   logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
@@ -220,26 +225,21 @@ object SSEtoElasticsearch extends App {
   }
 
   private def query() = {
-    logger.info(s"About to execute read query...")
+    logger.info(s"About to execute read queries...")
     for {
       result <- readFromElasticsearchTyped()
       resultRaw <- readFromElasticsearchRaw()
     } {
-      logger.info(s"Read typed: ${result.size} records. 1st: ${result.head}")
-      logger.info(s"Read raw: ${resultRaw.size} records. 1st: ${resultRaw.head}")
+      logger.info(s"Read typed: ${result.size}. 1st element: ${result.head}")
+      logger.info(s"Read raw: ${resultRaw.size}. 1st element: ${resultRaw.head}")
     }
   }
 
   private def readFromElasticsearchTyped() = {
-    elasticsearchSource.runWith(Sink.seq)
+    elasticsearchSourceTyped.runWith(Sink.seq)
   }
 
   private def readFromElasticsearchRaw() = {
-    ElasticsearchSource
-      .create(
-        elasticsearchParamsV7,
-        query = matchAllQuery,
-        settings = sourceSettings
-      ).runWith(Sink.seq)
+    elasticsearchSourceRaw.runWith(Sink.seq)
   }
 }
