@@ -1,10 +1,9 @@
 package sample.stream_shared_state
 
-import java.time.{Instant, OffsetDateTime, ZoneId}
-
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
 
+import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Random
@@ -29,6 +28,7 @@ import scala.util.Random
   *  - 1) is documented in the blog, 2) is default here
   *  - The additional param allowClosedSubstreamRecreation on groupBy
   *    allows reusing closed substreams and thus avoids potential memory issues
+  *  - Nice paper on watermarks: http://vldb.org/pvldb/vol14/p3135-begoli.pdf
   */
 object WindowingExample {
   implicit val system = ActorSystem("WindowingExample")

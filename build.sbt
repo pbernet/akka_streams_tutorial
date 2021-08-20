@@ -6,13 +6,13 @@ scalaVersion := "2.13.6"
 
 val akkaVersion = "2.6.15"
 val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "3.0.2"
+val alpakkaVersion = "3.0.3"
 
 val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
 
-val activemqVersion =  "5.16.3"
-val testContainersVersion = "1.15.3"
+val activemqVersion =  "5.16.0"
+val testContainersVersion = "1.16.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
@@ -68,7 +68,7 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
   // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "ch.qos.logback" % "logback-classic" % "1.2.5",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
