@@ -20,8 +20,8 @@ import scala.util.{Failure, Success}
 
 /**
   * An Alpakka JMS client which consumes text messages from either:
-  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
-  *  - Or Artemis JMS Broker on docker image: /docker/docker-compose.yml
+  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]], started from IDE
+  *  - Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *

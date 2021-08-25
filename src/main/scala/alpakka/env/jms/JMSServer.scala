@@ -5,8 +5,8 @@ import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * Embedded ActiveMQ JMSServer for local testing with:
-  *  - persistence
-  *  - aes encryption
+  *  - KahaDB persistence
+  *  - AES encryption
   *
   * Alternative: Embedded Artemis JMSServer
   * https://activemq.apache.org/components/artemis/documentation/1.0.0/embedding-activemq.html
@@ -27,7 +27,7 @@ object JMSServer extends App {
 
   val aesPlugin = new AESBrokerPlugin()
   broker.setPlugins(Array[BrokerPlugin](aesPlugin))
-  //For now the secret is passed via JVM system property
+  // For now the secret is passed via JVM system property
   System.setProperty("activemq.aeskey", "1234567890123456")
 
   broker.setAdvisorySupport(false)

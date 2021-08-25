@@ -32,9 +32,9 @@ public class AESBroker extends BrokerFilter {
 
     private static final String IS_ENCRYPTED = "isEncrypted";
     private static final String KEY_STRING = System.getProperty("activemq.aeskey");
+    private static final int IV_LENGTH = 16;
 
     private Key aesKey;
-    private int initialisationVectorLength = 16;
 
     public AESBroker(Broker next) throws Exception {
         super(next);
@@ -42,7 +42,7 @@ public class AESBroker extends BrokerFilter {
     }
 
     private void init() throws Exception {
-        if (KEY_STRING == null || KEY_STRING.length() != 16) {
+        if (KEY_STRING == null || KEY_STRING.length() != IV_LENGTH) {
             throw new Exception("Bad AES key configured - ensure that JVM system property 'activemq.aeskey' is set to a 16 character string");
         }
         aesKey = new SecretKeySpec(KEY_STRING.getBytes(), "AES");
@@ -53,7 +53,7 @@ public class AESBroker extends BrokerFilter {
         byte [] iv = genInitialisationVector();
         cipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
 
-        //Prepend IV
+        // Prepend IV
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         outputStream.write(iv);
         outputStream.write(cipher.doFinal(text.getBytes()));
@@ -64,8 +64,8 @@ public class AESBroker extends BrokerFilter {
     public String decrypt(String text) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING", "BC");
 
-        //Read IV (first n bytes from payload)
-        byte[] ivBytesBuffer = new byte[initialisationVectorLength];
+        // Read IV (first n bytes from payload)
+        byte[] ivBytesBuffer = new byte[IV_LENGTH];
         InputStream payload = new ByteArrayInputStream(toByteArray(text));
         payload.read(ivBytesBuffer);
 
@@ -110,7 +110,6 @@ public class AESBroker extends BrokerFilter {
             LOGGER.error("Could not write to message body. Cause:", e);
             return msg;
         }
-
         return tm;
     }
 
@@ -137,7 +136,6 @@ public class AESBroker extends BrokerFilter {
                 LOGGER.error("Could not get message body contents for decryption. Cause:", e);
                 return msg;
             }
-
 
             try {
                 msgBodyDecrypted = decrypt(new String(Base64.getDecoder().decode(msgBodyOriginal), StandardCharsets.UTF_8));
@@ -185,8 +183,8 @@ public class AESBroker extends BrokerFilter {
         }
     }
 
-    //Synonym for IV: nonce (= number once)
+    // Synonym for IV would be: nonce (= number once)
     private byte [] genInitialisationVector() {
-        return new SecureRandom().generateSeed(initialisationVectorLength);
+        return new SecureRandom().generateSeed(IV_LENGTH);
     }
 }

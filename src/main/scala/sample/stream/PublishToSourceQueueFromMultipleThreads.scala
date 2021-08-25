@@ -1,7 +1,6 @@
 package sample.stream
 
 import akka.actor.ActorSystem
-import akka.stream.Supervision.Decider
 import akka.stream._
 import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
 import akka.{Done, NotUsed}
@@ -19,6 +18,8 @@ import scala.util.{Failure, Success}
   *
   * Doc buffers:
   * https://doc.akka.io/docs/akka/current/stream/stream-rate.html#buffers-in-akka-streams
+  *
+  * Similar example: [[MergeHubWithDynamicSources]]
   *
   * Open issue:
   * https://github.com/akka/akka/issues/26696
@@ -44,32 +45,14 @@ object PublishToSourceQueueFromMultipleThreads extends App {
     .to(slowSink)
     .run()
 
-  val doneConsuming: Future[Done] = sourceQueue.watchCompletion()
-  signalWhen(doneConsuming, "consuming") //never completes
+  val doneConsuming = sourceQueue.watchCompletion()
+  signalWhen(doneConsuming, "consuming") // never completes
 
   simulatePublishingFromMulitpleThreads()
 
-  // Before 2.6.x a stream had to be used to throttle and control the backpressure
-  //simulatePublishingClientsFromStream()
-
-  // Decide on the stream level, because the OverflowStrategy.backpressure
-  // on the sourceQueue causes an IllegalStateException
-  // Handling this on the stream level allows to restart the stream
-  private def simulatePublishingClientsFromStream() = {
-
-    val decider: Decider = {
-      case _: IllegalStateException => println("Got backpressure signal for offered element, restart..."); Supervision.Restart
-      case _ => Supervision.Stop
-    }
-
-    val donePublishing: Future[Done] = Source(1 to numberOfPublishingClients)
-      .mapAsync(10)(offerToSourceQueue) //throttle
-      .withAttributes(ActorAttributes.supervisionStrategy(decider))
-      .runWith(Sink.ignore)
-    signalWhen(donePublishing, "publishing")
+  private def simulatePublishingFromMulitpleThreads() = {
+    (1 to numberOfPublishingClients).par.foreach(offerToSourceQueue)
   }
-
-  private def simulatePublishingFromMulitpleThreads() = (1 to numberOfPublishingClients).par.foreach(offerToSourceQueue)
 
   private def offerToSourceQueue(each: Int) = {
     sourceQueue.offer(each).map {
