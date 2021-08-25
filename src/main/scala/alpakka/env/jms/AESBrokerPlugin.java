@@ -12,8 +12,7 @@ import java.security.Security;
  * Inspired by:
  * https://github.com/justinreock-roguewave/activemq-aes-plugin
  *
- * TODO implement hooks for hooks for start/stop
- *
+ * TODO implement hooks for start/stop
  *
  */
 public class AESBrokerPlugin extends BrokerPluginSupport {
@@ -26,7 +25,7 @@ public class AESBrokerPlugin extends BrokerPluginSupport {
         AESBroker aesBroker = null;
         try {
             aesBroker = new AESBroker(broker);
-            //Because of race condition: preProcessDispatch is called before AESBroker is initialized
+            // Because of race condition: preProcessDispatch is called before AESBroker is initialized
             Thread.sleep(1000);
         } catch (Exception e) {
             LOGGER.error("Exception during installation AES encryption plugin: ", e);

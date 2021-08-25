@@ -11,7 +11,9 @@ val alpakkaVersion = "3.0.3"
 val alpakkaKafkaConnector = "2.1.0"
 val kafkaVersion = "2.7.0"
 
-val activemqVersion =  "5.16.3"
+// Bumping to latest 5.16.x causes runtime issue:
+// Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
+val activemqVersion =  "5.16.0"
 val testContainersVersion = "1.16.0"
 
 libraryDependencies ++= Seq(
@@ -33,7 +35,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-broker" % activemqVersion,
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.67",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
