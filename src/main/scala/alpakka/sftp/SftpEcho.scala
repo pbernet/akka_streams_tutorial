@@ -43,8 +43,9 @@ import scala.util.{Failure, Success}
   */
 object SftpEcho extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SftpEcho")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   //we need a sub folder due to permissions set on on the atmoz_sftp docker image
   val sftpRootDir = "echo"

@@ -20,7 +20,7 @@ import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 trait ClientCommon {
-  implicit val system = ActorSystem("Websocket")
+  implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext = system.dispatcher
 
   val printSink: Sink[Message, Future[Done]] =

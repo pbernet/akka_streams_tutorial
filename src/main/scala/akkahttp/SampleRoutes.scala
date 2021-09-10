@@ -18,12 +18,12 @@ import scala.util.{Failure, Success}
   * Akka http playground
   * No streams here
   *
-  *
   */
 object SampleRoutes extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SampleRoutes")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val rejectionHandler = RejectionHandler.newBuilder()
     .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }

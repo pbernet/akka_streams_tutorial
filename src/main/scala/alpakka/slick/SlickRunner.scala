@@ -1,7 +1,7 @@
 package alpakka.slick
 
 import akka.actor.ActorSystem
-import akka.stream.alpakka.slick.scaladsl.{SlickSession, _}
+import akka.stream.alpakka.slick.scaladsl._
 import akka.stream.scaladsl._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.slf4j.{Logger, LoggerFactory}
@@ -18,8 +18,9 @@ import scala.concurrent.{Await, Future}
   */
 class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SlickRunner")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val counter = new AtomicInteger()
 
@@ -29,7 +30,7 @@ class SlickRunner(urlWithMappedPort: String) {
   })
 
   // Tweak config url param dynamically with mapped port from container
-  val tweakedConf =  ConfigFactory.empty()
+  val tweakedConf = ConfigFactory.empty()
     .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPort))
     .withFallback(ConfigFactory.load())
 
@@ -38,9 +39,12 @@ class SlickRunner(urlWithMappedPort: String) {
   import session.profile.api._
 
   case class User(id: Int, name: String)
-  class Users(tag: Tag) extends Table[(Int, String)](tag, Some("public"),"users") {
+
+  class Users(tag: Tag) extends Table[(Int, String)](tag, Some("public"), "users") {
     def id = column[Int]("id")
+
     def name = column[String]("name")
+
     def * = (id, name)
   }
 
@@ -72,16 +76,16 @@ class SlickRunner(urlWithMappedPort: String) {
   }
 
   def processUsersPaged() = {
-     val done = Slick.source(typedSelectAllUsers)
-       .grouped(1000)
-       .wireTap((group: Seq[(Int, String)]) => {
-         // Simulate some processing on each group
-         val sum = group.map(_._1).sum
-         logger.info(s"Group PK sum: $sum")
-       })
+    val done = Slick.source(typedSelectAllUsers)
+      .grouped(1000)
+      .wireTap((group: Seq[(Int, String)]) => {
+        // Simulate some processing on each group
+        val sum = group.map(_._1).sum
+        logger.info(s"Group PK sum: $sum")
+      })
 
-       .map(each => counter.getAndAdd(each.size))
-       .runWith(Sink.ignore)
+      .map(each => counter.getAndAdd(each.size))
+      .runWith(Sink.ignore)
 
     done.onComplete(done => logger.info(s"Done reading paged: $done with: ${counter.get()} elements"))
     done

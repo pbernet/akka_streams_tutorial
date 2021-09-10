@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
   *
   */
 object BasicTransformation {
-  implicit val system = ActorSystem("BasicTransformation")
+  implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
   def main(args: Array[String]): Unit = {

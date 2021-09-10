@@ -24,8 +24,9 @@ import scala.util.{Failure, Success}
   */
 object SplitAfter extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SplitAfter")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   private def hasSecondChanged: () => Seq[(Int, Instant)] => Iterable[(Instant, Boolean)] = {
     () => {
@@ -47,11 +48,11 @@ object SplitAfter extends App {
   val done = Source(1 to 100)
     .throttle(1, 100.millis)
     .map(elem => (elem, Instant.now()))
-    .sliding(2)                           // allows to compare this element with the next element
-    .statefulMapConcat(hasSecondChanged)  // stateful decision
-    .splitAfter(_._2)                     // split when second has changed
-    .map(_._1)                            // proceed with payload
-    .fold(0)((acc, _) => acc + 1)   // sum
+    .sliding(2) // allows to compare this element with the next element
+    .statefulMapConcat(hasSecondChanged) // stateful decision
+    .splitAfter(_._2) // split when second has changed
+    .map(_._1) // proceed with payload
+    .fold(0)((acc, _) => acc + 1) // sum
     .mergeSubstreams
     .runWith(Sink.foreach(each => println(s"Elements in group: $each")))
 

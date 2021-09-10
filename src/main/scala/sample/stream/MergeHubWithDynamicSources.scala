@@ -16,8 +16,7 @@ import scala.concurrent.duration._
   *
   */
 object MergeHubWithDynamicSources extends App {
-  implicit val system = ActorSystem("MergeHubWithDynamicSources")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
   val slowSink: Sink[Seq[String], NotUsed] =
     Flow[Seq[String]]

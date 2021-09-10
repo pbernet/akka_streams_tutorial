@@ -19,7 +19,7 @@ import scala.concurrent.Future
   */
 object SplitAfterPrefix extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem()
+  implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
   val chunkTerminator = "STOP"

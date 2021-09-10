@@ -26,8 +26,9 @@ import scala.concurrent.Future
   */
 class DirectoryListener(uploadDir: Path, processedDir: Path) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("DirectoryListener")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val uploader = Uploader(system)
 

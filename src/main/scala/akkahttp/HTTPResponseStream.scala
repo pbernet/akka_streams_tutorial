@@ -35,8 +35,9 @@ import scala.util.{Failure, Success}
   */
 object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("HTTPResponseStream")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   final case class Person(name: String)
 

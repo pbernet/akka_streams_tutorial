@@ -16,9 +16,10 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
   */
 
 object AlsoTo extends App {
-  implicit val system = ActorSystem("AlsoTo")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
   implicit val adapter = Logging(system, this.getClass)
+
+  import system.dispatcher
 
   val source = Source(1 to 10)
 

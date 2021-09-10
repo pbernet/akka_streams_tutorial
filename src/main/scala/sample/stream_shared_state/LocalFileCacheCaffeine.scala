@@ -1,11 +1,5 @@
 package sample.stream_shared_state
 
-import java.net.URI
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Files, Path, Paths}
-import java.util
-import java.util.concurrent.ThreadLocalRandom
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
@@ -18,6 +12,11 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.http.client.HttpResponseException
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.net.URI
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{Files, Path, Paths}
+import java.util
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
@@ -38,9 +37,10 @@ import scala.util.control.NonFatal
   *  - Scala wrapper scaffeine for type convenience: https://github.com/blemale/scaffeine
   */
 object LocalFileCacheCaffeine {
-  implicit val system = ActorSystem("LocalFileCacheCaffeine")
-  implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>

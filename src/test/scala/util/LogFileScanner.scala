@@ -14,8 +14,7 @@ import scala.concurrent.duration._
 
 
 class LogFileScanner(localLogFilePath: String = "./logs/application.log") {
-  implicit val system = ActorSystem("LogFileScanner")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
   private val fs: FileSystem = FileSystems.getDefault
 

@@ -8,7 +8,7 @@ import akka.stream.alpakka.mqtt.scaladsl.{MqttSink, MqttSource}
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable.Seq
 import scala.collection.parallel.CollectionConverters._
@@ -39,9 +39,9 @@ import scala.sys.process.Process
   * docker-compose restart mosquitto
   */
 object MqttPahoEcho extends App {
-  val logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("MqttPahoEcho")
-  implicit val executionContext = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+  import system.dispatcher
 
   val (host, port) = ("127.0.0.1", 1883)
 

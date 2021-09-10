@@ -1,14 +1,14 @@
 package sample.stream
 
-import java.util.concurrent.ThreadLocalRandom
-
 import akka.actor.ActorSystem
 import akka.stream.ThrottleMode
 import akka.stream.scaladsl.Source
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.language.postfixOps
+
 /**
   * Inspired by:
   * https://stackoverflow.com/questions/4662292/scala-median-implementation
@@ -17,23 +17,22 @@ import scala.language.postfixOps
   * To calculate the "all time median of medians grouped by 5" we would need to store the values (eg in an actor)
   *
   */
-//noinspection LanguageFeature
-object CalculateMedian {
-  implicit val system = ActorSystem("CalculateMedian")
+
+object CalculateMedian extends App {
+  implicit val system: ActorSystem = ActorSystem()
   implicit val ec = system.dispatcher
 
-  def main(args: Array[String]) = {
-    val maxRandomNumber = 100
-    val source = Source.fromIterator(() => Iterator.continually(ThreadLocalRandom.current().nextDouble(maxRandomNumber)))
+  val maxRandomNumber = 100
+  val source = Source.fromIterator(() => Iterator.continually(ThreadLocalRandom.current().nextDouble(maxRandomNumber)))
 
-    source
-      .throttle(1, 10.millis, 1, ThrottleMode.shaping)
-      .groupedWithin(100, 1.second)
-      //.map{each => println(each); each}
-      .map(each => medianOfMedians(each.toArray))
-      .runForeach(result => println(s"Median of Median (grouped by 5) over the last 100 elements: $result"))
-      .onComplete(_ => system.terminate())
-  }
+  source
+    .throttle(1, 10.millis, 1, ThrottleMode.shaping)
+    .groupedWithin(100, 1.second)
+    //.map{each => println(each); each}
+    .map(each => medianOfMedians(each.toArray))
+    .runForeach(result => println(s"Median of Median (grouped by 5) over the last 100 elements: $result"))
+    .onComplete(_ => system.terminate())
+
 
   @tailrec def findKMedian(arr: Array[Double], k: Int)(implicit choosePivot: Array[Double] => Double): Double = {
     val a = choosePivot(arr)
@@ -51,16 +50,20 @@ object CalculateMedian {
   def medianUpTo5(five: Array[Double]): Double = {
     def order2(a: Array[Double], i: Int, j: Int) = {
       if (a(i) > a(j)) {
-        val t = a(i); a(i) = a(j); a(j) = t
+        val t = a(i);
+        a(i) = a(j);
+        a(j) = t
       }
     }
 
     def pairs(a: Array[Double], i: Int, j: Int, k: Int, l: Int) = {
       if (a(i) < a(k)) {
-        order2(a, j, k); a(j)
+        order2(a, j, k)
+        a(j)
       }
       else {
-        order2(a, i, l); a(i)
+        order2(a, i, l)
+        a(i)
       }
     }
 
@@ -74,10 +77,12 @@ object CalculateMedian {
     order2(five, 2, 3)
     if (five.length < 5) pairs(five, 0, 1, 2, 3)
     else if (five(0) < five(2)) {
-      order2(five, 1, 4); pairs(five, 1, 4, 2, 3)
+      order2(five, 1, 4);
+      pairs(five, 1, 4, 2, 3)
     }
     else {
-      order2(five, 3, 4); pairs(five, 0, 1, 3, 4)
+      order2(five, 3, 4);
+      pairs(five, 0, 1, 3, 4)
     }
   }
 

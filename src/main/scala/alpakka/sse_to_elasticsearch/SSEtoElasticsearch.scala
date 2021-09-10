@@ -42,8 +42,9 @@ import scala.util.control.NonFatal
   */
 object SSEtoElasticsearch extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SSEtoElasticsearch")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
@@ -55,6 +56,7 @@ object SSEtoElasticsearch extends App {
   val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
+
   case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String)
 
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)

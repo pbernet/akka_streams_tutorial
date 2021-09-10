@@ -17,8 +17,7 @@ import java.time.LocalDateTime
   *
   */
 object PassThroughFlowExample extends App {
-  implicit val system = ActorSystem("PassThroughFlowExample")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
   val sourceOfOriginalValues = Source(1 to 100)
     .map(origValue => (origValue.toString, LocalDateTime.now()))

@@ -29,9 +29,10 @@ import scala.concurrent.{Await, Future}
   * Can run in parallel with [[Kafka2SSE]]
   */
 class Kafka2Websocket(mappedPortKafka: Int = 9092) {
-  implicit val system = ActorSystem("Kafka2Websocket")
-  implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
 
@@ -47,11 +48,11 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   }
 
   def stop() = {
-     streamControl.get.shutdown()
+    streamControl.get.shutdown()
   }
 
   private def createConsumerSettings(group: String): ConsumerSettings[String, String] = {
-    ConsumerSettings(system, new StringDeserializer , new StringDeserializer)
+    ConsumerSettings(system, new StringDeserializer, new StringDeserializer)
       .withBootstrapServers(bootstrapServers)
       .withGroupId(group)
       // Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
@@ -94,17 +95,17 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
     val innerControl = new AtomicReference[Control](Consumer.NoopControl)
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
-    val stream = RestartSource.onFailuresWithBackoff(restartSettings ) { () =>
+    val stream = RestartSource.onFailuresWithBackoff(restartSettings) { () =>
       Transactional
         .source(createConsumerSettings("hl7-input consumer group"), Subscriptions.topics("hl7-input"))
-        .mapAsync(1) { msg => safeSendToWebsocket(transactionalId, msg)}
+        .mapAsync(1) { msg => safeSendToWebsocket(transactionalId, msg) }
         .map { msg =>
           ProducerMessage.single(new ProducerRecord(transactionalProducerTopic, msg.record.key, msg.record.value), msg.partitionOffset)
         }
         // side effect out the `Control` materialized value because it can't be propagated through the `RestartSource`
         .mapMaterializedValue(c => innerControl.set(c))
         .via(Transactional.flow(createProducerSettings, transactionalId))
-  }
+    }
 
     stream.runWith(Sink.ignore)
     innerControl
@@ -143,7 +144,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
     printable(message).take(20).concat("...")
   }
 
-  sys.ShutdownHookThread{
+  sys.ShutdownHookThread {
     logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     stop()
   }
@@ -152,6 +153,8 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
 object Kafka2Websocket extends App {
   val server = new Kafka2Websocket()
   server.run()
+
   def apply(mappedPortKafka: Int) = new Kafka2Websocket(mappedPortKafka)
+
   def stop() = server.stop()
 }

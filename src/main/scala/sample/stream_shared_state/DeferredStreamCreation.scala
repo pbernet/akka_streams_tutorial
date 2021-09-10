@@ -19,8 +19,9 @@ import scala.util.{Failure, Success}
   */
 object DeferredStreamCreation extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("DeferredStreamCreation")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val source = Source(List(1, 2, 3, 4, 5))
   val printSink = Sink.foreach[String](each => println(s"Reached sink: $each"))

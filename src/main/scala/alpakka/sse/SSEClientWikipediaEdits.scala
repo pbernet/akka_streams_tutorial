@@ -36,8 +36,8 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   */
 object SSEClientWikipediaEdits extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SSEClientWikipediaEdits")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")
