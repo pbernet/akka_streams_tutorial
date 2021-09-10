@@ -37,7 +37,9 @@ object WritePrimes extends App {
   // Additional processing flow, to show the nature of the composition
   val sharedDoubler = Flow[Int].map(_ * 2)
 
-  // send primes to both sinks using graph API
+  // partition primes to both sinks using graph DSL
+  // Alternative:
+  // https://doc.akka.io/docs/akka/current/stream/operators/Partition.html
   val graph = GraphDSL.create(slowSink, consoleSink)((x, _) => x) { implicit builder =>
     (slow, console) =>
       import GraphDSL.Implicits._

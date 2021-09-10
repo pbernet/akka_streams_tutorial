@@ -10,7 +10,7 @@ import java.util.concurrent.CompletionStage;
 /**
  * Untyped Java Actor example
  * Doc:
- * https://doc.akka.io/docs/akka/2.5.25/actors.html
+ * https://doc.akka.io/docs/akka/current/actors.html
  * https://www.baeldung.com/java-completablefuture
  */
 public class DemoMessagesActor extends AbstractLoggingActor {
