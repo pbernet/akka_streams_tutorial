@@ -1,20 +1,19 @@
 package sample.stream_shared_state
 
-import java.time.{Instant, LocalDateTime, ZoneOffset}
-
-import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.collection.immutable._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Split time series data into sub-streams for each second.
-  * This example is similar to [[SplitWhen]]
+  * Split time series data into sub-streams for each second
+  * Similar to: [[SplitWhen]]
+  * Similar streams operator: groupedWithin
   *
   * Inspired by:
   * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/splitAfter.html
@@ -45,7 +44,7 @@ object SplitAfter extends App {
     }
   }
 
-  val done: Future[Done] = Source(1 to 100)
+  val done = Source(1 to 100)
     .throttle(1, 100.millis)
     .map(elem => (elem, Instant.now()))
     .sliding(2)                           // allows to compare this element with the next element
