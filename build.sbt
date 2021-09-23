@@ -5,10 +5,10 @@ version := "1.0"
 scalaVersion := "2.13.6"
 
 val akkaVersion = "2.6.15"
-val akkaHTTPVersion = "10.2.2"
+val akkaHTTPVersion = "10.2.6"
 val alpakkaVersion = "3.0.3"
 
-val alpakkaKafkaConnector = "2.1.0"
+val alpakkaKafkaConnector = "2.1.1"
 val kafkaVersion = "2.7.0"
 
 // Bumping to latest 5.16.x causes runtime issue:
@@ -70,18 +70,18 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
   // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.5",
+  "ch.qos.logback" % "logback-classic" % "1.2.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.23",
+  "org.postgresql" % "postgresql" % "42.2.24",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
-  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "org.assertj" % "assertj-core" % "3.21.0" % Test,
   "junit" % "junit" % "4.13.1" % Test
 )
 
