@@ -1,7 +1,5 @@
 package alpakka.env
 
-import java.io.File
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes._
@@ -11,6 +9,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.File
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -25,8 +24,9 @@ import scala.util.{Failure, Success}
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("FileServer")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6001)
   server(address, port)
@@ -75,12 +75,12 @@ object FileServer extends App {
         } ~ path("downloadni" / Segment) { id =>
           logger.info(s"TRACE_ID: $id Server received non-idempotent request")
 
-          if(cache.getIfPresent(id).isDefined) {
+          if (cache.getIfPresent(id).isDefined) {
             logger.warn(s"TRACE_ID: $id Only one download per TRACE_ID allowed. Reply with 404")
             complete(StatusCodes.NotFound)
 
           } else {
-            cache.put(id, "downloading")  //to simulate blocking on concurrent requests
+            cache.put(id, "downloading") //to simulate blocking on concurrent requests
             get {
               randomSleeper()
               val response = getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)

@@ -5,7 +5,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.{HttpRequest, MediaTypes, RequestEntity, _}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
@@ -36,8 +36,9 @@ import scala.util.{Failure, Success}
   *
   */
 object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("HttpFileEchoStream")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
 

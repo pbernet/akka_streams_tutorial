@@ -1,8 +1,5 @@
 package alpakka.kafka
 
-import java.util
-import java.util.concurrent.ThreadLocalRandom
-
 import akka.actor.ActorSystem
 import akka.kafka.ProducerMessage.Message
 import akka.kafka.ProducerSettings
@@ -15,6 +12,8 @@ import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartition
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.kafka.common.{Cluster, PartitionInfo}
 
+import java.util
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -23,8 +22,9 @@ import scala.concurrent.duration._
   *
   */
 object WordCountProducer extends App {
-  implicit val system = ActorSystem("WordCountProducer")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val bootstrapServers = "localhost:9092"
 
@@ -49,7 +49,7 @@ object WordCountProducer extends App {
   def produce(topic: String, messageMap: Map[Int, String], settings: ProducerSettings[String, String] = producerSettings): Future[Done] = {
 
     val source = Source.fromIterator(() => {
-      Iterator.continually{
+      Iterator.continually {
         val nextInt = java.util.concurrent.ThreadLocalRandom.current().nextInt(messageMap.size)
         val nextString = messageMap.getOrElse(nextInt, "N/A")
         println("Next Message: " + nextString)
@@ -67,15 +67,15 @@ object WordCountProducer extends App {
     source.runWith(Sink.ignore)
   }
 
-  sys.addShutdownHook{
+  sys.addShutdownHook {
     println("Got control-c cmd from shell, about to shutdown...")
   }
 
   initializeTopic(topic)
-  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000,1000, 3, 5, 5, 10, WordCountProducer.fakeNewsKeyword).split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
+  val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000, 1000, 3, 5, 5, 10, WordCountProducer.fakeNewsKeyword).split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
   val doneFuture = produce(topic, randomMap)
 
-  doneFuture.recover{
+  doneFuture.recover {
     case e: NetworkException =>
       println(s"NetworkException $e occurred - Retry...")
       produce(topic, randomMap)

@@ -4,15 +4,17 @@ version := "1.0"
 
 scalaVersion := "2.13.6"
 
-val akkaVersion = "2.6.14"
-val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "2.0.2"
+val akkaVersion = "2.6.15"
+val akkaHTTPVersion = "10.2.6"
+val alpakkaVersion = "3.0.3"
 
-val alpakkaKafkaConnector = "2.1.0"
-val kafkaVersion = "2.7.1"
+val alpakkaKafkaConnector = "2.1.1"
+val kafkaVersion = "2.7.0"
 
+// Bumping to latest 5.16.x causes runtime issue:
+// Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
 val activemqVersion =  "5.16.0"
-val testContainersVersion = "1.15.2"
+val testContainersVersion = "1.16.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
@@ -33,7 +35,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-broker" % activemqVersion,
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.67",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -56,27 +58,30 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
+  "org.apache.opennlp" % "opennlp-tools" % "1.9.3",
+
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
   "org.apache.httpcomponents" % "httpmime" % "4.5.13",
-  "commons-io" % "commons-io" % "2.8.0",
+  "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
+  // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "ch.qos.logback" % "logback-classic" % "1.2.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.19",
+  "org.postgresql" % "postgresql" % "42.2.24",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
-  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "org.assertj" % "assertj-core" % "3.21.0" % Test,
   "junit" % "junit" % "4.13.1" % Test
 )
 

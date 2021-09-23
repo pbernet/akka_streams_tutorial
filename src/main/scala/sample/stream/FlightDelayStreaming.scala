@@ -1,12 +1,11 @@
 package sample.stream
 
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 
+import java.nio.file.Paths
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -27,8 +26,9 @@ import scala.util.{Failure, Success, Try}
   * and store locally, eg to src/main/resources/myData.csv
   */
 object FlightDelayStreaming extends App {
-  implicit val system = ActorSystem("FlightDelayStreaming")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
     .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
@@ -62,12 +62,12 @@ object FlightDelayStreaming extends App {
           val totalMins = x.totalMins + Try(y.arrDelayMins.toInt).getOrElse(0)
           FlightDelayAggregate(y.uniqueCarrier, count, totalMins)
       }
-      .async  //for maximizing throughput
+      .async //for maximizing throughput
       .mergeSubstreams
 
   def averageSink[A](avg: A): Unit = {
     avg match {
-      case aggregate@FlightDelayAggregate(_,_,_) => println(aggregate)
+      case aggregate@FlightDelayAggregate(_, _, _) => println(aggregate)
       case x => println("no idea what " + x + "is!")
     }
   }

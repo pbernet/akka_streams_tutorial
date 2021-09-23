@@ -1,9 +1,5 @@
 package alpakka.file
 
-import java.io.FileInputStream
-import java.nio.file.Paths
-import java.security._
-
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.alpakka.file.ArchiveMetadata
@@ -11,10 +7,13 @@ import akka.stream.alpakka.file.scaladsl.Archive
 import akka.stream.scaladsl._
 import akka.stream.stage._
 import akka.util.ByteString
-import javax.crypto._
-import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.FileInputStream
+import java.nio.file.Paths
+import java.security._
+import javax.crypto._
+import javax.crypto.spec.{GCMParameterSpec, IvParameterSpec, SecretKeySpec}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -74,14 +73,15 @@ private[this] class AesStage(cipher: Cipher) extends GraphStage[FlowShape[ByteSt
 }
 
 object ZipCryptoEcho extends App {
-  implicit val system = ActorSystem("ZipCryptoEcho")
-  implicit val executionContext = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   //For AES/CBC or AES/GCM
   val aesKeySize = 256
   val aesKey = generateAesKey()
-  val aesMode =  "AES/CBC"  //Switch to AES/GCM
+  val aesMode = "AES/CBC" //Switch to AES/GCM
   val ivLengthBytes = if (aesMode == "AES/CBC") 16 else 12
   val initialisationVector = generateNonce(ivLengthBytes)
 
@@ -136,7 +136,6 @@ object ZipCryptoEcho extends App {
 
       doneDec.onComplete {
         case Success(_) =>
-          // Use ArchiveHelper, because we don't have support for un-archive in alpakka files
           logger.info("Start un-archiving...")
           val resultFileContentFut =
             FileIO.fromPath(Paths.get(decFileName)).runWith(Sink.fold(ByteString.empty)(_ ++ _))
@@ -189,8 +188,8 @@ object ZipCryptoEcho extends App {
                   aesMode: String
                 ): Source[ByteString, Any] = {
     val cipher = aesMode match {
-      case "AES/GCM" =>  aesCipherGCM(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
-      case _ =>  aesCipherCBC(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
+      case "AES/GCM" => aesCipherGCM(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
+      case _ => aesCipherCBC(Cipher.ENCRYPT_MODE, keySpec, ivBytes)
     }
     source.via(new AesStage(cipher))
   }
@@ -203,8 +202,8 @@ object ZipCryptoEcho extends App {
                 ): Source[ByteString, Any] = {
 
     val cipher = aesMode match {
-      case "AES/GCM" =>  aesCipherGCM(Cipher.DECRYPT_MODE, keySpec, ivBytes)
-      case _ =>  aesCipherCBC(Cipher.DECRYPT_MODE, keySpec, ivBytes)
+      case "AES/GCM" => aesCipherGCM(Cipher.DECRYPT_MODE, keySpec, ivBytes)
+      case _ => aesCipherCBC(Cipher.DECRYPT_MODE, keySpec, ivBytes)
     }
     source.via(new AesStage(cipher))
   }
@@ -213,7 +212,7 @@ object ZipCryptoEcho extends App {
                           fileName: String,
                           keySpec: SecretKeySpec,
                           aesMode: String
-                ): Source[ByteString, Any] = {
+                        ): Source[ByteString, Any] = {
 
     //Read IV (first n bytes from stream), good old Java to the rescue
     //Surprisingly difficult in akka streams
@@ -238,41 +237,41 @@ object ZipCryptoEcho extends App {
 
   //Activate for ChaCha20-Poly1305/None/NoPadding
 
-//  def encryptChaCha20(
-//                       source: Source[ByteString, Any],
-//                       keySpec: SecretKeySpec
-//                     ): Source[ByteString, Any] = {
-//    val ivSpec = new IvParameterSpec(chaCha20Nonce)
-//    val cipher = chaCha20Cipher(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
-//    source.via(new AesStage(cipher))
-//  }
-//
-//  def decryptChaCha20FromFile(
-//                       fileName: String,
-//                       keySpec: SecretKeySpec
-//                     ): Source[ByteString, Any] = {
-//    //Must go via file, otherwise the AesStage can not initialize the cipher correctly
-//    val is = new FileInputStream(fileName)
-//    val source = StreamConverters.fromInputStream(() => is)
-//
-//    val ivSpec = new IvParameterSpec(chaCha20Nonce)
-//    val cipher = chaCha20Cipher(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-//    source.via(new AesStage(cipher))
-//  }
-//
-//  private def chaCha20Cipher(mode: Int, keySpec: SecretKeySpec, ivSpec: IvParameterSpec) = {
-//    val cipher = Cipher.getInstance("ChaCha20-Poly1305/None/NoPadding")
-//    cipher.init(mode, keySpec, ivSpec)
-//    cipher
-//  }
-//
-//  private def generateChaCha20Key() = {
-//    val KEY_LEN = 256 // bits
-//    val keyGen = KeyGenerator.getInstance("ChaCha20")
-//    keyGen.init(KEY_LEN, SecureRandom.getInstanceStrong)
-//    val secretKey = keyGen.generateKey
-//
-//    val secretKeySpec = new SecretKeySpec(secretKey.getEncoded, "ChaCha20")
-//    secretKeySpec
-//  }
+  //  def encryptChaCha20(
+  //                       source: Source[ByteString, Any],
+  //                       keySpec: SecretKeySpec
+  //                     ): Source[ByteString, Any] = {
+  //    val ivSpec = new IvParameterSpec(chaCha20Nonce)
+  //    val cipher = chaCha20Cipher(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
+  //    source.via(new AesStage(cipher))
+  //  }
+  //
+  //  def decryptChaCha20FromFile(
+  //                       fileName: String,
+  //                       keySpec: SecretKeySpec
+  //                     ): Source[ByteString, Any] = {
+  //    //Must go via file, otherwise the AesStage can not initialize the cipher correctly
+  //    val is = new FileInputStream(fileName)
+  //    val source = StreamConverters.fromInputStream(() => is)
+  //
+  //    val ivSpec = new IvParameterSpec(chaCha20Nonce)
+  //    val cipher = chaCha20Cipher(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+  //    source.via(new AesStage(cipher))
+  //  }
+  //
+  //  private def chaCha20Cipher(mode: Int, keySpec: SecretKeySpec, ivSpec: IvParameterSpec) = {
+  //    val cipher = Cipher.getInstance("ChaCha20-Poly1305/None/NoPadding")
+  //    cipher.init(mode, keySpec, ivSpec)
+  //    cipher
+  //  }
+  //
+  //  private def generateChaCha20Key() = {
+  //    val KEY_LEN = 256 // bits
+  //    val keyGen = KeyGenerator.getInstance("ChaCha20")
+  //    keyGen.init(KEY_LEN, SecureRandom.getInstanceStrong)
+  //    val secretKey = keyGen.generateKey
+  //
+  //    val secretKeySpec = new SecretKeySpec(secretKey.getEncoded, "ChaCha20")
+  //    secretKeySpec
+  //  }
 }

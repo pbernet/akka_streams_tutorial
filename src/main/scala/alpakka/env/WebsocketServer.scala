@@ -20,8 +20,9 @@ import scala.util.{Failure, Success}
   */
 class WebsocketServer extends WebSocketDirectives {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("WebsocketServer")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6002)
   var serverBinding: Future[Http.ServerBinding] = _
@@ -69,7 +70,7 @@ class WebsocketServer extends WebSocketDirectives {
     }
   }
 
-  sys.ShutdownHookThread{
+  sys.ShutdownHookThread {
     logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     stop()
   }
@@ -78,6 +79,8 @@ class WebsocketServer extends WebSocketDirectives {
 object WebsocketServer extends App {
   val server = new WebsocketServer()
   server.run()
+
   def apply() = new WebsocketServer()
+
   def stop() = server.stop()
 }

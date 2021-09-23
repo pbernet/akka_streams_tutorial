@@ -17,7 +17,7 @@ import scala.concurrent.duration._
   * The server is started with [[WindTurbineServer]]
   */
 object SimulateWindTurbines extends App {
-  implicit val system = ActorSystem()
+  implicit val system: ActorSystem = ActorSystem()
 
   val endpoint = "ws://127.0.0.1:8080"
   val numberOfTurbines = 5

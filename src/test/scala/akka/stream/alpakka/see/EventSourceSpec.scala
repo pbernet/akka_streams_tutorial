@@ -133,8 +133,8 @@ object EventSourceSpec {
 final class EventSourceSpec extends AsyncWordSpec with Matchers with BeforeAndAfterAll {
   import EventSourceSpec._
 
-  private implicit val system = ActorSystem()
-  private implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+  import system.dispatcher
 
   "EventSource" should {
     "communicate correctly with an unstable HTTP server" in {

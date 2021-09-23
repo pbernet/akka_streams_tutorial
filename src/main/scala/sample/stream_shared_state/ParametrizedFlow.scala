@@ -43,8 +43,9 @@ object ParametrizedFlow extends App {
 }
 
 object ParameterizedFlowService {
-  implicit val system = ActorSystem("ParameterizedFlowService")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   def update(element: Double): Unit = flow._1._2.offer(element)
 

@@ -23,8 +23,9 @@ import scala.util.{Failure, Success}
   */
 
 object XmlProcessing extends App {
-  implicit val system = ActorSystem("XmlProcessing")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val resultFileName = "testfile_result.jpg"
 

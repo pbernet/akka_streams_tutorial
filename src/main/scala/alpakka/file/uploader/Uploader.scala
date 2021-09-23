@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.{HttpEntity, HttpRequest, MediaTypes, Multipart,
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
+import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.scaladsl.FileIO
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,12 +21,14 @@ import scala.util.{Failure, Success}
   * Upload file, eg from file system
   * Is used by [[DirectoryListener]]
   *
-  * Starts a mock server to handle the files
+  * Also starts a mock server to handle the uploaded files
   */
 class Uploader(system: ActorSystem) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val systemImpl = system
   implicit val executionContext = system.dispatcher
+
+  var serverBinding: Future[Http.ServerBinding] = _
 
   val (protocol, address, port) = ("http", "localhost", 6000)
 
@@ -50,6 +53,7 @@ class Uploader(system: ActorSystem) {
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("Server started, listening on: " + b.localAddress)
+        serverBinding = bindingFuture
       case Failure(e) =>
         logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
@@ -72,6 +76,15 @@ class Uploader(system: ActorSystem) {
 
     val headers: Seq[HttpHeader] = Seq(RawHeader("accept", "*/*"))
 
+    // Doc ConnectionPoolSettings
+    // https://doc.akka.io/docs/akka-http/current/client-side/configuration.html#pool-settings
+    val connectionPoolSettings = ConnectionPoolSettings(system)
+      .withUpdatedConnectionSettings({ settings =>
+        settings
+          .withConnectingTimeout(10.seconds)
+          .withIdleTimeout(2.minutes)
+      })
+
     val result: Future[HttpResponse] =
       for {
         request <- createEntityFrom(file).map(entity => {
@@ -83,7 +96,7 @@ class Uploader(system: ActorSystem) {
           logger.debug(s"Request method: ${req.method}")
           req
         })
-        response <- Http().singleRequest(request)
+        response <- Http().singleRequest(request = request, settings = connectionPoolSettings)
       } yield response
 
     result.onComplete(res => logger.info(s"Upload client received result: $res"))
@@ -108,6 +121,16 @@ class Uploader(system: ActorSystem) {
       HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
       Map("filename" -> file.getName)))
     Marshal(formData).to[RequestEntity]
+  }
+
+  def stop() = {
+    logger.info("About to shutdown Uploader...")
+    val fut = serverBinding.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+    logger.info("Waiting for connections to terminate...")
+    val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+    logger.info("Connections terminated")
+    onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+    }
   }
 
 }

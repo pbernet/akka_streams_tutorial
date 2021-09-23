@@ -40,8 +40,9 @@ import scala.util.{Failure, Success}
   */
 class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("Hl7Tcp2Kafka")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
   val topic = "hl7-input"
@@ -202,7 +203,7 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
     AdminClient.create(prop)
   }
 
-  sys.ShutdownHookThread{
+  sys.ShutdownHookThread {
     logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     stop()
   }
@@ -211,7 +212,9 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
 object Hl7Tcp2Kafka extends App {
   val server = new Hl7Tcp2Kafka()
   server.run()
+
   def apply(mappedPort: Int) = new Hl7Tcp2Kafka(mappedPort)
+
   def stop() = server.stop()
 }
 

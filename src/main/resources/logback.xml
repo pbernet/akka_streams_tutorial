@@ -2,7 +2,8 @@
 <configuration scan="true" scanPeriod="5 seconds">
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd} | %d{HH:mm:ss.SSS} | %-20.20thread | %5p | %-25.25logger{25} | %m%n</pattern>
+            <!-- Use short version -->
+            <pattern>%d{HH:mm:ss.SSS} | %-10.10thread | %5p | %-25.25logger{25} | %m%n</pattern>
             <charset>utf8</charset>
         </encoder>
     </appender>
