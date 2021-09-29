@@ -17,7 +17,7 @@ val activemqVersion =  "5.16.0"
 val testContainersVersion = "1.16.0"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
   // Latest is 1.0.0 but several dependencies still point to 0.9.1
   "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
