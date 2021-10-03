@@ -20,8 +20,8 @@ import scala.sys.process.Process
 /**
   * Roundtrip with the Alpakka MQTT connector based on Eclipse Paho,
   * which works only via tcp.
-  * Implements Publisher/Subscriber(s), which handle initial connection failures
-  * as well as subsequent connection failures.
+  * Implements Publisher/Subscriber client(s), which handle
+  * initial connection failures as well as subsequent connection failures.
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/mqtt.html

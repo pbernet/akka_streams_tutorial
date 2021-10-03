@@ -10,21 +10,22 @@ See the class comment on how to run each example. These more complex examples ar
 * [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
 * [Analyse Wikipedia edits live stream](#Analyse-Wikipedia-edits-live-stream)
 
-Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) show some trickier stateful operators in action.
+Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful operators in action.
 
 Other noteworthy examples:
-* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
-* Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources. 
+* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala)
+* Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources
 
 Remarks:
 * Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* The use of [testcontainers](https://www.testcontainers.org) in different setups allows realistic runtime scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
+* The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
 
 Other resources:
-* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo.
-* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams).
+* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
+* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
+* The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html) and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html) provide useful background
 * The concept of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams) is also explained in this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
 
 ## HTTP file download with local cache ##
