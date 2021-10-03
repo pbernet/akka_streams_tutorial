@@ -24,7 +24,7 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 
   case class FileHandle(fileName: String, absolutePath: String, length: Long)
 
-  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
+  implicit def fileInfoFormat = jsonFormat3(FileHandle)
 }
 
 /**

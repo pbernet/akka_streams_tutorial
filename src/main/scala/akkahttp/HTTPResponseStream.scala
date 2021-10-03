@@ -41,7 +41,7 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   final case class Person(name: String)
 
-  implicit def personFormat = jsonFormat1(Person.apply)
+  implicit def personFormat = jsonFormat1(Person)
 
   implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 

@@ -42,7 +42,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
 
-  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
+  implicit def fileInfoFormat = jsonFormat3(FileHandle)
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
