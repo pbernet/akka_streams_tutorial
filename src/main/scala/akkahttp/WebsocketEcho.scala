@@ -4,7 +4,7 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{TextMessage, _}
+import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
@@ -232,6 +232,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   def serverHeartbeatStreamClient(id: Int, address: String, port: Int) = {
     val sourceKickOff = Source
       .single(TextMessage("kick off msg"))
+      // Keeps the connection open
       .concatMat(Source.maybe[Message])(Keep.right)
 
     val webSocketNonReusableFlow: Flow[Message, Message, Promise[Option[Message]]] = {
@@ -240,17 +241,17 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
         sourceKickOff)(Keep.right)
     }
 
-    val (upgradeResponse, sourceClosed: Promise[Option[Message]]) =
+    val (upgradeResponse, completionPromise: Promise[Option[Message]]) =
       Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo_heartbeat"), webSocketNonReusableFlow)
 
     val connected = handleUpgrade(upgradeResponse)
 
     connected.onComplete(done => println(s"Client: $id serverHeartbeatStreamClient connected: $done"))
-    sourceClosed.future.onComplete(closed => println(s"Client: $id serverHeartbeatStreamClient closed: $closed"))
+    completionPromise.future.onComplete(closed => println(s"Client: $id serverHeartbeatStreamClient closed: $closed"))
 
     Thread.sleep(10000)
-    println(s"About to close client: $id...")
-    sourceClosed.success(None)
+    println(s"About to explicitly close client: $id...")
+    completionPromise.success(None)
   }
 
   private def handleUpgrade(upgradeResponse: Future[WebSocketUpgradeResponse]) = {
