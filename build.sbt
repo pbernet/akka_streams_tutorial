@@ -2,7 +2,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.6"
+scalaVersion := "2.13.7"
 
 val akkaVersion = "2.6.15"
 val akkaHTTPVersion = "10.2.6"
@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "1.9.3",
+  "org.apache.opennlp" % "opennlp-tools" % "1.9.4",
 
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
@@ -77,7 +77,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.24",
+  "org.postgresql" % "postgresql" % "42.3.1",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
