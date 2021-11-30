@@ -26,7 +26,7 @@ Other resources:
 * Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
 * Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
 * The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html) and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html) provide useful background
-* The concept of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams) is also explained in this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
+* The concept of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams) is also explained in this [blog](http://nivox.github.io/posts/akka-stream-materialized-values), this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
 
 ## HTTP file download with local cache ##
 Use case with shared state:

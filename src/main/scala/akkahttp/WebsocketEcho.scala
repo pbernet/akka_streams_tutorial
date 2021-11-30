@@ -1,15 +1,17 @@
 package akkahttp
 
 import akka.Done
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.WebSocketDirectives
+import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
+import akka.stream.{CompletionStrategy, OverflowStrategy, QueueOfferResult}
+import akka.util.Timeout
 
 import java.time.LocalDateTime
 import scala.collection.parallel.CollectionConverters._
@@ -61,10 +63,12 @@ trait ClientCommon {
   * Currently akka streams has no user API for websocket close
   * see: https://github.com/akka/akka-http/issues/2458
   *
-  * Two already possible explicit client closing scenarios:
+  * Already possible explicit client closing scenarios:
   *  - [[akkahttp.WebsocketEcho.serverHeartbeatStreamClient]] shows an explicit client closing scenario (also from Browser)
   *    Inspired by: https://discuss.lightbend.com/t/websocket-connection-does-not-terminate-even-when-client-tries-to-close-it/8285
-  *  - [[akkahttp.WebsocketEcho.singleWebSocketRequestSourceQueueClient]] seems to work as well
+  *  - [[akkahttp.WebsocketEcho.singleWebSocketRequestSourceQueueClient]]
+  *  - [[akkahttp.WebsocketEcho.actorClient]]
+  *  -
   *
   *
   * See "Windturbine Example" in pkg [[sample.stream_actor]] for more life cycle management and fault-tolerance behaviour
@@ -80,6 +84,8 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   (1 to maxClients).par.foreach(each => singleWebSocketRequestClient(each, address, port))
   (1 to maxClients).par.foreach(each => webSocketClientFlowClient(each, address, port))
   (1 to maxClients).par.foreach(each => singleWebSocketRequestSourceQueueClient(each, address, port))
+  (1 to maxClients).par.foreach(each => actorClient(each, address, port))
+
   (1 to maxClients).par.foreach(each => serverHeartbeatStreamClient(each, address, port))
 
   def server(address: String, port: Int) = {
@@ -181,6 +187,21 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     completionPromise.future.onComplete(closed => println(s"Client: $id singleWebSocketRequestClient closed: $closed"))
   }
 
+  def webSocketClientFlowClient(id: Int, address: String, port: Int) = {
+
+    val webSocketNonReusableFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
+
+    val (upgradeResponse, closed) =
+      namedSource(id.toString)
+        .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
+        .toMat(printSink)(Keep.both) // also keep the Future[Done]
+        .run()
+
+    val connected = handleUpgrade(upgradeResponse)
+
+    connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
+    closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
+  }
 
   def singleWebSocketRequestSourceQueueClient(id: Int, address: String, port: Int) = {
 
@@ -215,29 +236,46 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
       }
     }
 
-    send(s"$id-1 SourceQueue")
-    send(s"$id-2 SourceQueue")
+    send(s"$id-1 SourceQueueClient")
+    send(s"$id-2 SourceQueueClient")
 
     Thread.sleep(1000)
     println(s"About to explicitly close client: $id...")
     sourceQueueWithComplete.complete()
   }
 
-  def webSocketClientFlowClient(id: Int, address: String, port: Int) = {
+  def actorClient(id: Int, address: String, port: Int) = {
 
-    val webSocketNonReusableFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echo"))
+    val sourceBackpressure = Source.actorRefWithBackpressure[TextMessage](
+      ackMessage = "ack",
+      completionMatcher = {
+        case Done =>
+          println("ActorClient: close connection")
+          CompletionStrategy.immediately
+      },
+      failureMatcher = PartialFunction.empty)
 
-    val (upgradeResponse, closed) =
-      namedSource(id.toString)
-        .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
-        .toMat(printSink)(Keep.both) // also keep the Future[Done]
-        .run()
+    val webSocketNonReusableFlow = Flow.fromSinkAndSourceMat(printSink, sourceBackpressure)(Keep.right)
+
+    val (upgradeResponse, _) =
+      Http().singleWebSocketRequest(WebSocketRequest(s"ws://$address:$port/echo"), webSocketNonReusableFlow)
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
-    closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
+    connected.onComplete(done => println(s"ActorClient: $id connected: $done"))
+
+    val (sendToSocketRef: ActorRef, _) =
+      sourceBackpressure
+        .viaMat(webSocketNonReusableFlow)(Keep.both)
+        .toMat(printSink)(Keep.left)
+        .run()
+
+    implicit val askTimeout: Timeout = Timeout(30.seconds)
+    sendToSocketRef.ask(TextMessage(s"$id-1 ActorClient"))
+    sendToSocketRef.ask(TextMessage(s"$id-2 ActorClient"))
+    sendToSocketRef ! Done
   }
+
 
   def serverHeartbeatStreamClient(id: Int, address: String, port: Int) = {
     val sourceKickOff = Source

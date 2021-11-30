@@ -29,9 +29,7 @@ object SampleRoutes extends App {
 
   val rejectionHandler = RejectionHandler.newBuilder()
     .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }
-    .handleNotFound {
-      complete(StatusCodes.NotFound, "Page not found")
-    }
+    .handleNotFound(complete(StatusCodes.NotFound, "Page not found"))
     .result()
 
   val getFromBrowsableDir: Route = {
@@ -44,8 +42,9 @@ object SampleRoutes extends App {
   }
 
   val parseFormData: Route =
-  // Set akka.loglevel to "DEBUG" to see log output
+  // Set loglevel to "DEBUG" in application.conf for verbose akka-http log output
     logRequest("log post request") {
+      post {
       path("post") {
         handleRejections(rejectionHandler) {
           val minAge = 18
@@ -59,6 +58,7 @@ object SampleRoutes extends App {
             }
           }
         }
+      }
       }
     }
 
@@ -90,7 +90,7 @@ object SampleRoutes extends App {
 
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://localhost:8000").!
+    if (os == "mac os x") Process(s"open http://127.0.0.1:8000").!
   }
 
   browserClient()
