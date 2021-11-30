@@ -6,7 +6,7 @@ scalaVersion := "2.13.7"
 
 val akkaVersion = "2.6.15"
 val akkaHTTPVersion = "10.2.6"
-val alpakkaVersion = "3.0.3"
+val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnector = "2.1.1"
 val kafkaVersion = "2.7.0"
