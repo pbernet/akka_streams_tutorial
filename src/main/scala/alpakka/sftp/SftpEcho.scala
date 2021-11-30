@@ -82,7 +82,8 @@ object SftpEcho extends App {
   def uploadClient() = {
     logger.info("Starting upload...")
 
-    Source(1 to 100)
+    //TODO Above 50 we get errors on ssh level
+    Source(1 to 50)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .mapAsync(parallelism = 10) { id =>
         val result = Source
@@ -257,7 +258,7 @@ object SftpEcho extends App {
     val payloadFactor = 1000
     val payload = "1234567890" * payloadFactor
 
-    logger.info(s"Upload file with TRACE_ID: $id and approx. size: ${payload.length} bytes")
+    logger.info(s"Upload file with TRACE_ID: $id and size: ${payload.length} bytes")
     ByteString(s"$payload for: $id")
   }
 }
