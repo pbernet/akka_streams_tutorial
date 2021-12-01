@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-broker" % activemqVersion,
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
