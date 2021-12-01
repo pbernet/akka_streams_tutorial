@@ -82,8 +82,8 @@ object SftpEcho extends App {
   def uploadClient() = {
     logger.info("Starting upload...")
 
-    //TODO Above 50 we get errors on ssh level
-    Source(1 to 50)
+    // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets
+    Source(1 to 100)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .mapAsync(parallelism = 10) { id =>
         val result = Source
