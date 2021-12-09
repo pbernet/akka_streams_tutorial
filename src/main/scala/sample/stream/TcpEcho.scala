@@ -7,21 +7,23 @@ import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters._
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.sys.process._
 import scala.util.{Failure, Success}
+
 /**
   * Inspired by:
   * https://doc.akka.io/docs/akka/current/stream/stream-io.html?language=scala
   *
-  * Use without parameters to start server and 10 parallel clients.
+  * Use without parameters to start server and 100 parallel clients.
   *
-  * Use parameters `server 0.0.0.0 6001` to start server listening on port 6001.
+  * Use parameters `server 0.0.0.0 6000` to start server listening on port 6000
   *
-  * Use parameters `client 127.0.0.1 6001` to start client connecting to
-  * server on 127.0.0.1:6001.
+  * Use parameters `client 127.0.0.1 6000` to start one client connecting to
+  * server on 127.0.0.1:6000
   *
-  * Start cmd line client:
+  * Run cmd line client:
   * echo -n "Hello World" | nc 127.0.0.1 6000
   *
   */
@@ -32,24 +34,30 @@ object TcpEcho extends App {
 
   var serverBinding: Future[Tcp.ServerBinding] = _
 
-    if (args.isEmpty) {
-      val (host, port) = ("127.0.0.1", 6000)
+  // Depending on the available file descriptors of the OS we may experience client retries
+  val os = System.getProperty("os.name").toLowerCase
+  if (os == "mac os x") {
+    val fileDesr = "launchctl limit maxfiles".!!
+    logger.info(s"Running with: $fileDesr")
+  }
+  if (args.isEmpty) {
+    val (host, port) = ("127.0.0.1", 6000)
+    serverBinding = server(systemServer, host, port)
+    (1 to 100).par.foreach(each => client(each, systemClient, host, port))
+  } else {
+    val (host, port) =
+      if (args.length == 3) (args(1), args(2).toInt)
+      else ("127.0.0.1", 6000)
+    if (args(0) == "server") {
       serverBinding = server(systemServer, host, port)
-      (1 to 10).par.foreach(each => client(each, systemClient, host, port))
-    } else {
-      val (host, port) =
-        if (args.length == 3) (args(1), args(2).toInt)
-        else ("127.0.0.1", 6000)
-      if (args(0) == "server") {
-        serverBinding = server(systemServer, host, port)
-      } else if (args(0) == "client") {
-        client(1, systemClient, host, port)
-      }
+    } else if (args(0) == "client") {
+      client(1, systemClient, host, port)
     }
+  }
 
   def server(system: ActorSystem, host: String, port: Int): Future[Tcp.ServerBinding] = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+    implicit val sys: ActorSystem = system
+    implicit val ec: ExecutionContextExecutor = system.dispatcher
 
     val handler = Sink.foreach[Tcp.IncomingConnection] { connection =>
 
@@ -70,10 +78,10 @@ object TcpEcho extends App {
         .map(_ + "\n")
         .map(ByteString(_))
         .watchTermination()((_, done) => done.onComplete {
-        case Failure(err) =>
-          logger.info(s"Server flow failed: $err")
-        case _ => logger.info(s"Server flow terminated for client: ${connection.remoteAddress}")
-      })
+          case Failure(err) =>
+            logger.info(s"Server flow failed: $err")
+          case _ => logger.info(s"Server flow terminated for client: ${connection.remoteAddress}")
+        })
       connection.handleWith(serverEchoFlow)
     }
 
@@ -92,14 +100,14 @@ object TcpEcho extends App {
   }
 
   def client(id: Int, system: ActorSystem, address: String, port: Int): Unit = {
-    implicit val sys = system
-    implicit val ec = system.dispatcher
+    implicit val sys: ActorSystem = system
+    implicit val ec: ExecutionContextExecutor = system.dispatcher
 
     val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
-    val restartSource = RestartSource.onFailuresWithBackoff(restartSettings) { () => Source(testInput).via(connection)}
+    val restartSource = RestartSource.onFailuresWithBackoff(restartSettings) { () => Source(testInput).via(connection) }
     val closed = restartSource.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
   }

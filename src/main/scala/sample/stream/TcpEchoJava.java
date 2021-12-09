@@ -22,20 +22,23 @@ public class TcpEchoJava {
 
     /**
      * Use without parameters to start both server and 10 clients.
+     * See also: [[sample.stream.TcpEcho]]
      *
-     * Use parameters `server 0.0.0.0 6001` to start server listening on port
-     * 6001.
-     *
-     * Use parameters `client 127.0.0.1 6001` to start client connecting to server
-     * on 127.0.0.1:6001.
-     *
+     * <p>
+     * Use parameters `server 0.0.0.0 6000` to start server listening on port
+     * 6000
+     * <p>
+     * Use parameters `client 127.0.0.1 6000` to start client connecting to server
+     * on 127.0.0.1:6000
+     * <p>
      */
     public static void main(String[] args) {
+        ActorSystem systemServer = ActorSystem.create("TcpEchoJavaServer");
+        ActorSystem systemClient = ActorSystem.create("TcpEchoJavaClient");
         if (args.length == 0) {
-            ActorSystem system = ActorSystem.create("TcpEchoJava");
             InetSocketAddress serverAddress = new InetSocketAddress("127.0.0.1", 6000);
-            server(system, serverAddress);
-            IntStream.range(1, 10).parallel().forEach(each -> client(system, serverAddress));
+            server(systemServer, serverAddress);
+            IntStream.range(1, 1000).parallel().forEach(each -> client(systemClient, serverAddress));
         } else {
             InetSocketAddress serverAddress;
             if (args.length == 3) {
@@ -44,11 +47,9 @@ public class TcpEchoJava {
                 serverAddress = new InetSocketAddress("127.0.0.1", 6000);
             }
             if (args[0].equals("server")) {
-                ActorSystem system = ActorSystem.create("Server");
-                server(system, serverAddress);
+                server(systemServer, serverAddress);
             } else if (args[0].equals("client")) {
-                ActorSystem system = ActorSystem.create("Client");
-                client(system, serverAddress);
+                client(systemClient, serverAddress);
             }
         }
     }
@@ -97,8 +98,6 @@ public class TcpEchoJava {
             } else {
                 System.out.println("Result: " + success.utf8String());
             }
-            System.out.println("Shutting down client");
-            system.terminate();
             return NotUsed.getInstance();
         });
     }
