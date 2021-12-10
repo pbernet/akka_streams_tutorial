@@ -12,9 +12,13 @@
 <body>
 
 <div>
-    <button onclick="keycloak.login()">Login</button>
-    <button onclick="keycloak.login({ action: 'UPDATE_PASSWORD' })">Update Password</button>
+    <button onclick="keycloak.login()">Login test/test</button>
     <button onclick="keycloak.logout()">Logout</button>
+    <button onclick="loadUsers()">Load Users</button>
+</div>
+<br/>
+<div>
+    <button onclick="keycloak.login({ action: 'UPDATE_PASSWORD' })">Update Password</button>
     <button onclick="keycloak.register()">Register</button>
     <button onclick="keycloak.accountManagement()">Account</button>
     <button onclick="refreshToken(9999)">Refresh Token</button>
@@ -31,9 +35,6 @@
     <button onclick="output(keycloak.createLogoutUrl())">Show Logout URL</button>
     <button onclick="output(keycloak.createRegisterUrl())">Show Register URL</button>
     <button onclick="output(keycloak.createAccountUrl())">Show Account URL</button>
-
-    <button onclick="loadUsers ()">Load Users</button>
-
 </div>
 
 <h2>Result</h2>
@@ -44,7 +45,7 @@
 
 
 <script>
-    function loadUsers () {
+    function loadUsers() {
         console.log("About to load users...")
         var url = 'http://127.0.0.1:6002/users';
 
@@ -54,10 +55,10 @@
         req.setRequestHeader('Authorization', 'Bearer ' + keycloak.token);
 
         req.onreadystatechange = function () {
-            if (req.readyState == 4) {
-                if (req.status == 200) {
+            if (req.readyState === 4) {
+                if (req.status === 200) {
                     output(req.responseText);
-                } else if (req.status == 403) {
+                } else if (req.status === 403) {
                     output('Access forbidden, need to login...');
                     //TODO setting the redirectURI does not work for /users
                     keycloak.login();
