@@ -83,9 +83,9 @@ libraryDependencies ++= Seq(
   "com.github.dasniko" % "testcontainers-keycloak" % "1.8.1",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
-  "org.keycloak" % "keycloak-core"         % "15.0.2" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-adapter-core" % "15.0.2" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-admin-client" % "15.0.2",
+  "org.keycloak" % "keycloak-core"         % "15.1.0" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-adapter-core" % "15.1.0" exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-admin-client" % "15.1.0",
   "org.jboss.logging" % "jboss-logging"    % "3.3.0.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
