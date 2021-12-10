@@ -1,15 +1,13 @@
 package akkahttp.oidc
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.{HttpChallenge, OAuth2BearerToken}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, Directive1, RejectionHandler, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.pattern.ask
 import akka.util.Timeout
-import akkahttp.oidc.UserRegistryActor.GetUsers
 import dasniko.testcontainers.keycloak.KeycloakContainer
 import org.keycloak.TokenVerifier
 import org.keycloak.adapters.KeycloakDeploymentBuilder
@@ -29,6 +27,7 @@ import java.util
 import java.util.{Base64, Collections}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
@@ -131,6 +130,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
     val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm("test").clients().findByClientId(clientId)
     logger.info(s"Successfully read ClientRepresentation for clientId: ${clients.get(0).getClientId}")
+    keycloakAdminClient
   }
 
   def runBackendServer(keycloak: KeycloakContainer) = {
@@ -140,8 +140,6 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
     }.result().mapRejectionResponse(addCORSHeaders)
 
     implicit val timeout: Timeout = Timeout(5.seconds)
-
-    val userRegistryActor: ActorRef = system.actorOf(UserRegistryActor.props, "userRegistryActor")
 
     val config = new AdapterConfig()
     config.setAuthServerUrl(keycloak.getAuthServerUrl)
@@ -165,11 +163,9 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
       })
 
 
-    // TODO Why not done via
+    // Alternative:
     // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/security-directives/authenticateOAuth2.html
-    // https://www.jannikarndt.de/blog/2018/10/oauth2-akka-http/
-
-    def authorize: Directive1[AccessToken] =
+    def authenticate: Directive1[AccessToken] =
       extractCredentials.flatMap {
         case Some(OAuth2BearerToken(token)) =>
           onComplete(verifyToken(token)).flatMap {
@@ -205,10 +201,11 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
       logRequest("log request") {
         path("users") {
           get {
-            authorize { token =>
-              // TODO Instead of dummy data: Read (real) users from Keycloak via the admin client
-              val resultF = (userRegistryActor ? GetUsers).mapTo[Users]
-              onSuccess(resultF)(u => complete(u))
+            authenticate { token =>
+              // Read stripped down users from Keycloak via the admin client
+              val usersOrig = adminClient.realm("test").users().list().asScala
+              val usersBasic = UsersKeycloak(usersOrig.collect(each => UserKeycloak(Option(each.getFirstName), Option(each.getLastName), Option(each.getEmail))).toSeq)
+              complete(usersBasic)
             }
           }
         }
@@ -252,7 +249,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
 
   val keycloak = runKeycloak()
-  configureKeycloak(keycloak)
+  val adminClient = configureKeycloak(keycloak)
   adminConsole(keycloak.getAuthServerUrl)
   runBackendServer(keycloak)
   browserClient()
