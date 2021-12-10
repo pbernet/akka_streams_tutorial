@@ -6,6 +6,7 @@ import akka.stream.scaladsl.{Flow, Framing, Keep, RestartSource, Sink, Source, T
 import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.net.InetSocketAddress
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -18,7 +19,7 @@ import scala.util.{Failure, Success}
   *
   * Use without parameters to start server and 100 parallel clients.
   *
-  * Use parameters `server 0.0.0.0 6000` to start server listening on port 6000
+  * Use parameters `server 127.0.0.1 6000` to start server listening on port 6000
   *
   * Use parameters `client 127.0.0.1 6000` to start one client connecting to
   * server on 127.0.0.1:6000
@@ -34,16 +35,15 @@ object TcpEcho extends App {
 
   var serverBinding: Future[Tcp.ServerBinding] = _
 
-  // Depending on the available file descriptors of the OS we may experience client retries
-  val os = System.getProperty("os.name").toLowerCase
-  if (os == "mac os x") {
-    val fileDesr = "launchctl limit maxfiles".!!
-    logger.info(s"Running with: $fileDesr")
-  }
   if (args.isEmpty) {
     val (host, port) = ("127.0.0.1", 6000)
     serverBinding = server(systemServer, host, port)
-    (1 to 100).par.foreach(each => client(each, systemClient, host, port))
+
+    checkResources()
+    // Issue:
+    // https://github.com/akka/akka/issues/29842
+    val maxClients = 100
+    (1 to maxClients).par.foreach(each => client(each, systemClient, host, port))
   } else {
     val (host, port) =
       if (args.length == 3) (args(1), args(2).toInt)
@@ -99,16 +99,27 @@ object TcpEcho extends App {
     binding
   }
 
-  def client(id: Int, system: ActorSystem, address: String, port: Int): Unit = {
+  def client(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
     implicit val sys: ActorSystem = system
     implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-    val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
+    // We want "halfClose behavior" on the client side. Doc:
+    // https://github.com/akka/akka/issues/22163
+    val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(remoteAddress = InetSocketAddress.createUnresolved(host, port), halfClose = true)
     val testInput = ('a' to 'z').map(ByteString(_)) ++ Seq(ByteString("BYE"))
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartSource = RestartSource.onFailuresWithBackoff(restartSettings) { () => Source(testInput).via(connection) }
     val closed = restartSource.runForeach(each => logger.info(s"Client: $id received echo: ${each.utf8String}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
+  }
+
+  private def checkResources() = {
+    // Depending on the available file descriptors of the OS we may experience client retries
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") {
+      val fileDesr = "launchctl limit maxfiles".!!
+      logger.info(s"Running with: $fileDesr")
+    }
   }
 }
