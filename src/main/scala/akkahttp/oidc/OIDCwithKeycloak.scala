@@ -11,7 +11,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import akkahttp.oidc.UserRegistryActor.GetUsers
 import dasniko.testcontainers.keycloak.KeycloakContainer
-import org.keycloak.RSATokenVerifier
+import org.keycloak.TokenVerifier
 import org.keycloak.adapters.KeycloakDeploymentBuilder
 import org.keycloak.admin.client.{CreatedResponseUtil, KeycloakBuilder}
 import org.keycloak.jose.jws.AlgorithmType
@@ -119,10 +119,10 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
     clientRepresentation.setClientId(clientId)
     clientRepresentation.setProtocol("openid-connect")
 
-    val redirectUriTestingOnly =  new java.util.ArrayList[String]()
+    val redirectUriTestingOnly = new java.util.ArrayList[String]()
     redirectUriTestingOnly.add("http://127.0.0.1:6002/*")
     clientRepresentation.setRedirectUris(redirectUriTestingOnly)
-    val webOriginsTestingOnly =  new java.util.ArrayList[String]()
+    val webOriginsTestingOnly = new java.util.ArrayList[String]()
     webOriginsTestingOnly.add("*")
     clientRepresentation.setWebOrigins(webOriginsTestingOnly)
 
@@ -151,10 +151,8 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
     val keycloakDeployment = KeycloakDeploymentBuilder.build(config)
     logger.info("Dynamic authServerBaseUrl: " + keycloakDeployment.getAuthServerBaseUrl)
 
-    def getVerifier(token: String): Future[RSATokenVerifier] =
-      Future(RSATokenVerifier.create(token).realmUrl(keycloakDeployment.getRealmInfoUrl))
 
-   def generateKey(keyData: KeyData): PublicKey = {
+    def generateKey(keyData: KeyData): PublicKey = {
       val keyFactory = KeyFactory.getInstance(AlgorithmType.RSA.toString)
       val urlDecoder = Base64.getUrlDecoder
       val modulus = new BigInteger(1, urlDecoder.decode(keyData.n))
@@ -189,9 +187,8 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
       }
 
     def verifyToken(token: String): Future[Option[AccessToken]] = {
-      val realmInfoUrl = keycloakDeployment.getRealmInfoUrl
-      logger.info(s"About to verify token against realmInfoUrl: $realmInfoUrl")
-      val tokenVerifier = RSATokenVerifier.create(token).realmUrl(realmInfoUrl)
+      logger.info(s"About to verify token...")
+      val tokenVerifier = TokenVerifier.create(token, classOf[AccessToken])
       for {
         publicKey <- publicKeys.map(_.get(tokenVerifier.getHeader.getKeyId))
       } yield publicKey match {
@@ -207,15 +204,14 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
     val userRoutes: Route =
       logRequest("log request") {
-
         path("users") {
           get {
-          authorize { token =>
-            // TODO Read the users of the Keycloak realm via the admin client (instead of dummy data)
-            val resultF = (userRegistryActor ? GetUsers).mapTo[Users]
-            onSuccess(resultF)(u => complete(u))
+            authorize { token =>
+              // TODO Instead of dummy data: Read (real) users from Keycloak via the admin client
+              val resultF = (userRegistryActor ? GetUsers).mapTo[Users]
+              onSuccess(resultF)(u => complete(u))
+            }
           }
-        }
         }
       }
 
@@ -224,7 +220,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
         concat(
           pathSingleSlash {
             val content = new String(Files.readAllBytes(Paths.get("src/main/resources/KeycloakClient.html")))
-            val renderedPage = content.replaceAll("%%PORT%%", keycloak.getFirstMappedPort.toString )
+            val renderedPage = content.replaceAll("%%PORT%%", keycloak.getFirstMappedPort.toString)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, renderedPage))
           }
         )
