@@ -58,10 +58,11 @@
             if (req.readyState === 4) {
                 if (req.status === 200) {
                     output(req.responseText);
-                } else if (req.status === 403) {
-                    output('Access forbidden, need to login...');
-                    //TODO setting the redirectURI does not work for /users
+                } else if (req.status === 401) {
+                    output('Not authenticated, need to login...');
+                    // Redirect to home is OK
                     keycloak.login();
+                    // TODO This does not work, the token is not in request
                     // keycloak.login({
                     //     redirectUri: 'http://127.0.0.1:6002/users'
                     // });

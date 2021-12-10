@@ -2,10 +2,10 @@ package akkahttp.oidc
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.OAuth2BearerToken
+import akka.http.scaladsl.model.headers.{HttpChallenge, OAuth2BearerToken}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{AuthorizationFailedRejection, Directive1, RejectionHandler, Route}
+import akka.http.scaladsl.server.{AuthenticationFailedRejection, Directive1, RejectionHandler, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.util.Timeout
@@ -135,9 +135,8 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
   def runBackendServer(keycloak: KeycloakContainer) = {
 
-    // TODO Why not use AuthenticationFailedRejection?
-    implicit def rejectionHandler: RejectionHandler = RejectionHandler.newBuilder().handle {
-      case AuthorizationFailedRejection => complete(StatusCodes.Unauthorized -> None)
+    implicit def rejectionHandler = RejectionHandler.newBuilder().handle {
+      case AuthenticationFailedRejection(reason,_) => complete(StatusCodes.Unauthorized, reason.toString)
     }.result().mapRejectionResponse(addCORSHeaders)
 
     implicit val timeout: Timeout = Timeout(5.seconds)
@@ -179,11 +178,11 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
               provide(t)
             case _ =>
               logger.warn(s"Token: '${token.take(10)}...' is not valid")
-              reject(AuthorizationFailedRejection)
+              reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsRejected,HttpChallenge("JWT", None)))
           }
         case _ =>
           logger.warn("No token present in request")
-          reject(AuthorizationFailedRejection)
+          reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsMissing,HttpChallenge("JWT", None)))
       }
 
     def verifyToken(token: String): Future[Option[AccessToken]] = {
