@@ -11,7 +11,7 @@ import akka.util.Timeout
 import dasniko.testcontainers.keycloak.KeycloakContainer
 import org.keycloak.TokenVerifier
 import org.keycloak.adapters.KeycloakDeploymentBuilder
-import org.keycloak.admin.client.{CreatedResponseUtil, KeycloakBuilder}
+import org.keycloak.admin.client.{CreatedResponseUtil, Keycloak, KeycloakBuilder}
 import org.keycloak.jose.jws.AlgorithmType
 import org.keycloak.representations.AccessToken
 import org.keycloak.representations.adapters.config.AdapterConfig
@@ -71,72 +71,80 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
   def configureKeycloak(keycloak: KeycloakContainer) = {
     val adminClientId = "admin-cli"
-    val keycloakAdminClient = KeycloakBuilder.builder()
-      .serverUrl(keycloak.getAuthServerUrl())
-      .realm("master")
-      .clientId(adminClientId)
-      .username(keycloak.getAdminUsername())
-      .password(keycloak.getAdminPassword())
-      .build()
-    logger.info("Connected to Keycloak server version: " + keycloakAdminClient.serverInfo().getInfo().getSystemInfo().getVersion())
-    logger.info("Number of users in realm 'test': " + keycloakAdminClient.realm("test").users().count())
 
-    val username = "test"
-    val password = "test"
-    val usersResource = keycloakAdminClient.realm("test").users()
+    def initAdminClient() = {
+      val keycloakAdminClient = KeycloakBuilder.builder()
+        .serverUrl(keycloak.getAuthServerUrl())
+        .realm("master")
+        .clientId(adminClientId)
+        .username(keycloak.getAdminUsername())
+        .password(keycloak.getAdminPassword())
+        .build()
+      logger.info("Connected to Keycloak server version: " + keycloakAdminClient.serverInfo().getInfo().getSystemInfo().getVersion())
+      keycloakAdminClient
+    }
 
-    val user = new UserRepresentation()
-    user.setEnabled(true)
-    user.setUsername(username)
-    user.setFirstName("First")
-    user.setLastName("Last")
-    user.setEmail(s"$username@test.local")
-    user.setAttributes(Collections.singletonMap("origin", util.Arrays.asList(adminClientId)))
+    def createTestUser(keycloakAdminClient: Keycloak) = {
+      val username = "test"
+      val password = "test"
+      val usersResource = keycloakAdminClient.realm("test").users()
 
-    // Create user
-    val response = usersResource.create(user)
-    val userId = CreatedResponseUtil.getCreatedId(response)
+      val user = new UserRepresentation()
+      user.setEnabled(true)
+      user.setUsername(username)
+      user.setFirstName("First")
+      user.setLastName("Last")
+      user.setEmail(s"$username@test.local")
+      user.setAttributes(Collections.singletonMap("origin", util.Arrays.asList(adminClientId)))
 
-    // Define password credential
-    val passwordCred = new CredentialRepresentation()
-    passwordCred.setTemporary(false)
-    passwordCred.setType(CredentialRepresentation.PASSWORD)
-    passwordCred.setValue(password)
+      // Create user
+      val response = usersResource.create(user)
+      val userId = CreatedResponseUtil.getCreatedId(response)
 
-    // Set password credential
-    val userResource = usersResource.get(userId)
-    userResource.resetPassword(passwordCred)
+      // Define password credential
+      val passwordCred = new CredentialRepresentation()
+      passwordCred.setTemporary(false)
+      passwordCred.setType(CredentialRepresentation.PASSWORD)
+      passwordCred.setValue(password)
 
-    logger.info(s"User $username created with userId: $userId")
-    logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/auth/realms/test/account")
-    logger.info("Number of users in realm 'test': " + keycloakAdminClient.realm("test").users().count())
+      // Set password credential
+      val userResource = usersResource.get(userId)
+      userResource.resetPassword(passwordCred)
 
+      logger.info(s"User $username created with userId: $userId")
+      logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/auth/realms/test/account")
+    }
 
-    // Create client config
-    val clientId = "my-test-client"
-    val clientRepresentation = new ClientRepresentation()
-    clientRepresentation.setClientId(clientId)
-    clientRepresentation.setProtocol("openid-connect")
+    def createClientConfig(keycloakAdminClient: Keycloak) = {
+      val clientId = "my-test-client"
+      val clientRepresentation = new ClientRepresentation()
+      clientRepresentation.setClientId(clientId)
+      clientRepresentation.setProtocol("openid-connect")
 
-    val redirectUriTestingOnly = new java.util.ArrayList[String]()
-    redirectUriTestingOnly.add("http://127.0.0.1:6002/*")
-    clientRepresentation.setRedirectUris(redirectUriTestingOnly)
-    val webOriginsTestingOnly = new java.util.ArrayList[String]()
-    webOriginsTestingOnly.add("*")
-    clientRepresentation.setWebOrigins(webOriginsTestingOnly)
+      val redirectUriTestingOnly = new util.ArrayList[String]()
+      redirectUriTestingOnly.add("http://127.0.0.1:6002/*")
+      clientRepresentation.setRedirectUris(redirectUriTestingOnly)
+      val webOriginsTestingOnly = new util.ArrayList[String]()
+      webOriginsTestingOnly.add("*")
+      clientRepresentation.setWebOrigins(webOriginsTestingOnly)
 
-    val resp = keycloakAdminClient.realm("test").clients().create(clientRepresentation)
-    logger.info(s"Created client config for clientId: $clientId, response status: " + resp.getStatus)
+      val resp = keycloakAdminClient.realm("test").clients().create(clientRepresentation)
+      logger.info(s"Created client config for clientId: $clientId, response status: " + resp.getStatus)
 
-    val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm("test").clients().findByClientId(clientId)
-    logger.info(s"Successfully read ClientRepresentation for clientId: ${clients.get(0).getClientId}")
+      val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm("test").clients().findByClientId(clientId)
+      logger.info(s"Successfully read ClientRepresentation for clientId: ${clients.get(0).getClientId}")
+    }
+
+    val keycloakAdminClient = initAdminClient()
+    createTestUser(keycloakAdminClient)
+    createClientConfig(keycloakAdminClient)
     keycloakAdminClient
   }
 
   def runBackendServer(keycloak: KeycloakContainer) = {
 
     implicit def rejectionHandler = RejectionHandler.newBuilder().handle {
-      case AuthenticationFailedRejection(reason,_) => complete(StatusCodes.Unauthorized, reason.toString)
+      case AuthenticationFailedRejection(reason, _) => complete(StatusCodes.Unauthorized, reason.toString)
     }.result().mapRejectionResponse(addCORSHeaders)
 
     implicit val timeout: Timeout = Timeout(5.seconds)
@@ -174,11 +182,11 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
               provide(t)
             case _ =>
               logger.warn(s"Token: '${token.take(10)}...' is not valid")
-              reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsRejected,HttpChallenge("JWT", None)))
+              reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsRejected, HttpChallenge("JWT", None)))
           }
         case _ =>
           logger.warn("No token present in request")
-          reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsMissing,HttpChallenge("JWT", None)))
+          reject(AuthenticationFailedRejection(AuthenticationFailedRejection.CredentialsMissing, HttpChallenge("JWT", None)))
       }
 
     def verifyToken(token: String): Future[Option[AccessToken]] = {
@@ -202,7 +210,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
         path("users") {
           get {
             authenticate { token =>
-              // Read stripped down users from Keycloak via the admin client
+              // To have "real data": Read 'UserRepresentation' from Keycloak via the admin client and then strip down
               val usersOrig = adminClient.realm("test").users().list().asScala
               val usersBasic = UsersKeycloak(usersOrig.collect(each => UserKeycloak(Option(each.getFirstName), Option(each.getLastName), Option(each.getEmail))).toSeq)
               complete(usersBasic)

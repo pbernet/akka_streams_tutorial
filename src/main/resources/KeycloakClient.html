@@ -1,8 +1,6 @@
 <!--
   Stolen from:
   https://github.com/keycloak/keycloak/tree/main/examples/js-console
-
-  TODO Add reading of /users
   -->
 
 <html>
@@ -57,7 +55,8 @@
         req.onreadystatechange = function () {
             if (req.readyState === 4) {
                 if (req.status === 200) {
-                    output(req.responseText);
+                    var obj = JSON.parse(req.responseText);
+                    output(JSON.stringify(obj, undefined, 2));
                 } else if (req.status === 401) {
                     output('Not authenticated, need to login...');
                     // Redirect to home is OK
