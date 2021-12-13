@@ -52,7 +52,7 @@ object WebsocketChatEcho extends App with ClientCommon {
     // To demonstrate the nature of the composition
     val sampleProcessingFlow  = Flow[String].map(i => i.toUpperCase)
 
-    val (chatSink: Sink[String, NotUsed], chatSource: Source[String, NotUsed]) = {
+    val (inSink: Sink[String, NotUsed], outSource: Source[String, NotUsed]) = {
       MergeHub.source[String](1)
         //.wireTap(elem => println(s"Server received after MergeHub: $elem"))
         .via(sampleProcessingFlow)
@@ -68,7 +68,7 @@ object WebsocketChatEcho extends App with ClientCommon {
         (acc, next) => acc ++ next
       }
     }
-      .via(Flow.fromSinkAndSourceCoupled(chatSink, chatSource))
+      .via(Flow.fromSinkAndSourceCoupled(inSink, outSource))
       // Optional msg aggregation
       .groupedWithin(10, 2.second)
       .map { eachSeq =>
@@ -100,12 +100,11 @@ object WebsocketChatEcho extends App with ClientCommon {
 
   private def clientWebSocketClientFlow(clientName: String, address: String, port: Int) = {
 
-    // This flow is not re-usable
-    val webSocketFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echochat"))
+    val webSocketNonReusableFlow: Flow[Message, Message, Future[WebSocketUpgradeResponse]] = Http().webSocketClientFlow(WebSocketRequest(s"ws://$address:$port/echochat"))
 
     val (upgradeResponse, closed) =
       namedSource(clientName)
-        .viaMat(webSocketFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
+        .viaMat(webSocketNonReusableFlow)(Keep.right) // keep the materialized Future[WebSocketUpgradeResponse]
         .toMat(printSink)(Keep.both) // also keep the Future[Done]
         .run()
 

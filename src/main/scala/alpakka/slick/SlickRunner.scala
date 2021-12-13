@@ -91,6 +91,13 @@ class SlickRunner(urlWithMappedPort: String) {
     done
   }
 
+  // Discussion:
+  // https://stackoverflow.com/questions/69674054/how-do-you-transform-a-fixedsqlaction-into-a-streamingdbio-in-slick/69682195#69682195
+  def getTotal() = {
+    val query = TableQuery[Users].length.result
+    Await.result(session.db.run(query), 60.seconds)
+  }
+
   def createTableOnSession() = {
     Await.result(session.db.run(createTable), 2.seconds)
   }
