@@ -14,7 +14,7 @@ val kafkaVersion = "2.7.2"
 // Bumping to latest 5.16.x causes runtime issue:
 // Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
 val activemqVersion =  "5.16.0"
-val testContainersVersion = "1.16.0"
+val testContainersVersion = "1.16.2"
 val keycloakVersion = "15.1.0"
 
 libraryDependencies ++= Seq(
