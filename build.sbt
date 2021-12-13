@@ -87,7 +87,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
-  "org.jboss.logging" % "jboss-logging"    % "3.3.3.Final",
+  "org.jboss.logging" % "jboss-logging"    % "3.4.2.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
 
