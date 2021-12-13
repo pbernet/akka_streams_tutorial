@@ -15,6 +15,7 @@ val kafkaVersion = "2.7.2"
 // Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
 val activemqVersion =  "5.16.0"
 val testContainersVersion = "1.16.0"
+val keycloakVersion = "15.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
@@ -72,7 +73,7 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
   // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.6",
+  "ch.qos.logback" % "logback-classic" % "1.2.7",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -83,10 +84,10 @@ libraryDependencies ++= Seq(
   "com.github.dasniko" % "testcontainers-keycloak" % "1.8.1",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
-  "org.keycloak" % "keycloak-core"         % "15.0.2" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-adapter-core" % "15.0.2" exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-admin-client" % "15.0.2",
-  "org.jboss.logging" % "jboss-logging"    % "3.3.0.Final",
+  "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
+  "org.jboss.logging" % "jboss-logging"    % "3.3.3.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
 
