@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.alpakka.file.scaladsl.LogRotatorSink
 import akka.stream.scaladsl.{FileIO, Flow, Keep, Source}
 import akka.util.ByteString
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Path
@@ -17,11 +18,13 @@ import java.nio.file.StandardOpenOption._
   * https://github.com/akka/alpakka/pull/2559
   *
   * So all .txt files are written with the correct content
-  * 
+  *
   */
 object FileRotator extends App {
-  implicit val system = ActorSystem("FileRotator")
-  implicit val executionContext = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val logRotatorSink = {
     LogRotatorSink.withSinkFactory(
@@ -38,5 +41,5 @@ object FileRotator extends App {
       .map(i => ByteString.fromString(i.toString))
       .runWith(logRotatorSink)
 
-  done.onComplete { _ => system.terminate()}
+  done.onComplete { _ => system.terminate() }
 }

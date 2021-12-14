@@ -2,19 +2,20 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.6"
+scalaVersion := "2.13.7"
 
 val akkaVersion = "2.6.15"
-val akkaHTTPVersion = "10.2.2"
-val alpakkaVersion = "3.0.3"
+val akkaHTTPVersion = "10.2.6"
+val alpakkaVersion = "3.0.4"
 
-val alpakkaKafkaConnector = "2.1.0"
-val kafkaVersion = "2.7.0"
+val alpakkaKafkaConnector = "2.1.1"
+val kafkaVersion = "2.7.2"
 
 // Bumping to latest 5.16.x causes runtime issue:
 // Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
-val activemqVersion =  "5.16.3"
-val testContainersVersion = "1.16.0"
+val activemqVersion =  "5.16.0"
+val testContainersVersion = "1.16.2"
+val keycloakVersion = "15.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
@@ -43,6 +44,8 @@ libraryDependencies ++= Seq(
 
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
+  // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
+  "com.hierynomus" % "sshj" % "0.32.0",
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
@@ -58,7 +61,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "1.9.3",
+  "org.apache.opennlp" % "opennlp-tools" % "1.9.4",
 
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
@@ -70,18 +73,27 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
   // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.5",
+  "ch.qos.logback" % "logback-classic" % "1.2.7",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-  "org.postgresql" % "postgresql" % "42.2.23",
+
+  "com.github.dasniko" % "testcontainers-keycloak" % "1.8.1",
+
+  // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
+  "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
+  "org.jboss.logging" % "jboss-logging"    % "3.3.3.Final",
+
+  "org.postgresql" % "postgresql" % "42.3.1",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
-  "org.assertj" % "assertj-core" % "3.18.1" % Test,
+  "org.assertj" % "assertj-core" % "3.21.0" % Test,
   "junit" % "junit" % "4.13.1" % Test
 )
 

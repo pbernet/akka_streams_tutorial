@@ -7,11 +7,10 @@ import akka.stream.alpakka.jms._
 import akka.stream.alpakka.jms.scaladsl.JmsProducer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
-
-import javax.jms.ConnectionFactory
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.slf4j.{Logger, LoggerFactory}
 
+import javax.jms.ConnectionFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -23,9 +22,7 @@ import scala.concurrent.duration._
   */
 object JMSTextMessageProducerClient {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("JMSTextMessageProducerClient")
-  implicit val ec = system.dispatcher
-
+  implicit val system: ActorSystem = ActorSystem()
 
   val connectionRetrySettings = ConnectionRetrySettings(system)
     .withConnectTimeout(10.seconds)
@@ -62,8 +59,8 @@ object JMSTextMessageProducerClient {
       .wireTap(number => logger.info(s"SEND Msg with TRACE_ID: $number"))
       .map { number =>
         JmsTextMessage(s"Payload: ${number.toString}")
-          .withProperty("TRACE_ID", number)                //custom TRACE_ID
-          .withHeader(JmsCorrelationId.create(number.toString))  //The JMS way
+          .withProperty("TRACE_ID", number) //custom TRACE_ID
+          .withHeader(JmsCorrelationId.create(number.toString)) //The JMS way
       }
       //.wireTap(each => println(each.getHeaders))
       .runWith(jmsProducerSink)

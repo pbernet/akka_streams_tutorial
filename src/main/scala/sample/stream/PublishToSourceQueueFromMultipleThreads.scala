@@ -10,6 +10,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+
 /**
   * n parallel publishing clients -> sourceQueue -> slowSink
   *
@@ -26,8 +27,9 @@ import scala.util.{Failure, Success}
   */
 object PublishToSourceQueueFromMultipleThreads extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("PublishToSourceQueueFromMultipleThreads")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val bufferSize = 100
   // As of akka 2.6.x there is a thread safe implementation for SourceQueue

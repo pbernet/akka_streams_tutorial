@@ -13,7 +13,7 @@ import akka.actor.typed.javadsl.Receive;
 /**
  * Akka Typed example 1:1
  * Doc:
- * https://doc.akka.io/docs/akka/2.6/typed/actors.html
+ * https://doc.akka.io/docs/akka/current/typed/actors.html
  *
  */
 public class HelloWorldMain extends AbstractBehavior<HelloWorldMain.Start> {

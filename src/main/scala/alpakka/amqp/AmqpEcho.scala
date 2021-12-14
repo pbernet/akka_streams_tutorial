@@ -7,7 +7,7 @@ import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource, CommittableReadR
 import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
 import akka.stream.{KillSwitches, RestartSettings, ThrottleMode}
 import akka.util.ByteString
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.containers.RabbitMQContainer
 
 import scala.collection.parallel.CollectionConverters._
@@ -21,9 +21,10 @@ import scala.util.{Failure, Random, Success}
   *
   */
 object AmqpEcho extends App {
-  val logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("AmqpEcho")
-  implicit val executionContext = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (host, port) = ("127.0.0.1", 5672)
   val queueName = "queue"
@@ -157,13 +158,13 @@ object AmqpEcho extends App {
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartFlow = RestartFlow.onFailuresWithBackoff(restartSettings)(() => amqpFlow)
 
-    val done: Future[Done] =  Source(1 to 10)
-        .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
-        .map(each => s"$id-$each")
-        .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
-        .map(message => WriteMessage(ByteString(message)))
-        .via(restartFlow)
-        .runWith(Sink.ignore)
+    val done: Future[Done] = Source(1 to 10)
+      .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
+      .map(each => s"$id-$each")
+      .wireTap(each => logger.info(s"Client: $id sending: $each to exchange: $exchangeName"))
+      .map(message => WriteMessage(ByteString(message)))
+      .via(restartFlow)
+      .runWith(Sink.ignore)
 
     done.onComplete {
       case Success(_) => logger.info("Done sending to exchange")

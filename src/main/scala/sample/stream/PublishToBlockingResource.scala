@@ -1,12 +1,11 @@
 package sample.stream
 
-import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
+import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Failure
@@ -18,8 +17,9 @@ import scala.util.Failure
   * https://doc.akka.io/docs/akka/current/stream/operators/Source/unfoldResource.html
   */
 object PublishToBlockingResource extends App {
-  implicit val system = ActorSystem("PublishToBlockingResource")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val slowSink: Sink[Seq[Int], NotUsed] =
     Flow[Seq[Int]]
@@ -31,9 +31,9 @@ object PublishToBlockingResource extends App {
   //Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
   val source: Source[Int, NotUsed] =
     Source.unfoldResource[Int, BlockingQueue[Int]](
-      () => blockingResource,                   //open
-      (q: BlockingQueue[Int]) => Some(q.take()),//read
-      (_: BlockingQueue[Int]) => {})            //close
+      () => blockingResource, //open
+      (q: BlockingQueue[Int]) => Some(q.take()), //read
+      (_: BlockingQueue[Int]) => {}) //close
 
   val done = source
     .groupedWithin(10, 2.seconds)

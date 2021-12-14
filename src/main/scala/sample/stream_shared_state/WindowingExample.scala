@@ -31,8 +31,7 @@ import scala.util.Random
   *  - Nice paper on watermarks: http://vldb.org/pvldb/vol14/p3135-begoli.pdf
   */
 object WindowingExample {
-  implicit val system = ActorSystem("WindowingExample")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
   val maxSubstreams = 64
 

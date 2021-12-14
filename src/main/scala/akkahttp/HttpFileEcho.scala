@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.{HttpEntity, HttpRequest, MediaTypes, Multipart, RequestEntity, _}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
@@ -24,7 +24,7 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
 
   case class FileHandle(fileName: String, absolutePath: String, length: Long)
 
-  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
+  implicit def fileInfoFormat = jsonFormat3(FileHandle)
 }
 
 /**
@@ -49,8 +49,9 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   *  - TODO Retry on download
   */
 object HttpFileEcho extends App with JsonProtocol {
-  implicit val system = ActorSystem("HttpFileEcho")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)

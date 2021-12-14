@@ -22,7 +22,7 @@ import scala.language.reflectiveCalls
   */
 
 object Blacklist extends App {
-  implicit val system = ActorSystem("Blacklist")
+  implicit val system: ActorSystem = ActorSystem()
 
   val initBlacklist = Set.empty[String]
 

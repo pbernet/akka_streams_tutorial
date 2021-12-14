@@ -27,15 +27,16 @@ import scala.concurrent.duration._
   * https://doc.akka.io/docs/alpakka-kafka/current/consumer.html#draining-control
   */
 object WordCountConsumer extends App {
-  implicit val system = ActorSystem("WordCountConsumer")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val total = system.actorOf(Props[TotalFake](), "totalFake")
 
   val committerSettings = CommitterSettings(system).withMaxBatch(1)
 
   def createConsumerSettings(group: String): ConsumerSettings[String, java.lang.Long] = {
-    ConsumerSettings(system, new StringDeserializer , new LongDeserializer)
+    ConsumerSettings(system, new StringDeserializer, new LongDeserializer)
       .withBootstrapServers("localhost:9092")
       .withGroupId(group)
       // Because we use DrainingControl
@@ -77,7 +78,7 @@ object WordCountConsumer extends App {
   val drainingControlM = createAndRunConsumerMessageCount("M")
 
 
-  sys.addShutdownHook{
+  sys.addShutdownHook {
     println("Got control-c cmd from shell, about to shutdown...")
     drainingControlW1.drainAndShutdown()
     drainingControlW2.drainAndShutdown()
@@ -89,15 +90,14 @@ object WordCountConsumer extends App {
       apply[A, T, (T, A)](processingFlow, Keep.both)
 
     def apply[A, T, O](processingFlow: Flow[A, T, NotUsed], output: (T, A) => O): Graph[FlowShape[A, O], NotUsed] =
-      Flow.fromGraph(GraphDSL.create() { implicit builder =>
-      {
+      Flow.fromGraph(GraphDSL.create() { implicit builder => {
         import GraphDSL.Implicits._
 
         val broadcast = builder.add(Broadcast[A](2))
         val zip = builder.add(ZipWith[T, A, O]((left, right) => output(left, right)))
 
         broadcast.out(0) ~> processingFlow ~> zip.in0
-        broadcast.out(1)         ~>           zip.in1
+        broadcast.out(1) ~> zip.in1
         FlowShape(broadcast.in, zip.out)
       }
       })

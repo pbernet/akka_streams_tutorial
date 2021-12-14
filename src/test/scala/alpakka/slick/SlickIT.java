@@ -77,4 +77,11 @@ public class SlickIT {
         // Delay initiate shutdown and thus give the async Slick operation time to complete
         Thread.sleep(10000);
     }
+
+    @Test
+    public void populateAndCountUsers() {
+        int noOfUsers = 100;
+        SLICK_RUNNER.populate(noOfUsers);
+        assertThat(SLICK_RUNNER.getTotal()).isEqualTo(noOfUsers);
+    }
 }

@@ -22,8 +22,9 @@ import scala.util.hashing.MurmurHash3
   *  - https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#balancing-jobs-to-a-fixed-pool-of-workers
   */
 object DistributeAndMerge extends App {
-  implicit val system = ActorSystem("DistributeAndMerge")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   def sampleAsyncCall(x: Int): Future[Int] = Future {
     Thread.sleep((x * 100L) % 10)
@@ -31,40 +32,40 @@ object DistributeAndMerge extends App {
     x
   }
 
-    /**
-      * Example based on numBuckets = 3
-      *                                          --- bucket 1 flow --- ~mapAsync(parallelism)~ ---
-      *                   |------------------| /                                                  \|---------------|
-      * Open inlet[A] --- | Partition Fan Out|  --- bucket 2 flow --- ~mapAsync(parallelism)~ -----| Merge Fan In  | --- Open outlet[B]
-      *                   |------------------| \                                                  /|---------------|
-      *                                         --- bucket 3 flow --- ~mapAsync(parallelism)~ ---
-      *
-      * @param numBuckets  the number of sub-flows to create
-      * @param parallelism the mapAsync (ordered) parallelism per sub-flow
-      * @param hash        the hashing function used to decide
-      * @param fn          the mapping function to be used for mapAsync
-      * @tparam A is the input stream of elements of type A
-      * @tparam B is the output streams of elements of type B
-      * @return a Flow of elements from type A to type B
-      */
-    def hashingDistribution[A, B](numBuckets: Int,
-                                  parallelism: Int,
-                                  hash: A => Int,
-                                  fn: A => Future[B]): Flow[A, B, NotUsed] = {
-      Flow.fromGraph(GraphDSL.create() { implicit builder =>
-        import GraphDSL.Implicits._
-        val numPorts = numBuckets
-        val partitioner =
-          builder.add(Partition[A](outputPorts = numPorts, partitioner = a => math.abs(hash(a)) % numPorts))
-        val merger = builder.add(Merge[B](inputPorts = numPorts, eagerComplete = false))
+  /**
+    * Example based on numBuckets = 3
+    * --- bucket 1 flow --- ~mapAsync(parallelism)~ ---
+    * |------------------| /                                                  \|---------------|
+    * Open inlet[A] --- | Partition Fan Out|  --- bucket 2 flow --- ~mapAsync(parallelism)~ -----| Merge Fan In  | --- Open outlet[B]
+    * |------------------| \                                                  /|---------------|
+    * --- bucket 3 flow --- ~mapAsync(parallelism)~ ---
+    *
+    * @param numBuckets  the number of sub-flows to create
+    * @param parallelism the mapAsync (ordered) parallelism per sub-flow
+    * @param hash        the hashing function used to decide
+    * @param fn          the mapping function to be used for mapAsync
+    * @tparam A is the input stream of elements of type A
+    * @tparam B is the output streams of elements of type B
+    * @return a Flow of elements from type A to type B
+    */
+  def hashingDistribution[A, B](numBuckets: Int,
+                                parallelism: Int,
+                                hash: A => Int,
+                                fn: A => Future[B]): Flow[A, B, NotUsed] = {
+    Flow.fromGraph(GraphDSL.create() { implicit builder =>
+      import GraphDSL.Implicits._
+      val numPorts = numBuckets
+      val partitioner =
+        builder.add(Partition[A](outputPorts = numPorts, partitioner = a => math.abs(hash(a)) % numPorts))
+      val merger = builder.add(Merge[B](inputPorts = numPorts, eagerComplete = false))
 
-        Range(0, numPorts).foreach { eachPort =>
-          partitioner.out(eachPort) ~> Flow[A].mapAsync(parallelism)(fn) ~> merger.in(eachPort)
-        }
+      Range(0, numPorts).foreach { eachPort =>
+        partitioner.out(eachPort) ~> Flow[A].mapAsync(parallelism)(fn) ~> merger.in(eachPort)
+      }
 
-        FlowShape(partitioner.in, merger.out)
-      })
-    }
+      FlowShape(partitioner.in, merger.out)
+    })
+  }
 
   Source(1 to 10)
     .via(

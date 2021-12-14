@@ -38,8 +38,9 @@ import scala.util.{Failure, Success}
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("ProcessingApp")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
@@ -48,10 +49,10 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  def main(args: Array[String]) : Unit = {
+  def main(args: Array[String]): Unit = {
 
     val control: JmsConsumerControl = jmsConsumerSource
-      .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
+      .mapAsyncUnordered(10)(ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
       .map {
         ackEnvelope =>
           ackEnvelope.acknowledge()
@@ -79,14 +80,14 @@ object ProcessingApp {
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
       .withBufferSize(0)
-      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
+      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge) //Default
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
   val errorQueue = Source
     .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
-    .toMat(errorQueueSink) (Keep.left)
+    .toMat(errorQueueSink)(Keep.left)
     .run()
 
 
@@ -116,7 +117,7 @@ object ProcessingApp {
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {
 
-    val origMessage =  ackEnvelope.message.asInstanceOf[TextMessage]
+    val origMessage = ackEnvelope.message.asInstanceOf[TextMessage]
     val traceID = origMessage.getIntProperty("TRACE_ID")
 
     val errorMessage = JmsTextMessage(origMessage.getText)
@@ -126,23 +127,23 @@ object ProcessingApp {
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
 
     errorQueue.offer(errorMessage).map {
-        case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
-        case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
-        case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
-      }
+      case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
+      case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
+      case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
+      case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
+    }
   }
 
- private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
-   val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
+  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
+    val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
 
-   val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
+    val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
       JmsBrowseSettings(system, connectionFactory)
         .withQueue("test-queue")
     )
 
     while (true) {
-      queue.pull().foreach{ each => logger.info(s"Connection state: $each")}
+      queue.pull().foreach { each => logger.info(s"Connection state: $each") }
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 

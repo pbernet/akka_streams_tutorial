@@ -27,13 +27,12 @@ services:
       - "2222:22"
     command: echouser:password:::echo
 
+  # toke/mosquitto extends eclipse-mosquitto with
+  # additional Websockets, configured on port 9001
+  # https://hub.docker.com/r/toke/mosquitto
   mosquitto:
     depends_on:
       - mqtt-admin
-    # Classic:
-    # image: eclipse-mosquitto
-    # Has websockets configured on port 9001
-    # https://hub.docker.com/r/toke/mosquitto
     image: toke/mosquitto
     ports:
       - "1883:1883"
@@ -45,6 +44,7 @@ services:
     ports:
       - 8090:80
     environment:
+      # Connect to MQTT broker via Websockets
       - MQTT_HOST=localhost:9001
 
 networks:

@@ -17,7 +17,7 @@ import scala.concurrent.duration._
   *
   */
 object PartitionHubWithDynamicSinks {
-  implicit val system = ActorSystem()
+  implicit val system: ActorSystem = ActorSystem()
   implicit val ec = system.dispatcher
 
   def main(args: Array[String]): Unit = {

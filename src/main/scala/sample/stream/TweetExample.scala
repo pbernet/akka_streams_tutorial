@@ -1,7 +1,5 @@
 package sample.stream
 
-import java.time.{Instant, ZoneId}
-
 import akka.NotUsed
 import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.DelayOverflowStrategy
@@ -9,6 +7,7 @@ import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.time.{Instant, ZoneId}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -22,9 +21,10 @@ import scala.util.{Failure, Success}
   */
 
 object TweetExample extends App {
-  implicit val system = ActorSystem("TweetExample")
-  implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   final case class Author(handle: String)
 
@@ -52,7 +52,7 @@ object TweetExample extends App {
     .filter(_.hashtags.contains(akkaTag))
     .wireTap(each => logger.info(s"$each"))
 
-  val slowDownstream  =
+  val slowDownstream =
     Flow[Tweet]
       .delay(5.seconds, DelayOverflowStrategy.backpressure)
 

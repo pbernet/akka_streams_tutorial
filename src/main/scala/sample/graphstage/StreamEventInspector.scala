@@ -2,7 +2,7 @@ package sample.graphstage
 
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * Example of an atomic operator created with GraphStage, which may be used to wire tap a stream.
@@ -76,7 +76,7 @@ class StreamEventInspector[Elem](onUpstreamFinishInspection:   ()        => Unit
 }
 
 object StreamEventInspector {
-  val logger = LoggerFactory.getLogger(this.getClass)
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   def apply[T](context: String, printElem: T => String): StreamEventInspector[T] = {
     val ctx = "[" + context + "] "

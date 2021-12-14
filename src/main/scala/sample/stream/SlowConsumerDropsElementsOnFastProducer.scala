@@ -1,12 +1,11 @@
 package sample.stream
 
-import java.time.{Instant, ZoneId, ZonedDateTime}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
 import akka.stream.{DelayOverflowStrategy, ThrottleMode}
 
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import scala.concurrent.duration._
 import scala.util.Failure
 
@@ -25,8 +24,9 @@ case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
   *
   */
 object SlowConsumerDropsElementsOnFastProducer extends App {
-  implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val fastSource: Source[SourceEvent, NotUsed] =
     Source(1 to 500)

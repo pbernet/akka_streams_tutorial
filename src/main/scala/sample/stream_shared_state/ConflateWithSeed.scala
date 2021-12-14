@@ -18,8 +18,7 @@ import scala.util.Random
   */
 object ConflateWithSeed extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("ConflateWithSeed")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
   def seed(i: Int): mutable.LinkedHashMap[Int, Int] = mutable.LinkedHashMap[Int, Int](i -> 1)
 
@@ -32,7 +31,7 @@ object ConflateWithSeed extends App {
   // conflateWithSeed invokes the seed method every time,
   // so it is safe to materialize this flow multiple times
   val flow =
-    Flow[Int]
+  Flow[Int]
     .map(_ => Random.nextInt(10))
     .conflateWithSeed(seed)(aggregate)
 
