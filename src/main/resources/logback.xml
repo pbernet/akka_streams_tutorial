@@ -25,8 +25,9 @@
 
     <!-- Turn down Kafka noise -->
     <logger name="kafka" level="WARN"/>
-    <!-- Turn down sshj noise in sftp -->
+    <!-- Turn down sshj noise in SftpEcho -->
     <logger name="com.hierynomus.sshj" level="ERROR"/>
+    <logger name="net.schmizz.sshj" level="ERROR"/>
     <!-- Turn up Akka and control level in application.conf -->
     <logger name="akka" level="DEBUG"/>
 

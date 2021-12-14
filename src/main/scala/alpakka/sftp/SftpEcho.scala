@@ -82,6 +82,7 @@ object SftpEcho extends App {
   def uploadClient() = {
     logger.info("Starting upload...")
 
+    // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets
     Source(1 to 100)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .mapAsync(parallelism = 10) { id =>
@@ -257,7 +258,7 @@ object SftpEcho extends App {
     val payloadFactor = 1000
     val payload = "1234567890" * payloadFactor
 
-    logger.info(s"Upload file with TRACE_ID: $id and approx. size: ${payload.length} bytes")
+    logger.info(s"Upload file with TRACE_ID: $id and size: ${payload.length} bytes")
     ByteString(s"$payload for: $id")
   }
 }
