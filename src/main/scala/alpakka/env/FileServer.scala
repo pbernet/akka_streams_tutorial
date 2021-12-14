@@ -17,10 +17,13 @@ import scala.util.{Failure, Success}
   * HTTP FileServer for local file download simulation
   *
   * The client can request these types of response:
-  *  - Normal response: /download/[id]
-  *  - Flaky response:  /downloadflaky/[id]
-  *  - Non-idempotent response: /downloadni/[id]
-  *    Allow only one download per id, answer with 404 on subsequent requests
+  *  - HTTP 200 response:        /download/[id]
+  *  - Flaky response:           /downloadflaky/[id]
+  *  - Non-idempotent response:  /downloadni/[id]
+  *    Allows only one download per id, answer with HTTP 404 on subsequent requests
+  *
+  * Note that akka-http also supports server-side caching (by wrapping caffeine in caching directives):
+  * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/caching-directives/index.html
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
