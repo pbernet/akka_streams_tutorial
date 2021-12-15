@@ -16,8 +16,8 @@ import scala.concurrent.duration._
 
 /**
   * Works together with [[ProcessingApp]]
-  * Implements the new ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector,
-  * together with the failover meccano provided by ActiveMQ
+  * Shows how to use ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector,
+  * together with the failover meccano provided by ActiveMQ lib
   *
   */
 object JMSTextMessageProducerClient {
@@ -38,7 +38,6 @@ object JMSTextMessageProducerClient {
     .withMaxRetries(10)
 
   // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
-  // Seems to work together with the new ConnectionRetrySettings/SendRetrySettings
   val connectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   def main(args: Array[String]): Unit = {

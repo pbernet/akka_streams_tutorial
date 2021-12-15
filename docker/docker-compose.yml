@@ -3,10 +3,13 @@ version: "3"
 # Or directly from IntelliJ IDEA
 
 services:
+  # Works, but not maintained anymore:
   # https://github.com/vromero/activemq-artemis-docker
+  # Alternative:
+  # https://github.com/apache/activemq-artemis/tree/main/artemis-docker
   artemis:
     restart: always
-    image: vromero/activemq-artemis:2.9.0-alpine
+    image: vromero/activemq-artemis:2.16.0-alpine
     hostname: artemis
     networks:
       - runtime-net

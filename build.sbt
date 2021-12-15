@@ -29,11 +29,12 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
-  "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1.1",
   "org.apache.activemq" % "activemq-client" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.activemq" % "activemq-broker" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
+  "javax.jms" % "jms" % "1.1",
+
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
