@@ -96,7 +96,7 @@ object ProcessingApp {
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < randomTime) {
         // Activate to simulate failure
-        //if (randomTime >= 400) throw new RuntimeException("BOOM")
+        //if (randomTime >= 400) throw new RuntimeException("BOOM - simulated failure in delivery")
       }
       Future(ackEnvelope)
     } catch {

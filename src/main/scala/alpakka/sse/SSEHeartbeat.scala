@@ -31,14 +31,14 @@ object SSEHeartbeat extends App {
 
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
-  simpleClient(address, port) // is not recovering after RuntimeException on server
+  simpleClient(address, port)  // is not recovering after RuntimeException on server
   backoffClient(address, port) // is recovering after RuntimeException on server
 
   private def server(address: String, port: Int) = {
 
     val route = {
       import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-      import akka.http.scaladsl.server.Directives._ // That does the trick!
+      import akka.http.scaladsl.server.Directives._
 
       def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
@@ -53,7 +53,7 @@ object SSEHeartbeat extends App {
                   val time = LocalTime.now()
                   if (time.getSecond > 50) {
                     println(s"Server RuntimeException at: $time");
-                    throw new RuntimeException("Boom!")
+                    throw new RuntimeException("BOOM - server RuntimeException")
                   }
                   println(s"Send to client: $time")
                   time
