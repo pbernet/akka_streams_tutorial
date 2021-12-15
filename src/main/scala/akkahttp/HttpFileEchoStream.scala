@@ -58,7 +58,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            //throw new RuntimeException("Boom server error during upload")
+            //throw new RuntimeException("BOOM - server error during upload")
             println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
             complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
         }
@@ -66,7 +66,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
-              //throw new RuntimeException("Boom server error during download")
+              //throw new RuntimeException("BOOM - server error during download")
               println(s"Server: Received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }

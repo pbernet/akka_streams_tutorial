@@ -12,7 +12,7 @@ import _root_.kafka.admin.TopicCommand
   */
 object DeleteTopicUtil extends App {
   try {
-    println("About to delete Topics...")
+    println("About to delete topics...")
     val deleteargs1 = Array[String]("--zookeeper", "localhost:2181", "--delete", "--topic", "wordcount-input, wordcount-output")
     TopicCommand.main(deleteargs1)
 
@@ -20,6 +20,6 @@ object DeleteTopicUtil extends App {
     TopicCommand.main(deleteargs2)
 
   } catch {
-    case e @ (_ : RuntimeException ) => println("Boom" + e)
+    case e @ (_ : RuntimeException ) => println("Ex during topic delete: " + e)
   }
 }

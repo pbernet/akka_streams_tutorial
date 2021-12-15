@@ -24,6 +24,10 @@ import scala.util.{Failure, Success}
   *
   * Open issue:
   * https://github.com/akka/akka/issues/26696
+  *
+  * See also:
+  * [[BoundedSourceQueue]] (= a sync variant of SourceQueue with OverflowStrategy.dropNew)
+  *
   */
 object PublishToSourceQueueFromMultipleThreads extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -41,18 +45,19 @@ object PublishToSourceQueueFromMultipleThreads extends App {
       .delay(2.seconds, DelayOverflowStrategy.backpressure)
       .to(Sink.foreach(e => logger.info(s"Reached sink: $e")))
 
-  val sourceQueue: SourceQueueWithComplete[Int] = Source
-    .queue[Int](bufferSize, OverflowStrategy.backpressure, maxConcurrentOffers)
-    .groupedWithin(10, 1.seconds)
-    .to(slowSink)
-    .run()
+  val sourceQueue: SourceQueueWithComplete[Int] =
+    Source
+      .queue[Int](bufferSize, OverflowStrategy.backpressure, maxConcurrentOffers)
+      .groupedWithin(10, 1.seconds)
+      .to(slowSink)
+      .run()
 
-  val doneConsuming = sourceQueue.watchCompletion()
-  signalWhen(doneConsuming, "consuming") // never completes
+  val doneConsuming = sourceQueue.watchCompletion() // never completes
+  signalWhen(doneConsuming, "consuming")
 
-  simulatePublishingFromMulitpleThreads()
+  simulatePublishingFromMultipleThreads()
 
-  private def simulatePublishingFromMulitpleThreads() = {
+  private def simulatePublishingFromMultipleThreads() = {
     (1 to numberOfPublishingClients).par.foreach(offerToSourceQueue)
   }
 
@@ -67,7 +72,7 @@ object PublishToSourceQueueFromMultipleThreads extends App {
 
   private def signalWhen(done: Future[Done], operation: String) = {
     done.onComplete {
-      case Success(b) =>
+      case Success(_) =>
         logger.info(s"Finished: $operation")
       case Failure(e) =>
         logger.info(s"Failure: $e About to terminate...")

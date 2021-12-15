@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Each stream value is processed by each flow stage (in parallel)
+  * Each stream element is processed by each flow stage A/B/C (in parallel)
   * Show the effects of using a custom dispatcher on stage B to guard (potentially) blocking behaviour
   *
   * Inspired by:

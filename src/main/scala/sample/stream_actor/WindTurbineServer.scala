@@ -127,7 +127,7 @@ object WindTurbineServer {
     val time = LocalTime.now()
     if (time.getSecond > 50) {
       println(s"Server RuntimeException at: $time");
-      throw new RuntimeException("Boom!")
+      throw new RuntimeException("BOOM - server RuntimeException")
     }
   }
 }

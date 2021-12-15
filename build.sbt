@@ -11,14 +11,13 @@ val alpakkaVersion = "3.0.4"
 val alpakkaKafkaConnector = "2.1.1"
 val kafkaVersion = "2.7.2"
 
-// Bumping to latest 5.16.x causes runtime issue:
-// Scala module 2.11.4 requires Jackson Databind version >= 2.11.0 and < 2.12.0
-val activemqVersion =  "5.16.0"
-val testContainersVersion = "1.16.0"
+val activemqVersion =  "5.16.3"
+val testContainersVersion = "1.16.2"
+val keycloakVersion = "15.1.0"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3",
-  // Latest is 1.0.0 but several dependencies still point to 0.9.1
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
+  // Latest is 1.0.2 but several dependencies still point to 0.9.x
   "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
@@ -30,12 +29,13 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
-  "org.apache.geronimo.specs" % "geronimo-jms_1.1_spec" % "1.1.1",
-  "org.apache.activemq" % "activemq-client" % activemqVersion,
-  "org.apache.activemq" % "activemq-broker" % activemqVersion,
-  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
+  "org.apache.activemq" % "activemq-client" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.apache.activemq" % "activemq-broker" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
+  "javax.jms" % "jms" % "1.1",
+
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -72,13 +72,22 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
   // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.6",
+  "ch.qos.logback" % "logback-classic" % "1.2.7",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
+
+  "com.github.dasniko" % "testcontainers-keycloak" % "1.8.1",
+
+  // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
+  "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
+  "org.jboss.logging" % "jboss-logging"    % "3.3.3.Final",
+
   "org.postgresql" % "postgresql" % "42.3.1",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
