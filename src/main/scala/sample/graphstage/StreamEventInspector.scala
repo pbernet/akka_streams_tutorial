@@ -15,6 +15,9 @@ import org.slf4j.{Logger, LoggerFactory}
   * GraphStages are atomic and allow state to be maintained inside it in a safe way.
   * GraphStage is a counterpart of the GraphDSL.create() method which creates new stream processing operators by composing others.
   *
+  * See also:
+  * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/monitor.html
+  *
   * Hooks:
   * @param onUpstreamFinishInspection
   * @param onUpstreamFailureInspection
