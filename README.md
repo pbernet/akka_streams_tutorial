@@ -37,7 +37,7 @@ Use case with shared state:
 | Class                     | Description     |
 | -------------------       |-----------------|
 | [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Local HTTP `FileServer` for non-idempotent file download simulation|
-| [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams flow, which uses a local file cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") to share state|
+| [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams client flow, with cache implemented with [caffeine](https://github.com/ben-manes/caffeine "")|
 
 
 ## Windturbine example ##
