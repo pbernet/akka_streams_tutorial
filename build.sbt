@@ -69,8 +69,8 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
-  // TODO Bump to 5.x
-  "com.github.blemale" %% "scaffeine" % "4.0.2",
+
+  "com.github.blemale" %% "scaffeine" % "5.1.1",
   "ch.qos.logback" % "logback-classic" % "1.2.9",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
