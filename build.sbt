@@ -4,7 +4,7 @@ version := "1.0"
 
 scalaVersion := "2.13.7"
 
-val akkaVersion = "2.6.15"
+val akkaVersion = "2.6.18"
 val akkaHTTPVersion = "10.2.6"
 val alpakkaVersion = "3.0.4"
 
@@ -13,12 +13,11 @@ val kafkaVersion = "2.7.2"
 
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
-val keycloakVersion = "15.1.0"
+val keycloakVersion = "15.1.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
-  // Latest is 1.0.2 but several dependencies still point to 0.9.x
-  "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.1",
+  "org.scala-lang.modules" %% "scala-java8-compat" % "1.0.2",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -70,9 +69,9 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
-  // TODO Latest is 5.x but this causes bin compatibility issues with scala-java8-compat
+  // TODO Bump to 5.x
   "com.github.blemale" %% "scaffeine" % "4.0.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.7",
+  "ch.qos.logback" % "logback-classic" % "1.2.9",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -80,13 +79,13 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
 
-  "com.github.dasniko" % "testcontainers-keycloak" % "1.8.1",
+  "com.github.dasniko" % "testcontainers-keycloak" % "1.9.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
-  "org.jboss.logging" % "jboss-logging"    % "3.3.3.Final",
+  "org.jboss.logging" % "jboss-logging"    % "3.4.2.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
 
@@ -108,3 +107,7 @@ scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
 run / fork := true
+
+// https://eed3si9n.com/sbt-1.5.0
+// https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
+ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
