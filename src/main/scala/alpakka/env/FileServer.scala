@@ -14,13 +14,16 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * HTTP FileServer for local file download simulation
+  * HTTP FileServer to test: [[sample.stream_shared_state.LocalFileCacheCaffeine]]
   *
   * The client can request these types of response:
-  *  - Normal response: /download/[id]
-  *  - Flaky response:  /downloadflaky/[id]
-  *  - Non-idempotent response: /downloadni/[id]
-  *    Allow only one download per id, answer with 404 on subsequent requests
+  *  - HTTP 200 response:        /download/[id]
+  *  - Flaky response:           /downloadflaky/[id]
+  *  - Non-idempotent response:  /downloadni/[id]
+  *    Allows only one download file per id, answer with HTTP 404 on subsequent requests
+  *
+  * Note that akka-http also supports server-side caching (by wrapping caffeine in caching directives):
+  * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/caching-directives/index.html
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -56,7 +59,7 @@ object FileServer extends App {
         path("download" / Segment) { id =>
           logger.info(s"TRACE_ID: $id Server received download request")
           get {
-            //return always the same file independent from the ID
+            // for testing: use the same file, independent of the TRACE_ID
             getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
           }
         } ~ path("downloadflaky" / Segment) { id =>
@@ -65,7 +68,7 @@ object FileServer extends App {
             if (id.toInt % 10 == 0) { // 10, 20, 30
               complete(randomErrorHttpStatusCode)
             } else if (id.toInt % 5 == 0) { // 5, 15, 25
-              //Causes TimeoutException on client if sleep time > 5 sec
+              // Causes TimeoutException on client if sleep time > 5 sec
               randomSleeper()
               getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
             } else {
@@ -76,7 +79,7 @@ object FileServer extends App {
           logger.info(s"TRACE_ID: $id Server received non-idempotent request")
 
           if (cache.getIfPresent(id).isDefined) {
-            logger.warn(s"TRACE_ID: $id Only one download per TRACE_ID allowed. Reply with 404")
+            logger.warn(s"TRACE_ID: $id Only one download file per TRACE_ID allowed. Reply with 404")
             complete(StatusCodes.NotFound)
 
           } else {

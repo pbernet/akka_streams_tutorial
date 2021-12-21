@@ -28,14 +28,14 @@ object PublishToBlockingResource extends App {
 
   val blockingResource: BlockingQueue[Int] = new ArrayBlockingQueue[Int](100)
 
-  //Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
+  // Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
   val source: Source[Int, NotUsed] =
     Source.unfoldResource[Int, BlockingQueue[Int]](
-      () => blockingResource, //open
+      () => blockingResource,                    //open
       (q: BlockingQueue[Int]) => Some(q.take()), //read
-      (_: BlockingQueue[Int]) => {}) //close
+      (_: BlockingQueue[Int]) => {})             //close
 
-  val done = source
+  source
     .groupedWithin(10, 2.seconds)
     .watchTermination()((_, done) => done.onComplete {
       case Failure(err) =>
@@ -44,6 +44,6 @@ object PublishToBlockingResource extends App {
     })
     .runWith(slowSink)
 
-  //simulate n process that publish in blocking fashion to the queue
+  // simulate n clients that publish to blockingResource
   (1 to 1000).par.foreach(value => blockingResource.put(value))
 }

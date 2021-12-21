@@ -78,7 +78,7 @@ object SampleRoutes extends App {
 
   val routes: Route = getFromBrowsableDir ~ parseFormData ~ getFromDocRoot
 
-  val bindingFuture = Http().newServerAt("127.0.0.1", 8000).bind(routes)
+  val bindingFuture = Http().newServerAt("127.0.0.1", 6002).bind(routes)
 
   bindingFuture.onComplete {
     case Success(b) =>
@@ -90,7 +90,7 @@ object SampleRoutes extends App {
 
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://127.0.0.1:8000").!
+    if (os == "mac os x") Process(s"open http://127.0.0.1:6002").!
   }
 
   browserClient()
