@@ -50,5 +50,32 @@ services:
       # Connect to MQTT broker via Websockets
       - MQTT_HOST=localhost:9001
 
+  nginx:
+   build: ./nginx
+   ports:
+     - "8081:80"
+   depends_on:
+    - app1
+    - app2
+    - app3
+
+  app1:
+   # Build like this does currently not work in docker-compose:
+   # https://github.com/moby/buildkit/issues/1939
+   #build: https://github.com/nassiesse/simple-ocr-microservice.git
+   image: nassiesse/simple-java-ocr
+   ports:
+     - "5001:8080"
+  app2:
+    #build: https://github.com/nassiesse/simple-ocr-microservice.git
+    image: nassiesse/simple-java-ocr
+    ports:
+      - "5002:8080"
+  app3:
+    #build: https://github.com/nassiesse/simple-ocr-microservice.git
+    image: nassiesse/simple-java-ocr
+    ports:
+      - "5003:8080"
+
 networks:
   runtime-net:

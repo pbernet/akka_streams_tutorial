@@ -14,6 +14,7 @@ val kafkaVersion = "2.7.2"
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
 val keycloakVersion = "15.1.1"
+val testcontainersScalaVersion = "0.39.12"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -80,6 +81,9 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "postgresql" % testContainersVersion,
 
   "com.github.dasniko" % "testcontainers-keycloak" % "1.9.0",
+
+  "com.dimafeng" %% "testcontainers-scala-core" % testcontainersScalaVersion,
+  "com.dimafeng" %% "testcontainers-scala-nginx" % testcontainersScalaVersion,
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
