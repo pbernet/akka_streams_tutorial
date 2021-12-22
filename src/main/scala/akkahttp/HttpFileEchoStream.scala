@@ -167,7 +167,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
             val result = response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
             result.map {
               ioresult =>
-                println(s"Client: Download file: $response finished: ${ioresult.count} bytes!")
+                println(s"Client: Finished download file: $response (size: ${ioresult.count} bytes)")
             }
           } else {
             println(s"About to retry, because of: $response")
@@ -198,11 +198,10 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
       // multiple pooled connections and may thus "overtake" each other!
       .runForeach {
         case (Success(response: HttpResponse), fileToUpload) =>
-          println(s"Client: Upload for file: $fileToUpload was successful: ${response.status}")
+          println(s"Client: Uploaded file: $fileToUpload (status: ${response.status})")
 
-          val fileHandleFuture = Unmarshal(response).to[FileHandle]
+          val fileHandleFuture = Unmarshal(response.entity).to[FileHandle]
           val fileHandle = Await.result(fileHandleFuture, 1.second)
-          response.discardEntityBytes()
 
           // Finish the roundtrip
           download(fileHandle)
