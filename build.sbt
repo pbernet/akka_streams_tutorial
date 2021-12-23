@@ -5,7 +5,7 @@ version := "1.0"
 scalaVersion := "2.13.7"
 
 val akkaVersion = "2.6.18"
-val akkaHTTPVersion = "10.2.6"
+val akkaHTTPVersion = "10.2.7"
 val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnector = "2.1.1"
@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   // see:
   // https://github.com/thesamet/sbt-protoc/issues/144
   // https://github.com/thesamet/sbt-protoc
-  "com.google.protobuf" % "protobuf-java" % "3.11.4" % "protobuf-src" intransitive(),
+  "com.google.protobuf" % "protobuf-java" % "3.19.1" % "protobuf-src" intransitive(),
 
   //TODO Check out interesting other predef protos
   //"com.google.api.grpc" % "proto-google-common-protos" % "1.17.0" % "protobuf-src" intransitive(),
