@@ -21,12 +21,14 @@ import scala.util.{Failure, Success}
   * Upload file, eg from file system
   * Is used by [[DirectoryListener]]
   *
-  * Also starts a mock server to handle the files
+  * Also starts a mock server to handle the uploaded files
   */
 class Uploader(system: ActorSystem) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val systemImpl = system
   implicit val executionContext = system.dispatcher
+
+  var serverBinding: Future[Http.ServerBinding] = _
 
   val (protocol, address, port) = ("http", "localhost", 6000)
 
@@ -51,6 +53,7 @@ class Uploader(system: ActorSystem) {
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("Server started, listening on: " + b.localAddress)
+        serverBinding = bindingFuture
       case Failure(e) =>
         logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
@@ -118,6 +121,16 @@ class Uploader(system: ActorSystem) {
       HttpEntity(MediaTypes.`application/octet-stream`, file.length(), fileSource),
       Map("filename" -> file.getName)))
     Marshal(formData).to[RequestEntity]
+  }
+
+  def stop() = {
+    logger.info("About to shutdown Uploader...")
+    val fut = serverBinding.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+    logger.info("Waiting for connections to terminate...")
+    val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+    logger.info("Connections terminated")
+    onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+    }
   }
 
 }

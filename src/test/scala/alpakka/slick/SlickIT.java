@@ -9,11 +9,9 @@ import org.testcontainers.utility.DockerImageName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static scala.compat.java8.FutureConverters.globalExecutionContext;
 
-
 /**
- * Her we use JUnit as test runner because of "type trouble"
- * when using this testcontainer with Scala
- *
+ * We use JUnit as test runner because of "type trouble"
+ * when using PostgreSQLContainer with Scala
  */
 public class SlickIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(SlickIT.class);
@@ -78,5 +76,12 @@ public class SlickIT {
 
         // Delay initiate shutdown and thus give the async Slick operation time to complete
         Thread.sleep(10000);
+    }
+
+    @Test
+    public void populateAndCountUsers() {
+        int noOfUsers = 100;
+        SLICK_RUNNER.populate(noOfUsers);
+        assertThat(SLICK_RUNNER.getTotal()).isEqualTo(noOfUsers);
     }
 }

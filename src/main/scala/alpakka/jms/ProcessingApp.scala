@@ -20,26 +20,22 @@ import scala.util.{Failure, Success}
 
 /**
   * An Alpakka JMS client which consumes text messages from either:
-  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
-  *  - Or Artemis JMS Broker on docker image: /docker/docker-compose.yml
+  *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
+  *  - Experimental: Embedded ActiveMQ [[alpakka.env.jms.JMSServer]], started from IDE
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
-  * Up to Alpakka 1.0-M1 there was an issue discussed here:
-  * Alpakka JMS connector restart behaviour
-  * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
-  * This was fixed with 1.0-M2
-  *
-  * In the meantime this example has been "upcycled" regarding restart and retry scenarios:
-  *  - where non deliverable messages are written now to an error queue
+  * Features:
+  *  - non deliverable messages are acknowledged and written to an error queue (so that processing resumes)
+  *  - Failures in this client may be simulated by throwing random java.lang.RuntimeException: BOOM
+  *    see [[ProcessingApp.simulateFaultyDeliveryToExternalSystem]]
   *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
-  *
-  * Failures in this client are simulated by throwing random java.lang.RuntimeException: BOOM
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("ProcessingApp")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
@@ -48,10 +44,10 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  def main(args: Array[String]) : Unit = {
+  def main(args: Array[String]): Unit = {
 
     val control: JmsConsumerControl = jmsConsumerSource
-      .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
+      .mapAsyncUnordered(10)(ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
       .map {
         ackEnvelope =>
           ackEnvelope.acknowledge()
@@ -79,14 +75,14 @@ object ProcessingApp {
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
       .withBufferSize(0)
-      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
+      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge) //Default
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
   val errorQueue = Source
     .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
-    .toMat(errorQueueSink) (Keep.left)
+    .toMat(errorQueueSink)(Keep.left)
     .run()
 
 
@@ -99,7 +95,8 @@ object ProcessingApp {
       logger.info(s"RECEIVED Msg with TRACE_ID: $traceID and payload: $payload - Working for: $randomTime ms")
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < randomTime) {
-        if (randomTime >= 400) throw new RuntimeException("BOOM") //comment out for "happy path"
+        // Activate to simulate failure
+        //if (randomTime >= 400) throw new RuntimeException("BOOM - simulated failure in delivery")
       }
       Future(ackEnvelope)
     } catch {
@@ -116,7 +113,7 @@ object ProcessingApp {
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {
 
-    val origMessage =  ackEnvelope.message.asInstanceOf[TextMessage]
+    val origMessage = ackEnvelope.message.asInstanceOf[TextMessage]
     val traceID = origMessage.getIntProperty("TRACE_ID")
 
     val errorMessage = JmsTextMessage(origMessage.getText)
@@ -126,23 +123,23 @@ object ProcessingApp {
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
 
     errorQueue.offer(errorMessage).map {
-        case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
-        case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
-        case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
-      }
+      case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
+      case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
+      case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
+      case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
+    }
   }
 
- private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
-   val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
+  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
+    val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
 
-   val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
+    val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
       JmsBrowseSettings(system, connectionFactory)
         .withQueue("test-queue")
     )
 
     while (true) {
-      queue.pull().foreach{ each => logger.info(s"Connection state: $each")}
+      queue.pull().foreach { each => logger.info(s"Connection state: $each") }
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 

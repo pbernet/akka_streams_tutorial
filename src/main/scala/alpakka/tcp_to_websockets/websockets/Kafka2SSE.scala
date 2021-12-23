@@ -30,9 +30,10 @@ import scala.util.{Failure, Success}
   * @param mappedPortKafka
   */
 class Kafka2SSE(mappedPortKafka: Int = 9092) {
-  implicit val system = ActorSystem("Kafka2SSE")
-  implicit val ec = system.dispatcher
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6000)
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
@@ -82,6 +83,7 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
             }
           }
         }
+
       events
     }
 
@@ -121,5 +123,6 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
 
 object Kafka2SSE extends App {
   val instance = new Kafka2SSE()
+
   def apply(mappedPortKafka: Int) = new Kafka2SSE(mappedPortKafka)
 }

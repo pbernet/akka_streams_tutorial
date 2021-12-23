@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Each stream value is processed by each flow stage (in parallel)
+  * Each stream element is processed by each flow stage A/B/C (in parallel)
   * Show the effects of using a custom dispatcher on stage B to guard (potentially) blocking behaviour
   *
   * Inspired by:
@@ -21,8 +21,9 @@ import scala.util.{Failure, Success}
   */
 object AsyncExecution extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("AsyncExecution")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   def stage(name: String) =
     Flow[Int]
@@ -38,7 +39,7 @@ object AsyncExecution extends App {
     Sink.foreach { index: Int =>
       Thread.sleep(2000)
       logger.info(s"Slow sink processing element $index by ${Thread.currentThread().getName}")
-     }
+    }
       //Adding a custom dispatcher creates an async boundary
       //see discussion in: https://discuss.lightbend.com/t/how-can-i-make-sure-that-fileio-frompath-is-picking-up-my-dispatcher/6528/4
       .withAttributes(ActorAttributes.dispatcher("custom-dispatcher-for-blocking"))

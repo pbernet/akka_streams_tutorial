@@ -15,12 +15,14 @@ import scala.util.{Failure, Success}
   * Remark:
   *
   * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
+  *
   * @see [[https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks]]
   *
   */
 object FileIOEcho extends App {
-  implicit val system = ActorSystem("FileIOEcho")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val sourceFileName = "src/main/resources/testfile.jpg"
   val encFileName = "testfile.enc"

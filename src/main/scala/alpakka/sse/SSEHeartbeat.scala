@@ -25,8 +25,9 @@ import scala.util.{Failure, Success}
   * see EventSourceSpec in this repo for a working example
   */
 object SSEHeartbeat extends App {
-  implicit val system = ActorSystem("SSEHeartbeat")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
@@ -37,7 +38,7 @@ object SSEHeartbeat extends App {
 
     val route = {
       import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-      import akka.http.scaladsl.server.Directives._ // That does the trick!
+      import akka.http.scaladsl.server.Directives._
 
       def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
@@ -51,7 +52,8 @@ object SSEHeartbeat extends App {
                 .map(_ => {
                   val time = LocalTime.now()
                   if (time.getSecond > 50) {
-                    println(s"Server RuntimeException at: $time"); throw new RuntimeException("Boom!")
+                    println(s"Server RuntimeException at: $time");
+                    throw new RuntimeException("BOOM - server RuntimeException")
                   }
                   println(s"Send to client: $time")
                   time
@@ -61,6 +63,7 @@ object SSEHeartbeat extends App {
             }
           }
         }
+
       events
     }
 
@@ -108,7 +111,8 @@ object SSEHeartbeat extends App {
 
     //See PrintMoreNumbers for correctly stopping the stream
     done.map(_ => {
-      println("Reached shutdown..."); killSwitch.shutdown()
+      println("Reached shutdown...");
+      killSwitch.shutdown()
     })
   }
 }

@@ -5,7 +5,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.{HttpRequest, MediaTypes, RequestEntity, _}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
@@ -36,12 +36,13 @@ import scala.util.{Failure, Success}
   *
   */
 object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("HttpFileEchoStream")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   final case class FileHandle(fileName: String, absolutePath: String, length: Long = 0)
 
-  implicit def fileInfoFormat = jsonFormat3(FileHandle.apply)
+  implicit def fileInfoFormat = jsonFormat3(FileHandle)
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6000)
@@ -57,7 +58,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            //throw new RuntimeException("Boom server error during upload")
+            //throw new RuntimeException("BOOM - server error during upload")
             println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
             complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
         }
@@ -65,7 +66,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
-              //throw new RuntimeException("Boom server error during download")
+              //throw new RuntimeException("BOOM - server error during download")
               println(s"Server: Received download request for: ${fileHandle.fileName}")
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }

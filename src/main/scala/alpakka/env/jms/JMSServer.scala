@@ -4,12 +4,16 @@ import org.apache.activemq.broker.{BrokerPlugin, BrokerService}
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
-  * Embedded ActiveMQ JMSServer for local testing with:
-  *  - persistence
-  *  - aes encryption
+  * Embedded old school ActiveMQ JMSServer to experiment with:
+  *  - KahaDB persistence (in java.io.tmpdir)
+  *  - AES encryption for the payload
   *
   * Alternative: Embedded Artemis JMSServer
-  * https://activemq.apache.org/components/artemis/documentation/1.0.0/embedding-activemq.html
+  * https://activemq.apache.org/components/artemis/documentation
+  * Search for: Embedding Apache ActiveMQ Artemis
+  *
+  * Issues:
+  *  - NPE in org.apache.activemq.openwire.v12.BaseDataStreamMarshaller
   *
   */
 object JMSServer extends App {
@@ -27,7 +31,7 @@ object JMSServer extends App {
 
   val aesPlugin = new AESBrokerPlugin()
   broker.setPlugins(Array[BrokerPlugin](aesPlugin))
-  //For now the secret is passed via JVM system property
+  // For now the secret is passed via JVM system property
   System.setProperty("activemq.aeskey", "1234567890123456")
 
   broker.setAdvisorySupport(false)

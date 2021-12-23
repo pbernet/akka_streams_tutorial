@@ -1,26 +1,26 @@
 package sample.stream
 
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file.Paths
 import scala.concurrent._
 import scala.concurrent.duration._
 
 /**
-  *  Run a fast and two slow flows with the same data and wait for all of them to complete.
-  *  Use custom dispatcher for slow FileIO flows.
+  * Run a fast and two slow flows with the same elements and wait for all flows to complete.
+  * Use custom dispatcher for slow FileIO flows.
   *
-  *  See [[actor.BlockingRight]] for use of custom dispatcher in typed Actor
+  * See [[actor.BlockingRight]] for use of custom dispatcher in typed Actor
   */
 object WaitForThreeFlowsToComplete extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("WaitForThreeFlowsToComplete")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   def lineSink(filename: String): Sink[String, Future[IOResult]] =
     Flow[String]
@@ -30,7 +30,8 @@ object WaitForThreeFlowsToComplete extends App {
       .withAttributes(ActorAttributes.dispatcher("custom-dispatcher-for-blocking"))
 
   val origSource = Source(1 to 10)
-  //scan (= transform) the source
+
+  // scan (= transform) the source
   val factorialsSource = origSource.scan(BigInt(1))((acc, next) => acc * next)
 
   val fastFlow = origSource.runForeach(i => logger.info(s"Reached sink: $i"))
