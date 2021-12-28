@@ -70,7 +70,7 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "com.github.blemale" %% "scaffeine" % "5.1.1",
+  "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.2.9",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
