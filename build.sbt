@@ -13,7 +13,7 @@ val kafkaVersion = "2.7.2"
 
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
-val keycloakVersion = "15.1.1"
+val keycloakVersion = "16.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -70,8 +70,8 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.9",
+  "com.github.blemale" %% "scaffeine" % "5.1.1",
+  "ch.qos.logback" % "logback-classic" % "1.2.10",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
