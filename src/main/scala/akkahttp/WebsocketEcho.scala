@@ -34,7 +34,7 @@ trait ClientCommon {
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
 
-  //see https://doc.akka.io/docs/akka-http/current/client-side/websocket-support.html?language=scala#half-closed-websockets
+  // see https://doc.akka.io/docs/akka-http/current/client-side/websocket-support.html?language=scala#half-closed-websockets
   def namedSource(clientname: String) = {
     Source
       .tick(1.second, 1.second, "tick")
@@ -69,7 +69,6 @@ trait ClientCommon {
   *  - [[akkahttp.WebsocketEcho.singleWebSocketRequestSourceQueueClient]]
   *  - [[akkahttp.WebsocketEcho.actorClient]]
   *  -
-  *
   *
   * See "Windturbine Example" in pkg [[sample.stream_actor]] for more life cycle management and fault-tolerance behaviour
   */
@@ -140,7 +139,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
               })
 
           extractWebSocketUpgrade { upgrade =>
-            val inSink = Sink.onComplete(_ => println("Client signaled termination, shutdown heartbeat server flow..."))
+            val inSink = Sink.onComplete(_ => println("Client signaled termination, shutdown corresponding echo_heartbeat server flow..."))
             complete(upgrade.handleMessages(Flow.fromSinkAndSourceCoupled(inSink, outSource), subprotocol = None))
           }
         }
@@ -278,15 +277,10 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
 
   def serverHeartbeatStreamClient(id: Int, address: String, port: Int) = {
-    val sourceKickOff = Source
-      .single(TextMessage("kick off msg"))
-      // Keeps the connection open
-      .concatMat(Source.maybe[Message])(Keep.right)
-
     val webSocketNonReusableFlow: Flow[Message, Message, Promise[Option[Message]]] = {
       Flow.fromSinkAndSourceMat(
         printSink,
-        sourceKickOff)(Keep.right)
+        Source.maybe[Message])(Keep.right)
     }
 
     val (upgradeResponse, completionPromise: Promise[Option[Message]]) =
