@@ -36,7 +36,7 @@ object WebsocketEchoActors extends App with ClientCommon {
   val (address, port) = ("127.0.0.1", 6002)
   server(address, port)
   browserClient()
-  browserClient()
+  //browserClient()
 
   val maximumClients = 1
 
@@ -50,7 +50,7 @@ object WebsocketEchoActors extends App with ClientCommon {
       case OpenConnection(ar, _) if clients.size == maximumClients => ar ! Done
       case OpenConnection(ar, uuid) => context.become(withClients(clients.updated(uuid, ar)))
       case CloseConnection(uuid) =>
-        println(s"CloseConnection for: $uuid")
+        logger.info(s"CloseConnection for: $uuid")
         context.become(withClients(clients - uuid))
     }
   }
@@ -91,7 +91,7 @@ object WebsocketEchoActors extends App with ClientCommon {
       val outSource = Source.actorRef(
         completionMatcher = {
           case Done =>
-            println(s"Exceeded number of maximumClients: $maximumClients. Close this connection.")
+            logger.info(s"Exceeded number of maximumClients: $maximumClients. Close this connection.")
             CompletionStrategy.immediately
         },
         failureMatcher = PartialFunction.empty,
@@ -109,7 +109,7 @@ object WebsocketEchoActors extends App with ClientCommon {
     val route: Route = {
       path("echo") {
         extractRequest { request =>
-          println(s"Got echo request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo request from client: ${request.getHeader("User-Agent")}")
           handleWebSocketMessages(websocketEchoFlow)
         }
       }
@@ -118,9 +118,9 @@ object WebsocketEchoActors extends App with ClientCommon {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
   }

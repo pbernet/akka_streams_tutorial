@@ -54,7 +54,7 @@ object WebsocketChatEcho extends App with ClientCommon {
 
     val (inSink: Sink[String, NotUsed], outSource: Source[String, NotUsed]) = {
       MergeHub.source[String](1)
-        //.wireTap(elem => println(s"Server received after MergeHub: $elem"))
+        //.wireTap(elem => logger.info(s"Server received after MergeHub: $elem"))
         .via(sampleProcessingFlow)
         .toMat(BroadcastHub.sink[String])(Keep.both).run()
     }
@@ -62,7 +62,7 @@ object WebsocketChatEcho extends App with ClientCommon {
     val echoFlow: Flow[Message, Message, NotUsed] =
     Flow[Message].mapAsync(1) {
       case TextMessage.Strict(text) =>
-        println(s"Server received: $text")
+        logger.info(s"Server received: $text")
         Future.successful(text)
       case streamed: TextMessage.Streamed => streamed.textStream.runFold("") {
         (acc, next) => acc ++ next
@@ -72,7 +72,7 @@ object WebsocketChatEcho extends App with ClientCommon {
       // Optional msg aggregation
       .groupedWithin(10, 2.second)
       .map { eachSeq =>
-        println(s"Server aggregated: ${eachSeq.size} chat messages within 2 seconds")
+        logger.info(s"Server aggregated: ${eachSeq.size} chat messages within 2 seconds")
         eachSeq.mkString("; ")
       }
       .map[Message](string => TextMessage.Strict("Hello " + string + "!"))
@@ -95,7 +95,7 @@ object WebsocketChatEcho extends App with ClientCommon {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture
       .map(_.localAddress)
-      .map(addr => println(s"Server bound to: $addr"))
+      .map(addr => logger.info(s"Server bound to: $addr"))
   }
 
   private def clientWebSocketClientFlow(clientName: String, address: String, port: Int) = {
@@ -118,7 +118,7 @@ object WebsocketChatEcho extends App with ClientCommon {
       }
     }
 
-    connected.onComplete(_ => println("client connected"))
-    closed.foreach(_ => println("client closed"))
+    connected.onComplete(_ => logger.info("client connected"))
+    closed.foreach(_ => logger.info("client closed"))
   }
 }

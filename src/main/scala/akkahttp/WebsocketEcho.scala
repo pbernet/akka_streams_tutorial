@@ -12,6 +12,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
 import akka.stream.{CompletionStrategy, OverflowStrategy, QueueOfferResult}
 import akka.util.Timeout
+import org.slf4j.{Logger, LoggerFactory}
 import sttp.client3.akkahttp.AkkaHttpBackend
 import sttp.client3.{UriContext, asWebSocket, basicRequest}
 import sttp.ws.WebSocket
@@ -25,14 +26,15 @@ import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 trait ClientCommon {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext = system.dispatcher
 
   val printSink: Sink[Message, Future[Done]] =
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text) => println(s"Client received TextMessage.Strict: $text")
-      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => println(s"Client received TextMessage.Streamed: ${value.get}"))
+      case TextMessage.Strict(text) => logger.info(s"Client received TextMessage.Strict: $text")
+      case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete(value => logger.info(s"Client received TextMessage.Streamed: ${value.get}"))
       case BinaryMessage.Strict(binary) => //do nothing
       case BinaryMessage.Streamed(binaryStream) => binaryStream.runWith(Sink.ignore)
     }
@@ -96,7 +98,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     def echoFlow: Flow[Message, Message, Any] =
       Flow[Message].mapConcat {
         case tm: TextMessage =>
-          println(s"Server received: $tm")
+          logger.info(s"Server received: $tm")
           // This is important (regarding termination):
           // Stream back the TextMessage as the tail of the response
           // this means we might start sending the response even before the
@@ -108,14 +110,14 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
           Nil
       }
         .watchTermination()((_, done) => done.onComplete {
-          case Failure(err) => println(s"Echo server flow failed: $err")
-          case _ => println(s"Echo server flow terminated")
+          case Failure(err) => logger.info(s"Echo server flow failed: $err")
+          case _ => logger.info(s"Echo server flow terminated")
         })
 
     def getEcho: Route = {
       path("echo") {
         extractRequest { request =>
-          println(s"Got echo request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo request from client: ${request.getHeader("User-Agent")}")
           handleWebSocketMessages(echoFlow)
         }
       }
@@ -124,7 +126,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     def getEchoHeartbeat: Route = {
       path("echo_heartbeat") {
         extractRequest { request =>
-          println(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
 
           // The inSink and the outSource are independent. By using fromSinkAndSourceCoupled
           // we kill the outSource once we get a terminate signal from the inSink
@@ -134,15 +136,15 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
             Source
               .repeat(s"Heartbeat response: ${LocalDateTime.now()}")
               .throttle(1, 1.seconds)
-              .wireTap(msg => println(s"Sending to client: $msg"))
+              .wireTap(msg => logger.info(s"Sending to client: $msg"))
               .map(TextMessage.Strict)
               .watchTermination()((_, done) => done.onComplete {
-                case Failure(err) => println(s"Heartbeat server flow failed: $err")
-                case _ => println(s"Heartbeat server flow terminated")
+                case Failure(err) => logger.info(s"Heartbeat server flow failed: $err")
+                case _ => logger.info(s"Heartbeat server flow terminated")
               })
 
           extractWebSocketUpgrade { upgrade =>
-            val inSink = Sink.onComplete(_ => println("Client signaled termination, shutdown corresponding echo_heartbeat server flow..."))
+            val inSink = Sink.onComplete(_ => logger.info("Client signaled termination, shutdown corresponding echo_heartbeat server flow..."))
             complete(upgrade.handleMessages(Flow.fromSinkAndSourceCoupled(inSink, outSource), subprotocol = None))
           }
         }
@@ -156,18 +158,18 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
 
     sys.addShutdownHook {
-      println("About to shutdown...")
+      logger.info("About to shutdown...")
       val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-      println("Waiting for connections to terminate...")
+      logger.info("Waiting for connections to terminate...")
       val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-      println("Connections terminated")
+      logger.info("Connections terminated")
       onceAllConnectionsTerminated.flatMap { _ => system.terminate()
       }
     }
@@ -185,8 +187,8 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"Client: $id singleWebSocketRequestClient connected: $done"))
-    completionPromise.future.onComplete(closed => println(s"Client: $id singleWebSocketRequestClient closed: $closed"))
+    connected.onComplete(done => logger.info(s"Client: $id singleWebSocketRequestClient connected: $done"))
+    completionPromise.future.onComplete(closed => logger.info(s"Client: $id singleWebSocketRequestClient closed: $closed"))
   }
 
   def webSocketClientFlowClient(id: Int, address: String, port: Int) = {
@@ -201,8 +203,8 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"Client: $id webSocketClientFlowClient connected: $done"))
-    closed.onComplete(closed => println(s"Client: $id webSocketClientFlowClient closed: $closed"))
+    connected.onComplete(done => logger.info(s"Client: $id webSocketClientFlowClient connected: $done"))
+    closed.onComplete(closed => logger.info(s"Client: $id webSocketClientFlowClient closed: $closed"))
   }
 
   def singleWebSocketRequestSourceQueueClient(id: Int, address: String, port: Int) = {
@@ -223,17 +225,17 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"Client: $id singleWebSocketRequestSourceQueueClient connected: $done"))
-    sourceQueueWithComplete.watchCompletion().onComplete(closed => println(s"Client: $id singleWebSocketRequestSourceQueueClient closed: $closed"))
+    connected.onComplete(done => logger.info(s"Client: $id singleWebSocketRequestSourceQueueClient connected: $done"))
+    sourceQueueWithComplete.watchCompletion().onComplete(closed => logger.info(s"Client: $id singleWebSocketRequestSourceQueueClient closed: $closed"))
 
     def send(messageText: String) = {
       val message = TextMessage.Strict(messageText)
       sourceQueue.flatMap { queue =>
         queue.offer(message: Message).map {
-          case QueueOfferResult.Enqueued => println(s"enqueued $message")
-          case QueueOfferResult.Dropped => println(s"dropped $message")
-          case QueueOfferResult.Failure(ex) => println(s"Offer failed: $ex")
-          case QueueOfferResult.QueueClosed => println("Source Queue closed")
+          case QueueOfferResult.Enqueued => logger.info(s"enqueued $message")
+          case QueueOfferResult.Dropped => logger.info(s"dropped $message")
+          case QueueOfferResult.Failure(ex) => logger.info(s"Offer failed: $ex")
+          case QueueOfferResult.QueueClosed => logger.info("Source Queue closed")
         }
       }
     }
@@ -242,7 +244,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     send(s"$id-2 SourceQueueClient")
 
     Thread.sleep(1000)
-    println(s"About to explicitly close client: $id...")
+    logger.info(s"About to explicitly close client: $id...")
     sourceQueueWithComplete.complete()
   }
 
@@ -252,7 +254,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
       ackMessage = "ack",
       completionMatcher = {
         case Done =>
-          println("ActorClient: close connection")
+          logger.info("ActorClient: close connection")
           CompletionStrategy.immediately
       },
       failureMatcher = PartialFunction.empty)
@@ -264,7 +266,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"ActorClient: $id connected: $done"))
+    connected.onComplete(done => logger.info(s"ActorClient: $id connected: $done"))
 
     val (sendToSocketRef: ActorRef, _) =
       sourceBackpressure
@@ -284,7 +286,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     def useWebSocket(ws: WebSocket[Future]): Future[Unit] = {
       def send(payload: String) = ws.sendText(payload)
-      def receive() = ws.receiveText().map(t => println(s"sttpClient $id received: $t"))
+      def receive() = ws.receiveText().map(t => logger.info(s"sttpClient $id received: $t"))
       for {
         _ <- send(s"$id-1 sttpClient")
         _ <- send(s"$id-2 sttpClient")
@@ -313,11 +315,11 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
 
     val connected = handleUpgrade(upgradeResponse)
 
-    connected.onComplete(done => println(s"Client: $id serverHeartbeatStreamClient connected: $done"))
-    completionPromise.future.onComplete(closed => println(s"Client: $id serverHeartbeatStreamClient closed: $closed"))
+    connected.onComplete(done => logger.info(s"Client: $id serverHeartbeatStreamClient connected: $done"))
+    completionPromise.future.onComplete(closed => logger.info(s"Client: $id serverHeartbeatStreamClient closed: $closed"))
 
     Thread.sleep(10000)
-    println(s"About to explicitly close client: $id...")
+    logger.info(s"About to explicitly close client: $id...")
     completionPromise.success(None)
   }
 
