@@ -12,6 +12,9 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
 import akka.stream.{CompletionStrategy, OverflowStrategy, QueueOfferResult}
 import akka.util.Timeout
+import sttp.client3.akkahttp.AkkaHttpBackend
+import sttp.client3.{UriContext, asWebSocket, basicRequest}
+import sttp.ws.WebSocket
 
 import java.time.LocalDateTime
 import scala.collection.parallel.CollectionConverters._
@@ -60,7 +63,7 @@ trait ClientCommon {
   * `http.server.websocket.periodic-keep-alive-max-idle`
   * see file `application.conf` for details
   *
-  * Currently akka streams has no user API for websocket close
+  * Currently akka http has no user API for websocket close
   * see: https://github.com/akka/akka-http/issues/2458
   *
   * Already possible explicit client closing scenarios:
@@ -68,7 +71,6 @@ trait ClientCommon {
   *    Inspired by: https://discuss.lightbend.com/t/websocket-connection-does-not-terminate-even-when-client-tries-to-close-it/8285
   *  - [[akkahttp.WebsocketEcho.singleWebSocketRequestSourceQueueClient]]
   *  - [[akkahttp.WebsocketEcho.actorClient]]
-  *  -
   *
   * See "Windturbine Example" in pkg [[sample.stream_actor]] for more life cycle management and fault-tolerance behaviour
   */
@@ -84,6 +86,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
   (1 to maxClients).par.foreach(each => webSocketClientFlowClient(each, address, port))
   (1 to maxClients).par.foreach(each => singleWebSocketRequestSourceQueueClient(each, address, port))
   (1 to maxClients).par.foreach(each => actorClient(each, address, port))
+  (1 to maxClients).par.foreach(each => sttpClient(each, address, port))
 
   (1 to maxClients).par.foreach(each => serverHeartbeatStreamClient(each, address, port))
 
@@ -275,6 +278,28 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
     sendToSocketRef ! Done
   }
 
+  // The STTP client wins the "conciseness award"
+  // https://github.com/softwaremill/sttp
+  def sttpClient(id: Int, address: String, port: Int) = {
+
+    def useWebSocket(ws: WebSocket[Future]): Future[Unit] = {
+      def send(payload: String) = ws.sendText(payload)
+      def receive() = ws.receiveText().map(t => println(s"sttpClient $id received: $t"))
+      for {
+        _ <- send(s"$id-1 sttpClient")
+        _ <- send(s"$id-2 sttpClient")
+        _ <- receive()
+      } yield ()
+    }
+
+    val backend = AkkaHttpBackend()
+
+    basicRequest
+      .response(asWebSocket(useWebSocket))
+      .get(uri"ws://$address:$port/echo")
+      .send(backend)
+      //.onComplete(_ => backend.close())
+  }
 
   def serverHeartbeatStreamClient(id: Int, address: String, port: Int) = {
     val webSocketNonReusableFlow: Flow[Message, Message, Promise[Option[Message]]] = {

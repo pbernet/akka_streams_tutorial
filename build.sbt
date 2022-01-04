@@ -5,7 +5,7 @@ version := "1.0"
 scalaVersion := "2.13.7"
 
 val akkaVersion = "2.6.18"
-val akkaHTTPVersion = "10.2.6"
+val akkaHTTPVersion = "10.2.7"
 val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnector = "2.1.1"
@@ -14,6 +14,7 @@ val kafkaVersion = "2.7.2"
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
 val keycloakVersion = "16.1.0"
+val sttpVersion = "3.3.18"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -27,6 +28,10 @@ libraryDependencies ++= Seq(
   
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
+
+  // sttp wraps around akka-http to allow for consice clients
+  "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
+  "com.softwaremill.sttp.client3" %% "akka-http-backend" % sttpVersion,
 
   "org.apache.activemq" % "activemq-client" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.activemq" % "activemq-broker" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
