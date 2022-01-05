@@ -30,41 +30,40 @@ import scala.util.Random
   *    allows reusing closed substreams and thus avoids potential memory issues
   *  - Nice paper on watermarks: http://vldb.org/pvldb/vol14/p3135-begoli.pdf
   */
-object WindowingExample {
+object WindowingExample extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   val maxSubstreams = 64
+  val random = new Random()
 
   val delayFactor = 8
   val acceptedMaxDelay = 5.seconds.toMillis
 
-  def main(args: Array[String]): Unit = {
-    val random = new Random()
+  Source
+    .tick(0.seconds, 1.second, "")
+    .map(_ => createEvent())
+    .statefulMapConcat { () =>
+      val generator = new CommandGenerator()
+      ev => generator.forEvent(ev)
+    }
+    .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
+    .takeWhile(!_.isInstanceOf[CloseWindow])
+    .fold(AggregateEventData(Window(0L, 0L), 0)) {
+      case (agg, OpenWindow(window)) => agg.copy(w = window)
+      // always filtered out by takeWhile
+      case (agg, CloseWindow(_)) => agg
+      case (agg, AddToWindow(_, _)) => agg.copy(eventCount = agg.eventCount + 1)
+    }
+    .async
+    .mergeSubstreams
+    .runForeach(println(_))
 
-    Source
-      .tick(0.seconds, 1.second, "")
-      .map { _ =>
-        val now = System.currentTimeMillis()
-        val delay = random.nextInt(delayFactor)
-        val myEvent = MyEvent(now - delay * 1000L)
-        println(s"$myEvent")
-        myEvent
-      }
-      .statefulMapConcat { () =>
-        val generator = new CommandGenerator()
-        ev => generator.forEvent(ev)
-      }
-      .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
-      .takeWhile(!_.isInstanceOf[CloseWindow])
-      .fold(AggregateEventData(Window(0L, 0L), 0)) {
-        case (agg, OpenWindow(window)) => agg.copy(w = window)
-        // always filtered out by takeWhile
-        case (agg, CloseWindow(_)) => agg
-        case (agg, AddToWindow(_, _)) => agg.copy(eventCount = agg.eventCount + 1)
-      }
-      .async
-      .mergeSubstreams
-      .runForeach(println(_))
+  private def createEvent() = {
+    val now = System.currentTimeMillis()
+    val delay = random.nextInt(delayFactor)
+    val myEvent = MyEvent(now - delay * 1000L)
+    println(s"$myEvent")
+    myEvent
   }
 
   case class MyEvent(timestamp: Long) {
@@ -138,7 +137,7 @@ object WindowingExample {
 
   case class AggregateEventData(w: Window, eventCount: Int) {
     override def toString =
-      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were $eventCount events."
+      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were $eventCount events"
   }
 
   def tsToString(ts: Long) = OffsetDateTime
