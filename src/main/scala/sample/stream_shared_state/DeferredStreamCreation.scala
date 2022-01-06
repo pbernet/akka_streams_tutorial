@@ -29,16 +29,14 @@ object DeferredStreamCreation extends App {
   def processingFlow(id: Int): Future[Flow[Int, String, NotUsed]] = {
     println("About to process tail elements...")
     Thread.sleep(2000)
-    Future {
-      Flow[Int].map(n => s"head element: $id, tail element: $n")
-    }
+    Future(Flow[Int].map(n => s"head element: $id, tail element: $n"))
   }
 
   val doneDelayed =
     source.prefixAndTail(1).flatMapConcat {
-      case (Seq(id), tail) =>
-        // process tail elements once the first element is here
-        tail.via(Flow.futureFlow(processingFlow(id)))
+      case (Seq(id), tailSource) =>
+        // process all tail elements once the first element is here
+        tailSource.via(Flow.futureFlow(processingFlow(id)))
     }.runWith(printSink)
 
   terminateWhen(doneDelayed)
