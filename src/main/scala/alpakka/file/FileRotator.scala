@@ -29,7 +29,7 @@ object FileRotator extends App {
   val logRotatorSink = {
     LogRotatorSink.withSinkFactory(
       triggerGeneratorCreator =
-        () => n => Some(new File(new String(s"file${n.decodeString("UTF-8")}" + ".txt")).toPath),
+        () => n => Some(new File(s"file${n.decodeString("UTF-8")}.txt").toPath),
       sinkFactory =
         (path: Path) =>
           Flow[ByteString].toMat(FileIO.toPath(path, Set(CREATE, WRITE, TRUNCATE_EXISTING, SYNC)))(Keep.right)
@@ -41,5 +41,5 @@ object FileRotator extends App {
       .map(i => ByteString.fromString(i.toString))
       .runWith(logRotatorSink)
 
-  done.onComplete { _ => system.terminate() }
+  done.onComplete(_ => system.terminate())
 }
