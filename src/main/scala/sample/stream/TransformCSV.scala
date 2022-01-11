@@ -12,12 +12,12 @@ import scala.sys.process._
   * Inspired by:
   * https://discuss.lightbend.com/t/transform-a-csv-file-into-multiple-csv-files-using-akka-stream/3142
   *
-  * Solution proposal in 4 steps according to "use the best tool available" strategy.
+  * Solution proposal in three steps according to "use the best tool available" strategy.
   * Thus we use linux tools instead of akka-streams,
   * because we only have "chainsaw style operations" and no business logic.
   *
   * Remarks:
-  *  - We could have done all 4 steps in one shell script, but we wanted to show Scala [[Process]] features
+  *  - Instead of putting all steps in a shell script, we want to use Scala [[Process]] for each step
   *  - See also: [[FlightDelayStreaming]] where the csv data file originates
   *
   * Doc Scala ProcessBuilder:
@@ -46,20 +46,20 @@ object TransformCSV extends App {
     val resultSplit = Seq("bash", "-c", bashLine).!
     logger.info(s"Exit code split: $resultSplit")
 
-    // 3) Get line count report
+    // 3) Get line count report and add results to filename
     val countLine = s"""wc -l `find results -type f`"""
     val resultCountLine = Seq("bash", "-c", countLine).!!
     logger.info(s"Line count report: $resultCountLine")
-    val reportCleaned = resultCountLine.split("\\s+").tail.reverse.tail.tail
 
-    // 4) Add line count to result filename
+    val reportCleaned = resultCountLine.split("\\s+").tail.reverse.tail.tail
     reportCleaned.sliding(2, 2).foreach { each =>
       val (path, count) = (each.head, each.last)
       logger.info(s"About to rename file: $path , with count: $count")
       FileUtils.moveFile(FileUtils.getFile(path), FileUtils.getFile(path.replace("xx", count)))
     }
-
-    println("Success. About to terminate...")
-    system.terminate()
+    println("Success")
+  } else {
+    logger.warn("OS not supported")
   }
+  system.terminate()
 }
