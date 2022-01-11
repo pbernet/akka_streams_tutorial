@@ -5,6 +5,7 @@ import org.apache.commons.io.FileUtils
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
+import java.util.concurrent.TimeUnit
 import scala.language.postfixOps
 import scala.sys.process._
 
@@ -36,20 +37,20 @@ object TransformCSV extends App {
     logger.info(s"Running with base path: $pwd")
 
     // 1) Remove csv header and use linux sort on the 9th column (= UniqueCarrier)
-    val resultSort = (Process(s"tail -n+2 $sourceFile") #| Process(s"sort -t\",\" -k9,9") #>> tmpSortedFile).!
+    val resultSort = exec("sort") { (Process(s"tail -n+2 $sourceFile") #| Process(s"sort -t\",\" -k9,9") #>> tmpSortedFile).!}
     logger.info(s"Exit code sort: $resultSort")
 
-    // 2) Split into files according to value of 9th column
+    // 2) Split into files according to value of 9th column (incl. file closing)
     "rm -rf results".!
     "mkdir -p results".!
-    val bashLine = """awk -F ',' '{print > ("results/"$9"-xx.csv")}' """ + s"$tmpSortedFile"
-    val resultSplit = Seq("bash", "-c", bashLine).!
+    val bashLine = """awk -F ',' '{out=("results/"$9"-xx.csv")} out!=prev {close(prev)} {print > out; prev=out}' """ + s"$tmpSortedFile"
+    val resultSplit = exec("split") { Seq("bash", "-c", bashLine).!}
     logger.info(s"Exit code split: $resultSplit")
 
     // 3) Get line count report and add results to filename
     val countLine = s"""wc -l `find results -type f`"""
-    val resultCountLine = Seq("bash", "-c", countLine).!!
-    logger.info(s"Line count report: $resultCountLine")
+    val resultCountLine = exec("count") {Seq("bash", "-c", countLine).!!}
+    logger.info(s"Line count report:\n $resultCountLine")
 
     val reportCleaned = resultCountLine.split("\\s+").tail.reverse.tail.tail
     reportCleaned.sliding(2, 2).foreach { each =>
@@ -57,9 +58,18 @@ object TransformCSV extends App {
       logger.info(s"About to rename file: $path , with count: $count")
       FileUtils.moveFile(FileUtils.getFile(path), FileUtils.getFile(path.replace("xx", count)))
     }
-    println("Success")
+    logger.info("Success")
   } else {
     logger.warn("OS not supported")
   }
   system.terminate()
+
+  def exec[R](op: String = "")(block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    val elapsedTimeMs = TimeUnit.MILLISECONDS.convert(t1 - t0, TimeUnit.NANOSECONDS)
+    logger.info(s"Elapsed time to '$op': $elapsedTimeMs ms")
+    result
+  }
 }
