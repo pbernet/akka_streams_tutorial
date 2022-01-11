@@ -4,9 +4,12 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import akka.{Done, NotUsed}
+import sample.graphstage.ThroughputMonitor
+import sample.graphstage.ThroughputMonitor.Stats
 
 import java.nio.file.Paths
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -14,15 +17,15 @@ import scala.util.{Failure, Success, Try}
   * https://blog.redelastic.com/diving-into-akka-streams-2770b3aeabb0
   *
   * Features:
-  *  - reads large csv file in streaming fashion (here with subset)
+  *  - evaluates a csv file with flight delay records in streaming fashion
   *  - uses akka stream operators (no graph)
   *  - shows "stateful processing" with reduce-by-key
   *
   * Doc reduce-by-key:
   * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#implementing-reduce-by-key
   *
-  * For testing, we use a shortened csv data file
-  * Download (large) flight delay data file from 2008:
+  * For testing, we use the shortened csv data file: 2008_subset.csv
+  * Download csv file with data from 2008 (689MB):
   * http://stat-computing.org/dataexpo/2009/the-data.html
   * and store locally, eg to src/main/resources/2008.csv
   */
@@ -43,6 +46,7 @@ object FlightDelayStreaming extends App {
   def stringArrayToFlightEvent(cols: Array[String]) = FlightEvent(cols(0), cols(1), cols(2), cols(3), cols(4), cols(5), cols(6), cols(7), cols(8), cols(9), cols(10), cols(11), cols(12), cols(13), cols(14), cols(15), cols(16), cols(17), cols(18), cols(19), cols(20), cols(21), cols(22), cols(23), cols(24), cols(25), cols(26), cols(27), cols(28))
 
   // Transform FlightEvent to FlightDelayRecord (only for records with a delay)
+  // Note that with this approach the average is calculated across delayed flights only
   val filterAndConvert: Flow[FlightEvent, FlightDelayRecord, NotUsed] =
     Flow[FlightEvent]
       .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
@@ -56,7 +60,7 @@ object FlightDelayStreaming extends App {
       // maxSubstreams must be larger than the number of UniqueCarrier in the file
       // on large dataset you may set allowClosedSubstreamRecreation to true
       .groupBy(30, _.uniqueCarrier, allowClosedSubstreamRecreation = false)
-      .wireTap(each => println(s"Processing FlightDelayRecord: $each"))
+      //.wireTap(each => println(s"Processing FlightDelayRecord: $each"))
       .fold(FlightDelayAggregate("", 0, 0)) {
         (x: FlightDelayAggregate, y: FlightDelayRecord) =>
           val count = x.count + 1
@@ -75,7 +79,10 @@ object FlightDelayStreaming extends App {
 
   val sink: Sink[FlightDelayAggregate, Future[Done]] = Sink.foreach(averageSink[FlightDelayAggregate])
 
+  var stats: List[Stats] = Nil
+
   val done = sourceOfLines
+    .via(ThroughputMonitor(1000.millis, { st => stats = st :: stats }))
     .via(csvToFlightEvent)
     .via(filterAndConvert)
     .via(averageCarrierDelay)
@@ -86,6 +93,8 @@ object FlightDelayStreaming extends App {
   def terminateWhen(done: Future[Done]) = {
     done.onComplete {
       case Success(_) =>
+        println("Perf report:")
+        ThroughputMonitor.avgThroughputReport(stats)
         println("Flow Success. About to terminate...")
         system.terminate()
       case Failure(e) =>
