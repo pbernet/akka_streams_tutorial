@@ -13,9 +13,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Scala
+      - name: Set up JDK 11
         uses: olafurpg/setup-scala@v10
         with:
-          java-version: "adopt@1.8"
+          java-version: adopt@1.11.0-9
       - name: Build and Test
         run: sbt -v +test

@@ -39,7 +39,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
   "javax.jms" % "jms" % "1.1",
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.69",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -75,7 +75,7 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "com.github.blemale" %% "scaffeine" % "5.1.1",
+  "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.2.10",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
@@ -90,7 +90,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
-  "org.jboss.logging" % "jboss-logging"    % "3.4.2.Final",
+  //"org.jboss.logging" % "jboss-logging"    % "3.4.2.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
 

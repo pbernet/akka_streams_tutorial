@@ -17,7 +17,7 @@ Other noteworthy examples:
 * Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources
 
 Remarks:
-* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
+* Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
 * The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
