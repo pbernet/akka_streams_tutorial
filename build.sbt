@@ -2,7 +2,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.7"
+scalaVersion := "2.13.8"
 
 val akkaVersion = "2.6.18"
 val akkaHTTPVersion = "10.2.7"
@@ -90,7 +90,6 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
-  //"org.jboss.logging" % "jboss-logging"    % "3.4.2.Final",
 
   "org.postgresql" % "postgresql" % "42.3.1",
 
