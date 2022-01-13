@@ -30,7 +30,7 @@ object WritePrimes extends App {
   val fileSink = FileIO.toPath(Paths.get("target/primes.txt"))
   val slowSink = Flow[Int]
     .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
-    .map(i => ByteString(i.toString))
+    .map(i => ByteString(i.toString + "\n"))
     .toMat(fileSink)((_, bytesWritten) => bytesWritten)
   val consoleSink = Sink.foreach[Int](each => println(s"Reached console sink: $each"))
 
@@ -38,9 +38,12 @@ object WritePrimes extends App {
   val sharedDoubler = Flow[Int].map(_ * 2)
 
   // partition primes to both sinks using graph DSL
-  // Alternative:
+  // Alternatives:
+  // partition:
   // https://doc.akka.io/docs/akka/current/stream/operators/Partition.html
-  val graph = GraphDSL.create(slowSink, consoleSink)((x, _) => x) { implicit builder =>
+  // alsoTo:
+  // https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html
+  val graph = GraphDSL.createGraph(slowSink, consoleSink)((_, _)) { implicit builder =>
     (slow, console) =>
       import GraphDSL.Implicits._
       val broadcastSplitter = builder.add(Broadcast[Int](2)) // the splitter - like a Unix tee
@@ -50,8 +53,10 @@ object WritePrimes extends App {
   }
   val materialized = RunnableGraph.fromGraph(graph).run()
 
-  materialized.onComplete {
+  materialized._2.onComplete {
     case Success(_) =>
+      // Grace time to allow writing the last entry to fileSink
+      Thread.sleep(500)
       system.terminate()
     case Failure(e) =>
       println(s"Failure: ${e.getMessage}")

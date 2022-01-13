@@ -65,7 +65,7 @@ object WebsocketEchoActors extends App with ClientCommon {
 
   def server(address: String, port: Int) = {
 
-    val chatRef = system.actorOf(Props[ChatRef])
+    val chatRef = system.actorOf(Props[ChatRef]())
 
     def websocketEchoFlow: Flow[Message, Message, Any] =
       Flow[Message]

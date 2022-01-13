@@ -11,8 +11,8 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val keyDataFormat = jsonFormat3(KeyData)
   implicit val keysFormat = jsonFormat1(Keys)
 
-  final case class UserKeycloak(firstName: Option[String], lastName: Option[String], email: Option[String])
-  final case class UsersKeycloak(users: Seq[UserKeycloak])
+  case class UserKeycloak(firstName: Option[String], lastName: Option[String], email: Option[String])
+  case class UsersKeycloak(users: Seq[UserKeycloak])
 
   implicit val userJsonFormat = jsonFormat3(UserKeycloak)
   implicit val usersJsonFormat = jsonFormat1(UsersKeycloak)

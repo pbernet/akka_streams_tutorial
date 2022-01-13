@@ -64,10 +64,10 @@ object WebsocketChatEcho extends App with ClientCommon {
       case TextMessage.Strict(text) =>
         logger.info(s"Server received: $text")
         Future.successful(text)
-      case streamed: TextMessage.Streamed => streamed.textStream.runFold("") {
-        (acc, next) => acc ++ next
+      case TextMessage.Streamed(textStream) =>
+        textStream.runFold("")(_ + _)
+          .flatMap(Future.successful)
       }
-    }
       .via(Flow.fromSinkAndSourceCoupled(inSink, outSource))
       // Optional msg aggregation
       .groupedWithin(10, 2.second)
