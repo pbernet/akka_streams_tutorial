@@ -12,6 +12,10 @@ import static scala.compat.java8.FutureConverters.globalExecutionContext;
 /**
  * We use JUnit as test runner because of "type trouble"
  * when using PostgreSQLContainer with Scala
+ *
+ * Doc:
+ * https://www.testcontainers.org/modules/databases/postgres
+ *
  */
 public class SlickIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(SlickIT.class);
@@ -55,8 +59,8 @@ public class SlickIT {
     @Test
     public void populateAndReadUsers() {
         int noOfUsers = 100;
-        SLICK_RUNNER.populate(noOfUsers);
-        assertThat(SLICK_RUNNER.readUsers().size()).isEqualTo(noOfUsers);
+        SLICK_RUNNER.populateSync(noOfUsers);
+        assertThat(SLICK_RUNNER.readUsersSync().size()).isEqualTo(noOfUsers);
     }
 
 
@@ -69,19 +73,19 @@ public class SlickIT {
     @Test
     public void populateAndReadUsersPaged() throws InterruptedException {
         int noOfUsers = 20000;
-        SLICK_RUNNER.populate(noOfUsers);
+        SLICK_RUNNER.populateSync(noOfUsers);
         SLICK_RUNNER.processUsersPaged().onComplete(
                 each -> assertThat(SLICK_RUNNER.counter().get()).isEqualTo(noOfUsers),
          globalExecutionContext());
 
-        // Delay initiate shutdown and thus give the async Slick operation time to complete
+        // Delay DB destroy and thus give processUsersPaged() time to complete
         Thread.sleep(10000);
     }
 
     @Test
     public void populateAndCountUsers() {
         int noOfUsers = 100;
-        SLICK_RUNNER.populate(noOfUsers);
+        SLICK_RUNNER.populateSync(noOfUsers);
         assertThat(SLICK_RUNNER.getTotal()).isEqualTo(noOfUsers);
     }
 }

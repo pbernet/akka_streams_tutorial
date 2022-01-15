@@ -15,6 +15,9 @@ import scala.concurrent.{Await, Future}
   * DB access via Slick
   * Run with integration test: alpakka.slick.SlickIT
   *
+  * Doc:
+  * https://doc.akka.io/docs/alpakka/current/slick.html
+  *
   */
 class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -68,7 +71,7 @@ class SlickRunner(urlWithMappedPort: String) {
 
   def getAllUsersFromDb: Future[Set[User]] = Slick.source(selectAllUsers).runWith(Sink.seq).map(_.toSet)
 
-  def readUsers() = {
+  def readUsersSync() = {
     logger.info("About to read...")
     val result = Await.result(getAllUsersFromDb, 10.seconds)
     logger.info(s"Successfully read: ${result.size} users")
@@ -106,7 +109,7 @@ class SlickRunner(urlWithMappedPort: String) {
     Await.result(session.db.run(dropTable), 2.seconds)
   }
 
-  def populate(noOfUsers: Int = 100) = {
+  def populateSync(noOfUsers: Int = 100) = {
     logger.info(s"About to populate DB with: $noOfUsers users...")
     val users = (1 to noOfUsers).map(i => User(i, s"Name$i")).toSet
     val actions = users.map(insertUser)
