@@ -8,8 +8,8 @@ val akkaVersion = "2.6.18"
 val akkaHTTPVersion = "10.2.7"
 val alpakkaVersion = "3.0.4"
 
-val alpakkaKafkaConnector = "2.1.1"
-val kafkaVersion = "2.7.2"
+val alpakkaKafkaConnector = "3.0.0-RC1"
+val kafkaVersion = "3.0.0"
 
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
@@ -44,6 +44,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
+  "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
 
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,

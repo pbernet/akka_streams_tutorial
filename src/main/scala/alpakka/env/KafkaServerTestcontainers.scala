@@ -8,12 +8,11 @@ import org.testcontainers.utility.DockerImageName
   * Uses testcontainers.org to run the
   * latest Kafka-Version from confluentinc
   *
-  * Alternatives:
-  *  - [[KafkaServer]]
-  *  - https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
+  * Alternative: [[KafkaServerEmbedded]]
   *
   * Doc:
   * https://www.testcontainers.org/modules/kafka
+  * https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
   */
 class KafkaServerTestcontainers {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)

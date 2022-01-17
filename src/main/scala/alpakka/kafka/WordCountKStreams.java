@@ -12,6 +12,7 @@ import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
@@ -32,12 +33,14 @@ public class WordCountKStreams {
 
     public static void main(String[] args) {
 
+        String tmpStateDir = Paths.get(System.getProperty("java.io.tmpdir")).resolve("kafka-state-dir").toString();
+
         Properties config = new Properties();
         config.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application");
         config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-        config.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-state-dir");
+        config.put(StreamsConfig.STATE_DIR_CONFIG, tmpStateDir);
 
         //What to do when there is no initial offset in Kafka or if the current offset does not exist any more on the server (e.g. because that data has been deleted)
         //earliest: automatically reset the offset to the earliest offset
@@ -107,9 +110,7 @@ public class WordCountKStreams {
 
                 Boolean shutdownResult = app.close(Duration.ofMillis(10000));
                 // cleanUp() deletes the application's *local* state dir (= STATE_DIR_CONFIG)
-                // On startup of KafkaServer this local state dir folder will be restored
-                // To prevent this: Remove the kafka log.dirs manually, after KafkaServer is shutdown eg:
-                // rm -rf /tmp/kafka-logs
+                // On restart of Kafka this local state dir folder will be restored
 
                 //When you have a Kafka installation: Use the app-reset-tool
                 //https://www.confluent.io/blog/data-reprocessing-with-kafka-streams-resetting-a-streams-application/

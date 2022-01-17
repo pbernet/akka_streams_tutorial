@@ -7,13 +7,10 @@ import akka.kafka.scaladsl.Producer
 import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import org.apache.kafka.clients.producer.{Partitioner, ProducerRecord}
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
 import org.apache.kafka.common.serialization.StringSerializer
-import org.apache.kafka.common.{Cluster, PartitionInfo}
 
-import java.util
-import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -39,7 +36,6 @@ object WordCountProducer extends App {
 
   val producerSettings = ProducerSettings(system, new StringSerializer, new StringSerializer)
     .withBootstrapServers(bootstrapServers)
-    .withProperty("partitioner.class", "alpakka.kafka.CustomPartitioner")
 
   def initializeTopic(topic: String): Unit = {
     val producer = producerSettings.createKafkaProducer()
@@ -86,40 +82,4 @@ object WordCountProducer extends App {
       println(s"RuntimeException $ex occurred - Do not retry. Shutdown...")
       system.terminate()
   }
-}
-
-/**
-  * Example of a CustomPartitioner hook in the producer realm
-  * Done like this, because here we have access to cluster.availablePartitionsForTopic
-  *
-  * The partitioning here gives no added value for the downstream WordCountKStreams,
-  * because here a whole message is put into the partition. WordCountKStreams counts words though
-  *
-  */
-class CustomPartitioner extends Partitioner {
-  override def partition(topic: String, key: Any, keyBytes: Array[Byte], value: Any, valueBytes: Array[Byte], cluster: Cluster): Int = {
-    val partitionInfoList: util.List[PartitionInfo] = cluster.availablePartitionsForTopic(topic)
-    val partitionCount = partitionInfoList.size
-    val fakeNewsPartition = 0
-
-    //println("CustomPartitioner received key: " + key + " and value: " + value)
-
-    if (value.toString.contains(WordCountProducer.fakeNewsKeyword)) {
-      //println("CustomPartitioner send message: " + value + " to fakeNewsPartition")
-      fakeNewsPartition
-    }
-    else ThreadLocalRandom.current.nextInt(1, partitionCount) //round robin
-  }
-
-  override def close(): Unit = {
-    println("CustomPartitioner: " + Thread.currentThread + " received close")
-  }
-
-  override def configure(configs: util.Map[String, _]): Unit = {
-    println("CustomPartitioner received configure with configuration: " + configs)
-  }
-}
-
-object CustomPartitioner {
-  private def deserialize[V](objectData: Array[Byte]): V = org.apache.commons.lang3.SerializationUtils.deserialize(objectData).asInstanceOf[V]
 }
