@@ -10,7 +10,7 @@ val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnector = "3.0.0-RC1"
 // TODO Bump to 3.1.x when available, to run embedded Broker on Windows, see kafka-13391
-val kafkaVersion = "3.0.0"
+val kafkaVersion = "3.1.0"
 
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
