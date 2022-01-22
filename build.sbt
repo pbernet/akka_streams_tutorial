@@ -15,7 +15,7 @@ val kafkaVersion = "3.0.0"
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
 val keycloakVersion = "16.1.0"
-val sttpVersion = "3.3.18"
+val sttpVersion = "3.4.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
