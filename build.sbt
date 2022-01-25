@@ -14,7 +14,7 @@ val kafkaVersion = "3.0.0"
 
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
-val keycloakVersion = "16.1.0"
+val keycloakVersion = "16.1.1"
 val sttpVersion = "3.3.18"
 
 libraryDependencies ++= Seq(
