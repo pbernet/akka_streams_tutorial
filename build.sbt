@@ -1,3 +1,5 @@
+import sbt.Keys.libraryDependencies
+
 name := "akka-streams-tutorial"
 
 version := "1.0"
@@ -15,7 +17,8 @@ val kafkaVersion = "3.0.0"
 val activemqVersion =  "5.16.3"
 val testContainersVersion = "1.16.2"
 val keycloakVersion = "16.1.0"
-val sttpVersion = "3.4.1"
+val sttpVersion = "3.3.18"
+val influxdbVersion = "4.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -60,6 +63,10 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
+  "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
+  "com.influxdb" % "flux-dsl" % influxdbVersion,
+  "org.influxdb" % "influxdb-java" % "2.22",
+
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
@@ -85,7 +92,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "rabbitmq" % testContainersVersion,
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
-
+  "org.testcontainers" % "influxdb" % testContainersVersion,
   "com.github.dasniko" % "testcontainers-keycloak" % "1.9.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
@@ -97,8 +104,8 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
-  "org.assertj" % "assertj-core" % "3.21.0" % Test,
-  "junit" % "junit" % "4.13.1" % Test
+  "org.assertj" % "assertj-core" % "3.22.0" % Test,
+  "junit" % "junit" % "4.13.2" % Test
 )
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"

@@ -2,6 +2,7 @@ package alpakka.mqtt
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.event.Logging
 import akka.stream._
 import akka.stream.alpakka.mqtt._
 import akka.stream.alpakka.mqtt.scaladsl.{MqttSink, MqttSource}
@@ -111,7 +112,12 @@ object MqttPahoEcho extends App {
     */
   private def wrapWithRestartSink[M](sink: => Sink[M, Future[Done]]): Sink[M, Future[Done]] = {
     val fut = Promise[Done]()
-    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+
+    // TODO Despite setting log levels logging on failure does not work, see:
+    // https://discuss.lightbend.com/t/error-handling-in-restartsink-withbackoff/9437/2
+    val logSettings = RestartSettings.LogSettings(Logging.DebugLevel).withCriticalLogLevel(Logging.InfoLevel, 1)
+
+    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute).withLogSettings(logSettings)
     RestartSink.withBackoff(restartSettings) {
       () => sink.mapMaterializedValue(mat => fut.completeWith(mat))
     }.mapMaterializedValue(_ => fut.future)
