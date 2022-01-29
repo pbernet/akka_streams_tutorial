@@ -22,7 +22,6 @@ val influxdbVersion = "4.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
-  "org.scala-lang.modules" %% "scala-java8-compat" % "1.0.2",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -121,6 +120,7 @@ scalacOptions += "-feature"
 
 run / fork := true
 
+// Needed as long as this lib is in the dependencies
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"

@@ -5,9 +5,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+import scala.jdk.javaapi.FutureConverters;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static scala.compat.java8.FutureConverters.globalExecutionContext;
 
 /**
  * We use JUnit as test runner because of "type trouble"
@@ -63,23 +65,14 @@ public class SlickIT {
         assertThat(SLICK_RUNNER.readUsersSync().size()).isEqualTo(noOfUsers);
     }
 
-
-    /**
-     * We need the lib:
-     * https://github.com/scala/scala-java8-compat
-     * to provide interop between Scala Futures and Java 8 lambdas
-     *
-     */
     @Test
-    public void populateAndReadUsersPaged() throws InterruptedException {
+    public void populateAndReadUsersPaged() {
         int noOfUsers = 20000;
         SLICK_RUNNER.populateSync(noOfUsers);
-        SLICK_RUNNER.processUsersPaged().onComplete(
-                each -> assertThat(SLICK_RUNNER.counter().get()).isEqualTo(noOfUsers),
-         globalExecutionContext());
 
-        // Delay DB destroy and thus give processUsersPaged() time to complete
-        Thread.sleep(10000);
+        // Done via counter to avoid Scala->Java result collection conversion "type trouble"
+        assertThat(FutureConverters.asJava(SLICK_RUNNER.processUsersPaged())).succeedsWithin(5, TimeUnit.SECONDS);
+        assertThat(SLICK_RUNNER.counter().get()).isEqualTo(noOfUsers);
     }
 
     @Test
