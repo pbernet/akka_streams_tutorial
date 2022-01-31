@@ -79,7 +79,7 @@ class SlickRunner(urlWithMappedPort: String) {
   }
 
   def processUsersPaged() = {
-    val done = Slick.source(typedSelectAllUsers)
+    val result = Slick.source(typedSelectAllUsers)
       .grouped(1000)
       .wireTap((group: Seq[(Int, String)]) => {
         // Simulate some processing on each group
@@ -88,10 +88,10 @@ class SlickRunner(urlWithMappedPort: String) {
       })
 
       .map(each => counter.getAndAdd(each.size))
-      .runWith(Sink.ignore)
+      .runWith(Sink.seq)
 
-    done.onComplete(done => logger.info(s"Done reading paged: $done with: ${counter.get()} elements"))
-    done
+    result.onComplete(res => logger.info(s"Done reading paged yielding: ${counter.get()} elements"))
+    result
   }
 
   // Discussion:

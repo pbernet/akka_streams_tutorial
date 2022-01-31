@@ -10,19 +10,17 @@ val akkaVersion = "2.6.18"
 val akkaHTTPVersion = "10.2.7"
 val alpakkaVersion = "3.0.4"
 
-val alpakkaKafkaConnector = "3.0.0-RC1"
-// TODO Bump to 3.1.x when available, to run embedded Broker on Windows, see kafka-13391
-val kafkaVersion = "3.0.0"
+val alpakkaKafkaConnector = "3.0.0"
+val kafkaVersion = "3.1.0"
 
 val activemqVersion =  "5.16.3"
-val testContainersVersion = "1.16.2"
-val keycloakVersion = "16.1.0"
-val sttpVersion = "3.4.1"
+val testContainersVersion = "1.16.3"
+val keycloakVersion = "16.1.1"
+val sttpVersion = "3.3.18"
 val influxdbVersion = "4.1.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
-  "org.scala-lang.modules" %% "scala-java8-compat" % "1.0.2",
 
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -121,6 +119,7 @@ scalacOptions += "-feature"
 
 run / fork := true
 
+// Needed as long as this lib is in the dependencies
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
