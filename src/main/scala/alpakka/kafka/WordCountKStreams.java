@@ -37,7 +37,7 @@ public class WordCountKStreams {
 
         Properties config = new Properties();
         config.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-application");
-        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
         config.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         config.put(StreamsConfig.STATE_DIR_CONFIG, tmpStateDir);
@@ -89,6 +89,7 @@ public class WordCountKStreams {
                 ReadOnlyKeyValueStore<String, Long> keyValueStoreMessages = WordCountKStreams.waitUntilStoreIsQueryable("count-message-store", QueryableStoreTypes.keyValueStore(), app, "total");
 
                 while (true) {
+                    // When running against restarted KafkaServerEmbedded, because of in-memory we get a InvalidStateStoreException here
                     System.out.println("Query WORD count fakenews total: " + keyValueStoreWords.get("fakenews"));
                     System.out.println("Query MESSAGES count total: " + keyValueStoreMessages.get("total"));
                     try {

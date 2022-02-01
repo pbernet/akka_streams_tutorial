@@ -37,12 +37,14 @@ object WordCountConsumer extends App {
 
   def createConsumerSettings(group: String): ConsumerSettings[String, java.lang.Long] = {
     ConsumerSettings(system, new StringDeserializer, new LongDeserializer)
-      .withBootstrapServers("localhost:9092")
+      .withBootstrapServers("localhost:29092")
       .withGroupId(group)
       // Because we use DrainingControl
       .withStopTimeout(Duration.Zero)
       // Define consumer behavior upon starting to read a partition for which it does not have a committed offset or if the committed offset it has is invalid
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+      // False is the default, we are doing explicit commits
+      .withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
   }
 
   def createAndRunConsumerWordCount(id: String) = {

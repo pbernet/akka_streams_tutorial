@@ -23,13 +23,13 @@ object WordCountProducer extends App {
 
   import system.dispatcher
 
-  val bootstrapServers = "localhost:9092"
+  val bootstrapServers = "localhost:29092"
 
   val topic = "wordcount-input"
   val fakeNewsKeyword = "fakeNews"
 
 
-  //initial msg in topic, required to create the topic before any consumer subscribes to it
+  // initial msg in topic, required to create the topic before any consumer subscribes to it
   val InitialMsg = "truth"
 
   val partition0 = 0
@@ -53,7 +53,6 @@ object WordCountProducer extends App {
       }
     })
       .map(each => {
-        //Use CustomPartitioner hook
         val recordWithCurrentTimestamp = new ProducerRecord(topic, null: String, each)
         Message(recordWithCurrentTimestamp, NotUsed)
       })
@@ -69,17 +68,17 @@ object WordCountProducer extends App {
 
   initializeTopic(topic)
   val randomMap: Map[Int, String] = TextMessageGenerator.genRandTextWithKeyword(1000, 1000, 3, 5, 5, 10, WordCountProducer.fakeNewsKeyword).split("([!?.])").toList.zipWithIndex.toMap.map(_.swap)
-  val doneFuture = produce(topic, randomMap)
+  val done = produce(topic, randomMap)
 
-  doneFuture.recover {
+  done.recover {
     case e: NetworkException =>
-      println(s"NetworkException $e occurred - Retry...")
+      println(s"NetworkException $e occurred. Retry...")
       produce(topic, randomMap)
     case e: UnknownTopicOrPartitionException =>
-      println(s"UnknownTopicOrPartitionException $e occurred - Retry...")
+      println(s"UnknownTopicOrPartitionException $e occurred. Retry...")
       produce(topic, randomMap)
-    case ex: RuntimeException =>
-      println(s"RuntimeException $ex occurred - Do not retry. Shutdown...")
+    case e: RuntimeException =>
+      println(s"RuntimeException $e occurred. Shutdown...")
       system.terminate()
   }
 }
