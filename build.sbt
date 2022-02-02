@@ -14,6 +14,7 @@ val alpakkaKafkaConnector = "3.0.0"
 val kafkaVersion = "3.1.0"
 
 val activemqVersion =  "5.16.3"
+val artemisVersion =  "2.20.0"
 val testContainersVersion = "1.16.3"
 val keycloakVersion = "16.1.1"
 val sttpVersion = "3.3.18"
@@ -40,6 +41,9 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
   "javax.jms" % "jms" % "1.1",
+  "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
+  "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
+  "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
 

@@ -21,6 +21,7 @@ import scala.util.{Failure, Success}
 /**
   * An Alpakka JMS client which consumes text messages from either:
   *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
+  *  - Preferred:    Embedded Artemis JMS Broker [[JMSServerArtemis]], started from IDE
   *  - Experimental: Embedded ActiveMQ [[alpakka.env.jms.JMSServer]], started from IDE
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
@@ -50,7 +51,9 @@ object ProcessingApp {
       .mapAsyncUnordered(10)(ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
       .map {
         ackEnvelope =>
+          // Ack this way ensures that messages are not replayed upon Broker restart
           ackEnvelope.acknowledge()
+          ackEnvelope.message.acknowledge()
           ackEnvelope.message
       }
       .wireTap(textMessage => logger.info(s"ACK Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))

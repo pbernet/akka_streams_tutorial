@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 /**
   * Works together with [[ProcessingApp]]
   * Shows how to use ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector,
-  * together with the failover meccano provided by ActiveMQ lib
+  * together with the failover meccano provided by ActiveMQ/Artemis libs
   *
   */
 object JMSTextMessageProducerClient {
