@@ -18,7 +18,7 @@ val artemisVersion =  "2.20.0"
 val testContainersVersion = "1.16.3"
 val keycloakVersion = "16.1.1"
 val sttpVersion = "3.3.18"
-val influxdbVersion = "4.1.0"
+val influxdbVersion = "4.2.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
