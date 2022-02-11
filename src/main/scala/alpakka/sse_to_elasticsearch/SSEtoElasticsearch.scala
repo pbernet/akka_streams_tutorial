@@ -34,7 +34,8 @@ import scala.util.control.NonFatal
 
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
-  * fetch the abstract from Wikipedia API, do NER processing
+  * fetch the abstract from Wikipedia API,
+  * do NER processing
   * and write the results to Elasticsearch version 7.x server
   *
   * Doc:
@@ -57,7 +58,8 @@ object SSEtoElasticsearch extends App {
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
-  case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String)
+  // Helps to carry the data through the stages, although this violates functional principles
+  case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String = "")
 
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
   implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
@@ -162,7 +164,7 @@ object SSEtoElasticsearch extends App {
   }
 
 
-  def findPersons(ctx: Ctx) = {
+  def findPersons(ctx: Ctx): Future[Ctx] = {
     logger.info(s"About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
@@ -186,7 +188,7 @@ object SSEtoElasticsearch extends App {
 
   val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
     .filter(change => !change.isBot)
-    .map(change => Ctx(change, List.empty, ""))
+    .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
     .mapAsync(3)(ctx => findPersons(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
