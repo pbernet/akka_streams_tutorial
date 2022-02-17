@@ -57,6 +57,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
 
   def runKeycloak() = {
+    // TODO Switch to Quarkus based container (= "quay.io/keycloak/keycloak:17.0.0") does not work yet
     val keycloak = new KeycloakContainer()
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
