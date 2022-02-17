@@ -46,7 +46,7 @@ public class InfluxdbIT {
 
     @AfterClass
     public static void shutdownAfterClass() throws InterruptedException {
-        // To keep browserClient open
+        LOGGER.info("Sleep to keep influxdb instance running...");
         Thread.sleep(10000000);
     }
 
@@ -58,7 +58,7 @@ public class InfluxdbIT {
 
     @Test
     public void testWriteAndRead() throws InterruptedException, ExecutionException {
-        int nPoints = 100;
+        int nPoints = 1000;
         influxDBWriter.writeTestPoints(nPoints, "sensor1");
         influxDBWriter.writeTestPoints(nPoints,"sensor2" );
         Thread.sleep(1000);
