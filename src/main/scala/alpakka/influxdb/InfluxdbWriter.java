@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
  * We try to do it via the Java API:
  * https://github.com/influxdata/influxdb-client-java/tree/master/client-scala
  * <p>
- * Doc discussion about write performances:
+ * We use the sync API, see discussion about write performance:
  * https://community.influxdata.com/t/influxdb-v2-java-client-write-performance/18919
  * <p>
  * There is also an async API:
@@ -61,16 +61,14 @@ public class InfluxdbWriter {
         this.influxDBClient = InfluxDBClientFactory.create(this.baseURL, this.token.toCharArray(), this.org, this.bucket).setLogLevel(LogLevel.BASIC);
     }
 
-    public void writeTestPoints(int nPoints, String sensorID) throws ExecutionException, InterruptedException {
+    public CompletionStage<Done> writeTestPoints(int nPoints, String sensorID) {
         List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().collect(Collectors.toList());
         Source<Integer, NotUsed> source = Source.from(range);
-        // Because writeApiBlocking seems to be "truly blocking", this code does not parallelize writing
         CompletionStage<Done> done = source
                 .groupedWithin(10, Duration.ofMillis(100))
                 .mapAsyncUnordered(10, each -> this.eventHandlerPointBatch(each, influxDBClient.getWriteApiBlocking(), nPoints, sensorID))
                 .runWith(Sink.ignore(), system);
-        done.toCompletableFuture().get();
-        LOGGER.info("Finished writing records for: {}", sensorID);
+        return done;
     }
 
     public void writeTestPointEverySecond(String sensorID) throws ExecutionException, InterruptedException {

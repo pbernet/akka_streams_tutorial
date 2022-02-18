@@ -13,6 +13,7 @@ import util.LogFileScanner;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,14 +58,21 @@ public class InfluxdbIT {
     }
 
     @Test
-    public void testWriteAndRead() throws InterruptedException, ExecutionException {
+    public void testWriteAndRead() throws InterruptedException {
+        int maxClients = 5;
         int nPoints = 1000;
-        influxDBWriter.writeTestPoints(nPoints, "sensor1");
-        influxDBWriter.writeTestPoints(nPoints,"sensor2" );
-        Thread.sleep(1000);
-        assertThat(influxDBReader.getQuerySync("testPacket").length()).isEqualTo(nPoints * 2);
-        assertThat(influxDBReader.fluxQueryCount("testPacket")).isEqualTo(nPoints * 2);
-        assertThat(new LogFileScanner("logs/application.log").run(1,2, searchAfterPattern, "ERROR").length()).isEqualTo(0);
+
+        IntStream.rangeClosed(1, maxClients).boxed().parallel().forEach(i -> {
+            Runnable r = () -> influxDBWriter.writeTestPoints(nPoints, "sensor" + i);
+            r.run();
+        });
+
+        // TODO Instead of waiting, try to collect done responses from writeTestPoints and wait for all of them to finish
+        // Similar to SlickIT>>populateAndReadUsersPaged
+        Thread.sleep(2000 * maxClients);
+        assertThat(influxDBReader.getQuerySync("testPacket").length()).isEqualTo(nPoints * maxClients);
+        assertThat(influxDBReader.fluxQueryCount("testPacket")).isEqualTo(nPoints * maxClients);
+        assertThat(new LogFileScanner("logs/application.log").run(1, 2, searchAfterPattern, "ERROR").length()).isEqualTo(0);
     }
 
     @Test

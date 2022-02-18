@@ -64,7 +64,7 @@ class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bu
       .wireTap(fluxRecord => {
         val measurement = fluxRecord.getMeasurement()
         val value = fluxRecord.getValue()
-        logger.info(s"About to process measurement: $measurement with value: $value")
+        logger.debug(s"About to process measurement: $measurement with value: $value")
       })
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.seq)
