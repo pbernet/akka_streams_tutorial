@@ -1,5 +1,6 @@
 package alpakka.influxdb;
 
+import akka.Done;
 import akka.actor.ActorSystem;
 import org.junit.*;
 import org.junit.rules.TestName;
@@ -12,7 +13,12 @@ import org.testcontainers.utility.DockerImageName;
 import util.LogFileScanner;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,18 +64,15 @@ public class InfluxdbIT {
     }
 
     @Test
-    public void testWriteAndRead() throws InterruptedException {
+    public void testWriteAndRead() {
         int maxClients = 5;
         int nPoints = 1000;
 
-        IntStream.rangeClosed(1, maxClients).boxed().parallel().forEach(i -> {
-            Runnable r = () -> influxDBWriter.writeTestPoints(nPoints, "sensor" + i);
-            r.run();
-        });
+        List<CompletionStage<Done>> futList = IntStream.rangeClosed(1, maxClients).boxed().parallel()
+                .map(i -> influxDBWriter.writeTestPoints(nPoints, "sensor" + i))
+                .collect(Collectors.toList());
+        assertThat(CompletableFuture.allOf(futList.toArray(new CompletableFuture[futList.size()]))).succeedsWithin(3 * maxClients, TimeUnit.SECONDS);
 
-        // TODO Instead of waiting, try to collect done responses from writeTestPoints and wait for all of them to finish
-        // Similar to SlickIT>>populateAndReadUsersPaged
-        Thread.sleep(2000 * maxClients);
         assertThat(influxDBReader.getQuerySync("testPacket").length()).isEqualTo(nPoints * maxClients);
         assertThat(influxDBReader.fluxQueryCount("testPacket")).isEqualTo(nPoints * maxClients);
         assertThat(new LogFileScanner("logs/application.log").run(1, 2, searchAfterPattern, "ERROR").length()).isEqualTo(0);
