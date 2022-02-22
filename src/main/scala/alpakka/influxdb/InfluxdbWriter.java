@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -86,21 +87,24 @@ public class InfluxdbWriter {
 
     public void writeTestPointsFromLineProtocolSync() throws ExecutionException, InterruptedException {
         WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+
+        // Ref Doc: https://docs.influxdata.com/influxdb/v2.1/reference/syntax/line-protocol
         Path file = Paths.get("src/main/resources/line_protocol_data.txt");
 
         CompletionStage<Done> done = FileIO.fromPath(file)
-                .via(Framing.delimiter(ByteString.fromString("\n"), 1024, FramingTruncation.ALLOW))
+                .via(Framing.delimiter(ByteString.fromString(System.lineSeparator()), 1024, FramingTruncation.ALLOW))
                 .map(ByteString::utf8String)
                 .grouped(2)
-                .mapAsync(1, each -> this.eventHandlerRecordBatch(each, writeApi))
+                .mapAsync(1, each -> this.eventHandlerRecordBatch(new ArrayList<>(each), writeApi))
                 .runWith(Sink.ignore(), system);
         done.toCompletableFuture().get();
     }
 
 
-    private CompletionStage<Done> eventHandlerRecordBatch(List<String> batch, WriteApiBlocking writeApi) {
-        LOGGER.info("Writing batch: {} with size: {}", batch, batch.size());
+    private CompletionStage<Done> eventHandlerRecordBatch(ArrayList<String> batch, WriteApiBlocking writeApi) {
+        LOGGER.info("Writing batch with size: {}", batch.size());
         writeApi.writeRecords(WritePrecision.MS, batch);
+        LOGGER.info("Successfully written batch with size: {}", batch.size());
         return CompletableFuture.completedFuture(Done.done());
     }
 
@@ -121,10 +125,13 @@ public class InfluxdbWriter {
 
     @NotNull
     private Point createPoint(long nPoints, String sensorID, long testTime, int hr) {
+        // A point is uniquely identified by the measurement name, tag set, and timestamp
+        // If you submit duplicates, the field set becomes the union of the old field set and the new field set,
+        // where any conflicts favor the new field set
         return Point
                 .measurement("testPacket")
                 .addTag("sensorID", sensorID)
-                .addTag("testTime", String.valueOf(testTime)) // must be unique, otherwise InfluxDB overwrites records
+                .addTag("testTime", String.valueOf(testTime))
                 .addTag("nPoints", String.valueOf(nPoints))   // used to verify completeness
                 .addField("hr", hr)
                 .time(Instant.now().toEpochMilli(), WritePrecision.MS);

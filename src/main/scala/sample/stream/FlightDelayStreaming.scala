@@ -35,7 +35,7 @@ object FlightDelayStreaming extends App {
   import system.dispatcher
 
   val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
-    .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
+    .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
 
   // Split csv into a string array and transform each array into a FlightEvent
