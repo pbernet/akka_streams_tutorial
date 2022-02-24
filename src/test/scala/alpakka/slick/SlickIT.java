@@ -1,9 +1,11 @@
 package alpakka.slick;
 
-import org.junit.*;
+import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import scala.jdk.javaapi.FutureConverters;
 
@@ -19,18 +21,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * https://www.testcontainers.org/modules/databases/postgres
  *
  */
+@Testcontainers
 public class SlickIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(SlickIT.class);
     private static SlickRunner SLICK_RUNNER;
     private static String URL_WITH_MAPPED_PORT;
 
-    @ClassRule
+    @Container
     public static PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:latest"))
         .withDatabaseName("test")
 		.withUsername("test")
 		.withPassword("test");
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         String dbName = postgres.getDatabaseName();
         URL_WITH_MAPPED_PORT = postgres.getJdbcUrl();
@@ -40,18 +43,18 @@ public class SlickIT {
     }
 
 
-    @AfterClass
+    @AfterAll
     public static void teardown() {
         SLICK_RUNNER.terminate();
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         SLICK_RUNNER = SlickRunner.apply(URL_WITH_MAPPED_PORT);
         SLICK_RUNNER.createTableOnSession();
     }
 
-    @After
+    @AfterEach
     public void after() {
         SLICK_RUNNER.dropTableOnSession();
         SLICK_RUNNER.session().close();

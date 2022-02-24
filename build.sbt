@@ -98,16 +98,20 @@ libraryDependencies ++= Seq(
   "com.github.dasniko" % "testcontainers-keycloak" % "1.10.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
-  "org.keycloak" % "keycloak-core"         % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
   "org.postgresql" % "postgresql" % "42.3.1",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion  % Test,
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
   "org.assertj" % "assertj-core" % "3.22.0" % Test,
-  "junit" % "junit" % "4.13.2" % Test
+
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.8.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.8.2" % Test,
+  "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
+
 )
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
