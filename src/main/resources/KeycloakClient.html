@@ -5,7 +5,7 @@
 
 <html>
 <head>
-    <script src="http://localhost:%%PORT%%/auth/js/keycloak.js"></script>
+    <script src="http://localhost:%%PORT%%/js/keycloak.js"></script>
 </head>
 <body>
 
@@ -149,10 +149,10 @@
         var e = document.getElementById('events').innerHTML;
         document.getElementById('events').innerHTML = new Date().toLocaleString() + "\t" + event + "\n" + e;
     }
-    
-    // Direct init (vs json file) here to handle dynamic port
+
+    // We init here to handle dynamic port (vs in json file)
     let keycloak = new Keycloak({
-        url: 'http://localhost:%%PORT%%/auth',
+        url: 'http://localhost:%%PORT%%',
         realm: 'test',
         clientId: 'my-test-client'
     });

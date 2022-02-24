@@ -57,12 +57,10 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
 
   def runKeycloak() = {
-    // TODO Switch to Quarkus based container (= "quay.io/keycloak/keycloak:17.0.0") does not work yet
-    // See also reproducer: [[KeycloakTestRunner]]
     val keycloak = new KeycloakContainer()
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
-      .withRealmImportFile("keycloak_realm_config.json")
+      .withRealmImportFile("/keycloak_realm_config.json")
       .withStartupTimeout(Duration.ofSeconds(120))
 
     keycloak.start()
@@ -114,7 +112,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
       userResource.resetPassword(passwordCred)
 
       logger.info(s"User $username created with userId: $userId")
-      logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/auth/realms/test/account")
+      logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/realms/test/account")
     }
 
     def createClientConfig(keycloakAdminClient: Keycloak) = {
