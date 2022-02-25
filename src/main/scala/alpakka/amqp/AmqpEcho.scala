@@ -13,6 +13,7 @@ import org.testcontainers.containers.RabbitMQContainer
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
+import scala.sys.process.Process
 import scala.util.{Failure, Random, Success}
 
 /**
@@ -29,7 +30,7 @@ object AmqpEcho extends App {
   val (host, port) = ("127.0.0.1", 5672)
   val queueName = "queue"
 
-  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:3.8.14")
+  val rabbitMQContainer = new RabbitMQContainer("rabbitmq:management")
   rabbitMQContainer.start()
   logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
 
@@ -205,4 +206,12 @@ object AmqpEcho extends App {
       })
       .run()
   }
+
+  // Login with guest/guest
+  def browserClient() = {
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") Process(s"open ${rabbitMQContainer.getHttpUrl}").!
+  }
+
+  browserClient()
 }
