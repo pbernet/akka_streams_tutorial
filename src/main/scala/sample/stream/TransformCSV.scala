@@ -44,33 +44,36 @@ object TransformCSV extends App {
 
 
   def sort(sourceFile: String): File = {
+    val op = "sort"
     val tmpSortedFile = File.createTempFile("sorted_tmp", ".csv")
 
     // Remove csv header and use linux sort on the 9th column (= UniqueCarrier)
-    val resultSort = exec("sort") {
+    val resultSort = exec(op) {
       (Process(s"tail -n+2 $sourceFile") #| Process(s"sort -t\",\" -k9,9") #>> tmpSortedFile).!
     }
-    logger.info(s"Exit code sort: $resultSort")
+    logger.info(s"Exit code '$op': $resultSort")
     tmpSortedFile
   }
 
   def split(tmpSortedFile: File): Unit = {
+    val op = "split"
     s"rm -rf $resultsDir".!
     s"mkdir -p $resultsDir".!
 
     // Split into files according to value of 9th column (incl. file closing)
-    // TODO Parametrize but keep it still readable: the $ operator is used in Scala string interpolation and in linux...
-    val bashLine = """awk -F ',' '{out=("results/"$9"-_count_.csv")} out!=prev {close(prev)} {print > out; prev=out}' """ + s"$tmpSortedFile"
-    val resultSplit = exec("split") {
-      Seq("bash", "-c", bashLine).!
+    // Note that the $ operator is used in the linux cmd
+    val bashCmdSplit = s"""awk -F ',' '{out=("$resultsDir""" + """/"$9"-_count_.csv")} out!=prev {close(prev)} {print > out; prev=out}' """ + s"$tmpSortedFile"
+    val resultSplit = exec(op) {
+      Seq("bash", "-c", bashCmdSplit).!
     }
-    logger.info(s"Exit code split: $resultSplit")
+    logger.info(s"Exit code '$op': $resultSplit")
   }
 
   def countLines(results: String): Unit = {
-    val bashLine = s"""wc -l `find $results -type f`"""
-    val resultCountLines = exec("count") {
-      Seq("bash", "-c", bashLine).!!
+    val op = "count"
+    val bashCmdCountLines = s"""wc -l `find $results -type f`"""
+    val resultCountLines = exec(op) {
+      Seq("bash", "-c", bashCmdCountLines).!!
     }
     logger.info(s"Line count report:\n $resultCountLines")
 
