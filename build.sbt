@@ -87,7 +87,7 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.10",
+  "ch.qos.logback" % "logback-classic" % "1.2.11",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
