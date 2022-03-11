@@ -7,7 +7,7 @@ version := "1.0"
 scalaVersion := "2.13.8"
 
 val akkaVersion = "2.6.18"
-val akkaHTTPVersion = "10.2.7"
+val akkaHTTPVersion = "10.2.9"
 val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnector = "3.0.0"
@@ -18,7 +18,7 @@ val artemisVersion =  "2.20.0"
 val testContainersVersion = "1.16.3"
 val keycloakVersion = "17.0.0"
 val sttpVersion = "3.3.18"
-val influxdbVersion = "4.2.0"
+val influxdbVersion = "4.3.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -87,7 +87,7 @@ libraryDependencies ++= Seq(
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.10",
+  "ch.qos.logback" % "logback-classic" % "1.2.11",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,

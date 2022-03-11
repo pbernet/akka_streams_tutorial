@@ -109,7 +109,7 @@ public class InfluxdbWriter {
     }
 
     private CompletionStage<Done> eventHandlerPoint(int hr, WriteApiBlocking writeApi, int nPoints, String sensorID) {
-        LOGGER.info("Writing point: {}-{} ", sensorID, hr);
+        LOGGER.debug("Writing point: {}-{} ", sensorID, hr);
         long testTime = System.nanoTime();
         Point point = createPoint(nPoints, sensorID, testTime, hr);
         writeApi.writePoint(point);
@@ -129,7 +129,7 @@ public class InfluxdbWriter {
         // If you submit duplicates, the field set becomes the union of the old field set and the new field set,
         // where any conflicts favor the new field set
         return Point
-                .measurement("testPacket")
+                .measurement("testMem")
                 .addTag("sensorID", sensorID)
                 .addTag("testTime", String.valueOf(testTime))
                 .addTag("nPoints", String.valueOf(nPoints))   // used to verify completeness

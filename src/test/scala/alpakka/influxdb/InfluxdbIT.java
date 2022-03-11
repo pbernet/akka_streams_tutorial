@@ -40,7 +40,7 @@ public class InfluxdbIT {
 
     @BeforeAll
     public static void setupBeforeClass() throws IOException, InterruptedException {
-        // We use the new official docker image (which has the now separate cli installed)
+        // We use the new official docker image, which has the (now separate cli) installed
         // Doc: https://docs.influxdata.com/influxdb/v2.1/reference/release-notes/influxdb/
         LOGGER.info("InfluxDB container listening on port: {}. Running: {} ", influxDBContainer.getMappedPort(INFLUXDB_PORT), influxDBContainer.isRunning());
         Container.ExecResult result = influxDBContainer.execInContainer("influx", "setup", "-b", "testbucket", "-f", "-o", "testorg", "-t", "abcdefgh", "-u", "admin", "-p", "adminadmin");
@@ -70,10 +70,10 @@ public class InfluxdbIT {
         List<CompletionStage<Done>> futList = IntStream.rangeClosed(1, maxClients).boxed().parallel()
                 .map(i -> influxDBWriter.writeTestPoints(nPoints, "sensor" + i))
                 .collect(Collectors.toList());
-        assertThat(CompletableFuture.allOf(futList.toArray(new CompletableFuture[futList.size()]))).succeedsWithin(3 * maxClients, TimeUnit.SECONDS);
+        assertThat(CompletableFuture.allOf(futList.toArray(new CompletableFuture[futList.size()]))).succeedsWithin(4 * maxClients, TimeUnit.SECONDS);
 
-        assertThat(influxDBReader.getQuerySync("testPacket").length()).isEqualTo(nPoints * maxClients);
-        assertThat(influxDBReader.fluxQueryCount("testPacket")).isEqualTo(nPoints * maxClients);
+        assertThat(influxDBReader.getQuerySync("testMem").length()).isEqualTo(nPoints * maxClients);
+        assertThat(influxDBReader.fluxQueryCount("testMem")).isEqualTo(nPoints * maxClients);
         assertThat(new LogFileScanner("logs/application.log").run(1, 2, searchAfterPattern, "ERROR").length()).isEqualTo(0);
     }
 
@@ -82,23 +82,24 @@ public class InfluxdbIT {
     public void testWriteAndReadLineProtocol() throws ExecutionException, InterruptedException {
         int nPoints = 10;
         influxDBWriter.writeTestPointsFromLineProtocolSync();
-        assertThat(influxDBReader.getQuerySync("testPacketLP").length()).isEqualTo(nPoints);
+        assertThat(influxDBReader.getQuerySync("testMemLP").length()).isEqualTo(nPoints);
     }
 
     @Test
     @Order(3)
     public void testWriteContinuously() throws ExecutionException, InterruptedException {
-        influxDBWriter.writeTestPointEverySecond("testPacketPeriod");
+        influxDBReader.run();
+        influxDBWriter.writeTestPointEverySecond("sensorPeriodic");
     }
 
+    // login with admin/adminadmin
     private static void browserClient() throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
         String influxURL = "http://localhost:" + influxDBContainer.getMappedPort(INFLUXDB_PORT);
-        if (os.equals("mac os x")){
-          Runtime.getRuntime().exec("open " + influxURL);
-        }
-        else {
-          LOGGER.info("Please open a browser at: {}", influxURL);
+        if (os.equals("mac os x")) {
+            Runtime.getRuntime().exec("open " + influxURL);
+        } else {
+            LOGGER.info("Please open a browser at: {}", influxURL);
         }
     }
 }
