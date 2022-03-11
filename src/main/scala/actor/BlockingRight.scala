@@ -11,7 +11,7 @@ import akka.actor.typed.{ActorSystem, DispatcherSelector}
   * Stolen from:
   * https://github.com/raboof/akka-blocking-dispatcher
   *
-  * See [[sample.stream.WaitForThreeFlowsToComplete]] for use of custom dispatcher in a stream
+  * See [[sample.stream.WaitForFlowsToComplete]] for use of custom dispatcher in a stream
   *
   */
 object BlockingRight extends App {
