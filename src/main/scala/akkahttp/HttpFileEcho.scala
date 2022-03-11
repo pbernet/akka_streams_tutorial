@@ -18,6 +18,7 @@ import java.nio.file.Paths
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
@@ -31,22 +32,22 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * This HTTP file upload/download round trip is inspired by:
   * https://github.com/clockfly/akka-http-file-server
   *
-  * It's possible to upload/download files up to the configured size in application.conf:
-  *  - akka.http.server.parsing.max-content-length
-  *  - akka.http.client.parsing.max-content-length
+  * Upload/download files up to the configured size in application.conf
   *
   * Added:
   *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
   *  - On the fly gzip compression on upload and gunzip decompression on download,
   *    Doc: https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dealing-with-compressed-data-streams
+  *  - Browser client for manual upload of uncompressed files
   *
   * To prove that the streaming works:
-  *  - Replace testfile.jpg with a large file
+  *  - Replace testfile.jpg with a large file, eg 63MB.pdf
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
   *
-  * Remarks:
-  *  - TODO Retry on download
+  * TODO:
+  *  - Retry on download
+  *  - Investigate why chuckSizeBytes must be so large to handle large files
   */
 object HttpFileEcho extends App with JsonProtocol {
   implicit val system: ActorSystem = ActorSystem()
@@ -54,11 +55,12 @@ object HttpFileEcho extends App with JsonProtocol {
   import system.dispatcher
 
   val resourceFileName = "testfile.jpg"
-  val (address, port) = ("127.0.0.1", 6000)
-  val chuckSizeBytes = 10000
+  val (address, port) = ("127.0.0.1", 6002)
+  val chuckSizeBytes = 100 * 1024
 
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
+  browserClient()
 
   def server(address: String, port: Int): Unit = {
 
@@ -66,7 +68,7 @@ object HttpFileEcho extends App with JsonProtocol {
       path("upload") {
 
         formFields(Symbol("payload")) { payload =>
-          println(s"Server received request with additional payload: $payload")
+          println(s"Server received request with additional form data: $payload")
 
           def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
 
@@ -84,6 +86,15 @@ object HttpFileEcho extends App with JsonProtocol {
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
           }
+        } ~
+        get {
+          val static = "src/main/resources"
+          concat(
+            pathSingleSlash {
+              val appHtml = Paths.get(static, "fileupload.html").toFile
+              getFromFile(appHtml, ContentTypes.`text/html(UTF-8)`)
+            }
+          )
         }
     }
 
@@ -128,7 +139,7 @@ object HttpFileEcho extends App with JsonProtocol {
         // see: https://www.w3.org/Protocols/HTTP/Issues/content-disposition.txt
         Map("filename" -> file.getName)),
         // Pass additional (json) payload in a form field
-        Multipart.FormData.BodyPart.Strict("payload", "{\"payload\": \"bla\"}", Map.empty)
+        Multipart.FormData.BodyPart.Strict("payload", "{\"payload\": \"sent from Scala client\"}", Map.empty)
       )
 
       Marshal(formData).to[RequestEntity]
@@ -208,5 +219,10 @@ object HttpFileEcho extends App with JsonProtocol {
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
     download(remoteFile, localFile)
     Future(localFile)
+  }
+
+  def browserClient() = {
+    val os = System.getProperty("os.name").toLowerCase
+    if (os == "mac os x") Process(s"open http://$address:$port").!
   }
 }
