@@ -17,7 +17,7 @@ val activemqVersion =  "5.16.3"
 val artemisVersion =  "2.20.0"
 val testContainersVersion = "1.16.3"
 val keycloakVersion = "17.0.0"
-val sttpVersion = "3.3.18"
+val sttpVersion = "3.5.1"
 val influxdbVersion = "4.3.0"
 
 libraryDependencies ++= Seq(
@@ -95,14 +95,14 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.0.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.1.1",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.3.1",
+  "org.postgresql" % "postgresql" % "42.3.3",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
