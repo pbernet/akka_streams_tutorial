@@ -43,8 +43,9 @@ object ParametrizedFlow extends App {
 }
 
 object ParameterizedFlowService {
-  implicit val system = ActorSystem("ParameterizedFlowService")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   def update(element: Double): Unit = flow._1._2.offer(element)
 
@@ -64,12 +65,12 @@ object ParameterizedFlowService {
   terminateWhen(done)
 
   private def createParamFlow[A, P, O](bufferSize: Int, overflowStrategy: OverflowStrategy, initialParam: P)(fun: (A, P) => O) =
-    Flow.fromGraph(GraphDSL.create(Source.queue[P](bufferSize, overflowStrategy)) { implicit builder =>
+    Flow.fromGraph(GraphDSL.createGraph(Source.queue[P](bufferSize, overflowStrategy)) { implicit builder =>
       queue =>
         import GraphDSL.Implicits._
         val zip = builder.add(Zip[A, P]())
-        //Interesting use of the extrapolate operator
-        //based on https://doc.akka.io/docs/akka/current/stream/stream-rate.html#understanding-extrapolate-and-expand
+        // Interesting use of the extrapolate operator
+        // based on https://doc.akka.io/docs/akka/current/stream/stream-rate.html#understanding-extrapolate-and-expand
         val extra = builder.add(Flow[P].extrapolate(Iterator.continually(_), Some(initialParam)))
         val map = builder.add(Flow[(A, P)].map(r => fun(r._1, r._2)))
 

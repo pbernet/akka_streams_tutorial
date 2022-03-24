@@ -1,9 +1,5 @@
 package alpakka.sftp
 
-import java.io.File
-import java.net.InetAddress
-import java.nio.file.{Files, Paths}
-
 import akka.actor.ActorSystem
 import akka.stream.alpakka.ftp.scaladsl.Sftp
 import akka.stream.alpakka.ftp.{FtpCredentials, FtpFile, SftpSettings}
@@ -18,6 +14,9 @@ import net.schmizz.sshj.{DefaultConfig, SSHClient}
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.File
+import java.net.InetAddress
+import java.nio.file.{Files, Paths}
 import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -44,8 +43,9 @@ import scala.util.{Failure, Success}
   */
 object SftpEcho extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SftpEcho")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   //we need a sub folder due to permissions set on on the atmoz_sftp docker image
   val sftpRootDir = "echo"
@@ -82,6 +82,7 @@ object SftpEcho extends App {
   def uploadClient() = {
     logger.info("Starting upload...")
 
+    // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets
     Source(1 to 100)
       .throttle(10, 1.second, 10, ThrottleMode.shaping)
       .mapAsync(parallelism = 10) { id =>
@@ -131,7 +132,7 @@ object SftpEcho extends App {
 
     val fetchedFile = retrieveFromPath(ftpFile.path).runWith(FileIO.toPath(localPath))
     fetchedFile.map { ioResult =>
-      logger.debug(s"Fetched file status: ${ioResult.status}")
+      logger.debug(s"Fetched file: $ioResult")
       try {
         // TODO This fails silently: the file is not moved
         Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
@@ -221,7 +222,7 @@ object SftpEcho extends App {
   //works
   private def uploadFileNative() = {
     val resourceFileName = "testfile.jpg"
-    val resourceFilePath = Paths.get(s"./src/main/resources/$resourceFileName")
+    val resourceFilePath = Paths.get(s"src/main/resources/$resourceFileName")
     val sftpClient = newSftpClient()
 
     try {
@@ -257,7 +258,7 @@ object SftpEcho extends App {
     val payloadFactor = 1000
     val payload = "1234567890" * payloadFactor
 
-    logger.info(s"Upload file with TRACE_ID: $id and approx. size: ${payload.length} bytes")
+    logger.info(s"Upload file with TRACE_ID: $id and size: ${payload.length} bytes")
     ByteString(s"$payload for: $id")
   }
 }

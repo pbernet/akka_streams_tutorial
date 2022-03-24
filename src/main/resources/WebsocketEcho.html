@@ -4,28 +4,31 @@
 <head>
     <meta charset="utf-8">
     <title>Simple websocket Client</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 </head>
 <body>
 <input type="button" onclick="connectToWS()" value="Connect to:"/>
-<input type="text" id="endpoint" name="endpoint" value="ws://localhost:6002/echo"
+<input type="text" id="endpoint_echo" name="endpoint_echo" value="ws://localhost:6002/echo"
        style="width: 200px"><br><br>
 <input type="button" onclick="sendMsg()" value="Send message:"/>
 <input type="text" id="myMessage" name="myMessage" value="world"><br><br>
-<input type="button" onclick="closeConn()" value="Close connection"/>
+<input type="button" onclick="connectToWSHeartbeat()" value="Connect to heartbeat:"/>
+<input type="text" id="endpoint_heartbeat" name="endpoint_heartbeat" value="ws://localhost:6002/echo_heartbeat"
+       style="width: 200px"><br><br>
+<input type="button" onclick="closeConn()" value="Close connection(s)"/>
 <ul id="messages"></ul>
 
 <script type="text/javascript">
     var $messages = $("#messages");
-    var myWebSocket;
+    var echoWebSocket;
 
     function connectToWS() {
-        var endpoint = document.getElementById("endpoint").value;
-        if (myWebSocket !== undefined) {
-            myWebSocket.close()
+        var endpoint_echo = document.getElementById("endpoint_echo").value;
+        if (echoWebSocket !== undefined) {
+            echoWebSocket.close()
         }
-        myWebSocket = new WebSocket(endpoint);
-        myWebSocket.onmessage = function (event) {
+        echoWebSocket = new WebSocket(endpoint_echo);
+        echoWebSocket.onmessage = function (event) {
             var leng;
             if (event.data.size === undefined) {
                 leng = event.data.length
@@ -35,26 +38,71 @@
             $messages.prepend($("<li>" + event.data + "</li>"))
             console.log("onmessage. size: " + leng + ", content: " + event.data);
         };
-        myWebSocket.onopen = function (evt) {
-            $messages.prepend($("<li>Connected</li>"))
-            console.log("onopen.");
+        echoWebSocket.onopen = function (evt) {
+            $messages.prepend($("<li>OPEN</li>"))
+            console.log("onopen state client: " + echoWebSocket.readyState);
         };
-        myWebSocket.onclose = function (evt) {
-            $messages.prepend($("<li>Closed</li>"))
-            console.log("onclose.");
+        echoWebSocket.onclose = function (evt) {
+            $messages.prepend($("<li>CLOSED</li>"))
+            // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
+            // If the server closes correctly, we get a 1000 (= Normal Closure) code
+            console.log("onclose - state client: " + echoWebSocket.readyState + " Reason server: " + evt.code);
         };
-        myWebSocket.onerror = function (evt) {
+        echoWebSocket.onerror = function (evt) {
             console.log("Error!");
         };
     }
 
+    var heartbeatWebSocket;
+
+    function connectToWSHeartbeat() {
+        var endpoint_heartbeat = document.getElementById("endpoint_heartbeat").value;
+        if (heartbeatWebSocket !== undefined) {
+            heartbeatWebSocket.close()
+        }
+        heartbeatWebSocket = new WebSocket(endpoint_heartbeat);
+        heartbeatWebSocket.onmessage = function (event) {
+            var leng;
+            if (event.data.size === undefined) {
+                leng = event.data.length
+            } else {
+                leng = event.data.size
+            }
+            $messages.prepend($("<li>" + event.data + "</li>"))
+            console.log("onmessage. size: " + leng + ", content: " + event.data);
+        };
+        heartbeatWebSocket.onopen = function (evt) {
+            $messages.prepend($("<li>OPEN</li>"))
+            console.log("onopen state client: " + heartbeatWebSocket.readyState);
+            console.log("Requesting heartbeat stream...");
+            heartbeatWebSocket.send("Start");
+        };
+        heartbeatWebSocket.onclose = function (evt) {
+            $messages.prepend($("<li>CLOSED</li>"))
+            // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
+            // If the server does not close, we would get a 1006 (= Abnormal Closure) code
+            console.log("onclose - state client: " + heartbeatWebSocket.readyState + " Reason server: " + evt.code);
+        };
+        heartbeatWebSocket.onerror = function (evt) {
+            console.log("Error!");
+        };
+    }
+
+
     function sendMsg() {
         var message = document.getElementById("myMessage").value;
-        myWebSocket.send("Browser-" + message);
+        echoWebSocket.send("Browser-" + message);
     }
 
     function closeConn() {
-        myWebSocket.close();
+        $messages.prepend($("<li>About to close connection(s)</li>"))
+
+        if (echoWebSocket !== undefined) {
+            echoWebSocket.close();
+        }
+        if (heartbeatWebSocket !== undefined) {
+            heartbeatWebSocket.close();
+        }
     }
 </script>
 </body>

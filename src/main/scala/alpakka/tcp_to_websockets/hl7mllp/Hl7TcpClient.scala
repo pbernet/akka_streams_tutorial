@@ -13,8 +13,9 @@ import scala.concurrent.duration._
 
 class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("Hl7TcpClient")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6160)
   val connection = Tcp().outgoingConnection(address, port)
@@ -30,7 +31,7 @@ class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
   }
 
   def localStreamingMessageClient(id: Int, numberOfMesssages: Int): Unit = {
-    val hl7MllpMessages=  (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString)) ))
+    val hl7MllpMessages = (1 to numberOfMesssages).map(each => ByteString(encodeMllp(generateTestMessage(each.toString))))
     val source = Source(hl7MllpMessages).throttle(10, 1.second).via(connection)
     val closed = source.runForeach(each => logger.info(s"Client: $id received echo: ${printable(each.utf8String)}"))
     closed.onComplete(each => logger.info(s"Client: $id closed: $each"))
@@ -83,5 +84,6 @@ class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
 
 object Hl7TcpClient extends App {
   val client = new Hl7TcpClient()
-  def apply(numberOfMessages: Int) = new Hl7TcpClient(numberOfMessages)
+
+  def apply(numberOfMessages: Int = 100) = new Hl7TcpClient(numberOfMessages)
 }

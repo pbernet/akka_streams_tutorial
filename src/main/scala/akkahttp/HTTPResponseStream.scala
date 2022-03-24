@@ -9,9 +9,9 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives.{complete, get, logRequestResult, path, _}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ThrottleMode
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import com.typesafe.config.ConfigFactory
+import org.slf4j.{Logger, LoggerFactory}
+import sample.graphstage.StreamEventInspector
 import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.Future
@@ -27,18 +27,21 @@ import scala.util.{Failure, Success}
   *
   * Doc JSON streaming support:
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/source-streaming-support.html
-  *
-  * Doc consuming JSON streaming APIs
   * https://doc.akka.io/docs/akka-http/current/common/json-support.html
+  *
+  * Remarks:
+  *  - No retry logic
+  *
   */
 object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSupport {
-  implicit val system = ActorSystem("HTTPResponseStream")
-  implicit val executionContext = system.dispatcher
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
 
-  //JSON Protocol and streaming support
-  final case class ExamplePerson(name: String)
+  import system.dispatcher
 
-  implicit def examplePersonFormat = jsonFormat1(ExamplePerson.apply)
+  final case class Person(name: String)
+
+  implicit def personFormat = jsonFormat1(Person)
 
   implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
@@ -47,20 +50,22 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   client(address, port)
 
   def client(address: String, port: Int): Unit = {
-    val requestParallelism = ConfigFactory.load.getInt("akka.http.host-connection-pool.max-connections")
+    val requestParallelism = 2
 
-    val requests: Source[HttpRequest, NotUsed] = Source
+    val requests = Source
       .fromIterator(() =>
-        Range(0, requestParallelism).map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i"))).iterator
+        Range(0, requestParallelism)
+          .map(i => HttpRequest(uri = Uri(s"http://$address:$port/download/$i")))
+          .iterator
       )
 
-    // Run singleRequest and consume all response elements
+    // Run singleRequest and then consume all response elements
     def runRequestDownload(req: HttpRequest) =
       Http()
         .singleRequest(req)
         .flatMap { response =>
-          val unmarshalled: Future[Source[ExamplePerson, NotUsed]] = Unmarshal(response).to[Source[ExamplePerson, NotUsed]]
-          val source: Source[ExamplePerson, Future[NotUsed]] = Source.futureSource(unmarshalled)
+          val unmarshalled: Future[Source[Person, NotUsed]] = Unmarshal(response).to[Source[Person, NotUsed]]
+          val source: Source[Person, Future[NotUsed]] = Source.futureSource(unmarshalled)
           source.via(processorFlow).runWith(printSink)
         }
 
@@ -70,11 +75,11 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   }
 
 
-  val printSink = Sink.foreach[ExamplePerson] { each: ExamplePerson => println(s"Client processed element: $each") }
+  val printSink = Sink.foreach[Person] { each: Person => logger.info(s"Client processed element: $each") }
 
-  val processorFlow: Flow[ExamplePerson, ExamplePerson, NotUsed] = Flow[ExamplePerson].map {
-    each: ExamplePerson => {
-      //println(s"Process: $each")
+  val processorFlow: Flow[Person, Person, NotUsed] = Flow[Person].map {
+    each: Person => {
+      //logger.info(s"Process: $each")
       each
     }
   }
@@ -83,15 +88,20 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   def server(address: String, port: Int): Unit = {
 
     def routes: Route = logRequestResult("httpecho") {
-      path("download" / Segment) { id: String =>
+      path("download" / Segment) { clientId: String =>
         get {
-          println(s"Server received request with id: $id, stream response...")
+          logger.info(s"Server received request with id: $clientId, start streaming response...")
           extractRequest { r: HttpRequest =>
             val finishedWriting = r.discardEntityBytes().future
-            onComplete(finishedWriting) { done =>
-              //Limit response by appending eg .take(5)
-              val responseStream: LazyList[ExamplePerson] = LazyList.continually(ExamplePerson(s"request:$id"))
-              complete(Source(responseStream).throttle(1, 1.second, 1, ThrottleMode.shaping))
+            onComplete(finishedWriting) { _ =>
+
+              val numberOfMessages = 100
+              val response = Source
+                .tick(1.second, 100.millis, ())
+                .zipWith(Source(1 to numberOfMessages))((_, nbr) => Person(s"$clientId-$nbr"))
+                // Optional, eg for debugging
+                .via(StreamEventInspector(r.uri.path.toString(), Person => Person.toString))
+              complete(response)
             }
           }
         }
@@ -101,9 +111,9 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
     val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info("Server started, listening on: " + b.localAddress)
       case Failure(e) =>
-        println(s"Server could not bind to: $address:$port. Exception message: ${e.getMessage}")
+        logger.info(s"Server could not bind to: $address:$port. Exception message: ${e.getMessage}")
         system.terminate()
     }
   }

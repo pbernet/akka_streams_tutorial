@@ -1,7 +1,5 @@
 package sample.stream_shared_state
 
-import java.nio.file.Paths
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.IOResult
@@ -9,6 +7,7 @@ import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
 import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file.Paths
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -43,8 +42,9 @@ import scala.util.{Failure, Success}
   */
 object SplitWhen extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SplitWhen")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val nonLinearCapacityFactor = 100 //raise to see how it scales
   val filename = "splitWhen.csv"
@@ -54,7 +54,7 @@ object SplitWhen extends App {
 
     def fileSink(filename: String): Sink[String, Future[IOResult]] =
       Flow[String]
-        .map(s => ByteString(s + "\n"))
+        .map(s => ByteString(s + System.lineSeparator))
         .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right)
 
     Source.fromIterator(() => (1 to nonLinearCapacityFactor).toList.combinations(2))
@@ -63,7 +63,7 @@ object SplitWhen extends App {
   }
 
   val sourceOfLines = FileIO.fromPath(Paths.get(filename))
-    .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
+    .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
 
   val csvToRecord: Flow[String, Record, NotUsed] = Flow[String]
@@ -103,11 +103,11 @@ object SplitWhen extends App {
       sourceOfLines
         .via(csvToRecord)
         .via(terminationHook)
-        .statefulMapConcat(hasKeyChanged)   // stateful decision
-        .splitWhen(_._2)                    // split when key has changed
-        .map(_._1)                          // proceed with payload
+        .statefulMapConcat(hasKeyChanged) // stateful decision
+        .splitWhen(_._2) // split when key has changed
+        .map(_._1) // proceed with payload
         .fold(Vector.empty[Record])(_ :+ _) // sum payload
-        .mergeSubstreams                    // better performance, but why?
+        .mergeSubstreams // better performance, but why?
         .runWith(printSink)
     case Failure(exception) => logger.info(s"Exception: $exception")
   }

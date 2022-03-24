@@ -99,7 +99,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
   private def createEchoPrintSink(): Sink[Message, Future[Done]] = {
     Sink.foreach {
       //see https://github.com/akka/akka-http/issues/65
-      case TextMessage.Strict(text) => logger.info(s"WebSocket client received TextMessage.Strict: ${printableShort(text)}")
+      case TextMessage.Strict(text) => logger.info(s"WebSocket client received ACK TextMessage.Strict: ${printableShort(text)}")
       case TextMessage.Streamed(textStream) => textStream.runFold("")(_ + _).onComplete { value =>
         logger.info(s"WebSocket client received TextMessage.Streamed: ${printableShort(value.get)}")
       }

@@ -1,12 +1,11 @@
 package sample.stream
 
-import java.time.{Instant, ZoneId, ZonedDateTime}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
 import akka.stream.{DelayOverflowStrategy, ThrottleMode}
 
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import scala.concurrent.duration._
 import scala.util.Failure
 
@@ -25,8 +24,9 @@ case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
   *
   */
 object SlowConsumerDropsElementsOnFastProducer extends App {
-  implicit val system = ActorSystem("SlowConsumerDropsElementsOnFastProducer")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val fastSource: Source[SourceEvent, NotUsed] =
     Source(1 to 500)
@@ -37,8 +37,8 @@ object SlowConsumerDropsElementsOnFastProducer extends App {
       }
 
   val droppyStream: Flow[SourceEvent, SourceEvent, NotUsed] =
-  //Conflate is "rate aware", it combines/aggregates elements from upstream while downstream backpressures
-  //The reducer function here takes the freshest element. This in a simple dropping operation.
+    // Conflate is "rate aware", it combines/aggregates elements from upstream while downstream backpressures
+    // The reducer function takes the freshest element (= newEvent). This in a simple dropping operation.
     Flow[SourceEvent]
       .conflate((lastEvent, newEvent) => newEvent)
 
@@ -60,13 +60,13 @@ object SlowConsumerDropsElementsOnFastProducer extends App {
 
   val slowSink: Sink[DomainEvent, NotUsed] =
     Flow[DomainEvent]
-      //.buffer(100, OverflowStrategy.backpressure)
+      // Internal buffer in delay operator has default capacity 16
       .delay(10.seconds, DelayOverflowStrategy.backpressure)
       .to(Sink.foreach(e => println(s"Reached Sink: $e")))
 
   fastSource
     .via(droppyStream)
     .via(enrichWithTimestamp)
-    .via(terminationHook)
+    //.via(terminationHook)
     .runWith(slowSink)
 }

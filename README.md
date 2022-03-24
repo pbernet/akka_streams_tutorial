@@ -1,25 +1,32 @@
-[![Build Status](https://travis-ci.org/pbernet/akka_streams_tutorial.svg?branch=master)](https://travis-ci.org/pbernet/akka_streams_tutorial)
+[![Build Status](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml/badge.svg)](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml)
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) docs, tutorials, blogs and postings to provide you with exactly this feeling.
+This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * [HTTP file download with local cache](#HTTP-file-download-with-local-cache)
 * [Windturbine example](#Windturbine-example) 
 * [Apache Kafka WordCount](#Apache-Kafka-WordCount)
 * [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
+* [Analyse Wikipedia edits live stream](#Analyse-Wikipedia-edits-live-stream)
 
-These examples all deal with some kind of shared state. 
+Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful operators in action.
 
-Another group are the `*Echo` examples, which implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala).
-
-Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources. 
+Other noteworthy examples:
+* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala)
+* Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources
 
 Remarks:
-* Requires JDK 8 update 252 or higher (to run akka-http 10.2.x examples in package [akkahttp](src/main/scala/akkahttp)) or a late JDK 8/11 to run [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
-* Most examples are throttled so you can see from the console output what is happening
+* Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
+* Most examples are throttled, so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* No unit tests and quirky package names
+* The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
+
+Other resources:
+* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
+* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
+* The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html) and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html) provide useful background
+* The concept of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams) is also explained in this [blog](http://nivox.github.io/posts/akka-stream-materialized-values), this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
 
 ## HTTP file download with local cache ##
 Use case with shared state:
@@ -30,7 +37,7 @@ Use case with shared state:
 | Class                     | Description     |
 | -------------------       |-----------------|
 | [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Local HTTP `FileServer` for non-idempotent file download simulation|
-| [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams flow, which uses a local file cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") to share state|
+| [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams client flow, with cache implemented with [caffeine](https://github.com/ben-manes/caffeine "")|
 
 
 ## Windturbine example ##
@@ -51,24 +58,30 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
 
 ## Apache Kafka WordCount ##
-The ubiquitous word count with additional message count (A message is a sequence of words).
+The ubiquitous word count with an additional message count. A message is a sequence of words.
 Start the classes in the order below and watch the console output.
 
-| Class               | Description      |
-| ------------------- |-----------------|
-| [KafkaServer.scala](src/main/scala/alpakka/env/KafkaServer.scala)| Standalone Kafka/Zookeeper.  
-| [WordCountProducer.scala](src/main/scala/alpakka/kafka/WordCountProducer.scala)| Client which feeds words to topic `wordcount-input`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")      |
-| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| Client which does word and message count. Implemented with [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc")        |
-| [WordCountConsumer.scala](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| Client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`. Implemented with [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc")    |
-| [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset    | 
-
-`WordCountKStreams.java` and `WordCountConsumer.scala` should yield the same results.
+| Class               | Description                                                                                                                                                                                                                                                                            |
+| ------------------- |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [KafkaServerEmbedded.scala](src/main/scala/alpakka/env/KafkaServerEmbedded.scala)| Uses [Embedded Kafka](https://github.com/embeddedkafka/embedded-kafka) (= an in-memory Kafka instance). No persistence on restart                                                                                                                                                      | 
+| [WordCountProducer.scala](src/main/scala/alpakka/kafka/WordCountProducer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which feeds random words to topic `wordcount-input`                                                                                                                                    |
+| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc") client to count words and messages and feed the results to `wordcount-output` and `messagecount-output` topics. Contains additional interactive queries which should yield the same results `WordCountConsumer.scala` |
+| [WordCountConsumer.scala](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`                                                                                              |
+| [DeleteTopicUtil.scala](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset                                                                                                                                                                                                                                                            |
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is some kind of Alpakka-Trophy with these stages:
+This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
 
 `Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
 
-The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost.
+The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
-Start the stages separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/AlpakkaTrophySpec.scala)  
+Start each stage separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
+
+## Analyse Wikipedia edits live stream ##
+Find out whose Wikipedia articles were changed in (near) real time by tapping into the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
+The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API, eg for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
+Text processing on this content using [opennlp](https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html) yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
+The index is queried periodically and the content may also be viewed with a Browser, eg
+
+`http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`

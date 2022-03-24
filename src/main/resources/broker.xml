@@ -1,0 +1,63 @@
+<?xml version='1.0'?>
+<!--
+Apache Artemis minimal broker config
+-->
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:activemq"
+               xsi:schemaLocation="urn:activemq /schema/artemis-server.xsd">
+    <core xmlns="urn:activemq:core">
+
+        <persistence-enabled>true</persistence-enabled>
+        <journal-type>NIO</journal-type>
+        <journal-pool-files>10</journal-pool-files>
+
+        <acceptors>
+            <!-- https://activemq.apache.org/uri-protocols -->
+            <acceptor name="in-vm">vm://0</acceptor>
+            <acceptor name="tcp">tcp://0.0.0.0:21616</acceptor>
+        </acceptors>
+
+
+        <security-settings>
+            <security-setting match="#">
+                <permission type="createAddress" roles="guest"/>
+                <permission type="createDurableQueue" roles="guest"/>
+                <permission type="deleteDurableQueue" roles="guest"/>
+                <permission type="createNonDurableQueue" roles="guest"/>
+                <permission type="deleteNonDurableQueue" roles="guest"/>
+                <permission type="consume" roles="guest"/>
+                <permission type="send" roles="guest"/>
+                <permission type="browse" roles="guest"/>
+            </security-setting>
+        </security-settings>
+
+        <!-- TODO sync with broker_docker.xml -->
+        <queues>
+            <queue name="jms.queue.exampleQueue">
+                <address>jms.queue.exampleQueue</address>
+                <durable>true</durable>
+            </queue>
+        </queues>
+
+
+        <address-settings>
+            <address-setting match="jms.queue.exampleQueue">
+                <dead-letter-address>jms.queue.deadLetterQueue</dead-letter-address>
+                <max-delivery-attempts>3</max-delivery-attempts>
+                <redelivery-delay>5000</redelivery-delay>
+                <expiry-address>jms.queue.expiryQueue</expiry-address>
+                <last-value-queue>true</last-value-queue>
+                <max-size-bytes>100000</max-size-bytes>
+                <page-size-bytes>20000</page-size-bytes>
+                <redistribution-delay>0</redistribution-delay>
+                <send-to-dla-on-no-route>true</send-to-dla-on-no-route>
+                <address-full-policy>PAGE</address-full-policy>
+                <slow-consumer-threshold>-1</slow-consumer-threshold>
+                <slow-consumer-policy>NOTIFY</slow-consumer-policy>
+                <slow-consumer-check-period>5</slow-consumer-check-period>
+                <auto-create-queues>true</auto-create-queues>
+                <!-- <auto-delete-queues>true</auto-delete-queues> -->
+            </address-setting>
+        </address-settings>
+
+    </core>
+</configuration>

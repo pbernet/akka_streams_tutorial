@@ -1,11 +1,10 @@
 package alpakka.file
 
-import java.nio.file.Paths
-
 import akka.actor.ActorSystem
 import akka.stream.IOResult
 import akka.stream.scaladsl.FileIO
 
+import java.nio.file.Paths
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -16,14 +15,16 @@ import scala.util.{Failure, Success}
   * Remark:
   *
   * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
+  *
   * @see [[https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks]]
   *
   */
 object FileIOEcho extends App {
-  implicit val system = ActorSystem("FileIOEcho")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
 
-  val sourceFileName = "./src/main/resources/testfile.jpg"
+  import system.dispatcher
+
+  val sourceFileName = "src/main/resources/testfile.jpg"
   val encFileName = "testfile.enc"
   val resultFileName = "testfile_result.jpg"
 

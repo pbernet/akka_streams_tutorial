@@ -1,12 +1,11 @@
 package sample.stream
 
-import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 
+import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Failure
@@ -18,8 +17,9 @@ import scala.util.Failure
   * https://doc.akka.io/docs/akka/current/stream/operators/Source/unfoldResource.html
   */
 object PublishToBlockingResource extends App {
-  implicit val system = ActorSystem("PublishToBlockingResource")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val slowSink: Sink[Seq[Int], NotUsed] =
     Flow[Seq[Int]]
@@ -28,14 +28,14 @@ object PublishToBlockingResource extends App {
 
   val blockingResource: BlockingQueue[Int] = new ArrayBlockingQueue[Int](100)
 
-  //Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
+  // Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
   val source: Source[Int, NotUsed] =
     Source.unfoldResource[Int, BlockingQueue[Int]](
-      () => blockingResource,                   //open
-      (q: BlockingQueue[Int]) => Some(q.take()),//read
-      (_: BlockingQueue[Int]) => {})            //close
+      () => blockingResource,                    //open
+      (q: BlockingQueue[Int]) => Some(q.take()), //read
+      (_: BlockingQueue[Int]) => {})             //close
 
-  val done = source
+  source
     .groupedWithin(10, 2.seconds)
     .watchTermination()((_, done) => done.onComplete {
       case Failure(err) =>
@@ -44,6 +44,6 @@ object PublishToBlockingResource extends App {
     })
     .runWith(slowSink)
 
-  //simulate n process that publish in blocking fashion to the queue
+  // simulate n clients that publish to blockingResource
   (1 to 1000).par.foreach(value => blockingResource.put(value))
 }

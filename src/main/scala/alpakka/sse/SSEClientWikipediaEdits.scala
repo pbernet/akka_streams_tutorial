@@ -1,25 +1,25 @@
 package alpakka.sse
 
-import java.time.{Instant, ZoneId}
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import akka.stream.{ActorAttributes, RestartSettings, Supervision}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
+import akka.stream.alpakka.sse.scaladsl.EventSource
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{Supervision, ThrottleMode}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 
+import java.time.{Instant, ZoneId}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.sys.process._
 import scala.util.Try
 import scala.util.control.NonFatal
 
 
-case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot:Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
   override def toString = {
     val localDateTime = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDateTime
     s"$localDateTime - $cmdType on server: $serverName by: $user isBot:$isBot isNamedBot:$isNamedBot new: $lengthNew old: $lengthOld (${lengthNew - lengthOld})"
@@ -30,52 +30,47 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   * Just because we can :-)
   * Consume the WikipediaEdits stream which is implemented with SSE - see:
   * https://wikitech.wikimedia.org/wiki/EventStreams
-  * https://www.matthowlett.com/2017-12-23-exploring-wikipedia-ksql.html
   *
+  * Uses Alpakka SSE client, Doc: https://doc.akka.io/docs/alpakka/current/sse.html
+  * Similar usage in [[alpakka.sse_to_elasticsearch.SSEtoElasticsearch]])
   */
-object SSEClientWikipediaEdits {
-  implicit val system = ActorSystem("SSEClientWikipediaEdits")
-  implicit val executionContext = system.dispatcher
+object SSEClientWikipediaEdits extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  implicit val system: ActorSystem = ActorSystem()
+
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")
       Supervision.Restart
   }
 
-  def main(args: Array[String]) : Unit = {
-    browserClient()
-    sseClient()
-  }
+  browserClient()
+  sseClient()
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open ./src/main/resources/SSEClientWikipediaEdits.html").!
+    if (os == "mac os x") Process("open src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
   private def sseClient() = {
+    val send: HttpRequest => Future[HttpResponse] = Http().singleRequest(_)
 
-    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+    val eventSource: Source[ServerSentEvent, NotUsed] =
+      EventSource(
+        uri = Uri("https://stream.wikimedia.org/v2/stream/recentchange"),
+        send,
+        None,
+        retryDelay = 1.second
+      )
 
-    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
-    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
-      Source.futureSource {
-        Http()
-          .singleRequest(HttpRequest(
-            uri = "https://stream.wikimedia.org/v2/stream/recentchange"
-          ))
-          .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-      }.withAttributes(ActorAttributes.supervisionStrategy(decider))
-    }
-
-    val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString())}
+    val printSink = Sink.foreach[Change] { each: Change => logger.info(each.toString()) }
 
     val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
 
         def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
 
-        def isNamedBot(bot: Boolean, user: String) : Boolean = {
+        def isNamedBot(bot: Boolean, user: String): Boolean = {
           if (bot) user.toLowerCase().contains("bot") else false
         }
 
@@ -87,7 +82,7 @@ object SSEClientWikipediaEdits {
 
         val cmdType = (Json.parse(event.data) \ "type").as[String]
 
-        val bot =  (Json.parse(event.data) \ "bot").as[Boolean]
+        val bot = (Json.parse(event.data) \ "bot").as[Boolean]
 
         if (cmdType == "new" || cmdType == "edit") {
           val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
@@ -99,7 +94,8 @@ object SSEClientWikipediaEdits {
       }
     }
 
-    restartSource
+    eventSource
+      .throttle(elements = 1, per = 500.milliseconds, maximumBurst = 1, ThrottleMode.Shaping)
       .via(parserFlow)
       .runWith(printSink)
   }

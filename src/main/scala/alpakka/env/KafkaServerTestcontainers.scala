@@ -6,17 +6,21 @@ import org.testcontainers.utility.DockerImageName
 
 /**
   * Uses testcontainers.org to run the
-  * latest Kafka-Version from confluentinc
+  * latest Kafka-Version from Confluent
   *
-  * Alternatives:
-  *  - [[KafkaServer]]
+  * Alternative: [[KafkaServerEmbedded]]
   *
   * Doc:
   * https://www.testcontainers.org/modules/kafka
+  * https://doc.akka.io/docs/alpakka-kafka/current/testing-testcontainers.html
+  * https://doc.akka.io/docs/alpakka-kafka/current/testing.html
   */
 class KafkaServerTestcontainers {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val kafkaVersion = "latest"
+  // Pin Kafka version for now, because 'latest' does not work on github actions anymore
+  // https://hub.docker.com/r/confluentinc/cp-kafka
+  // https://docs.confluent.io/platform/current/installation/versions-interoperability.html#cp-and-apache-kafka-compatibility
+  val kafkaVersion = "6.2.1"
   val imageName = s"confluentinc/cp-kafka:$kafkaVersion"
   val originalPort = 9093
   var mappedPort = 1111

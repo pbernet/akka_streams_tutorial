@@ -1,46 +1,51 @@
 package alpakka.sse_to_elasticsearch
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.alpakka.elasticsearch.WriteMessage.createIndexMessage
+import akka.stream.alpakka.elasticsearch._
 import akka.stream.alpakka.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
-import akka.stream.alpakka.elasticsearch.{ApiVersion, ElasticsearchWriteSettings, ReadResult, WriteMessage}
 import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
 import akka.stream.{ActorAttributes, RestartSettings, Supervision}
-import akka.{Done, NotUsed}
-import org.apache.http.HttpHost
-import org.elasticsearch.client.RestClient
+import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
+import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
+import opennlp.tools.util.Span
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.elasticsearch.ElasticsearchContainer
+import org.testcontainers.utility.DockerImageName
 import play.api.libs.json._
-import spray.json
-import spray.json.DefaultJsonProtocol.{jsonFormat8, _}
+import spray.json.DefaultJsonProtocol._
 import spray.json.JsonFormat
 
+import java.io.FileInputStream
+import java.net.URLEncoder
+import java.nio.file.Paths
+import java.time.{Instant, ZoneId}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.sys.process.Process
 import scala.util.Try
 import scala.util.control.NonFatal
 
+
 /**
-  * Read Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]])
-  * and write them to Elasticsearch version 7.x
-  * [[SSEtoElasticsearch.Change]] acts as a data bridge between the two worlds
+  * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
+  * fetch the abstract from Wikipedia API,
+  * do NER processing
+  * and write the results to Elasticsearch version 7.x server
   *
-  * Note that alpakka 2.0.1 has this dependency. Output from cmd dependencyTree:
-  * [info]   +-com.lightbend.akka:akka-stream-alpakka-elasticsearch_2.12:2.0.1 [S]
-  * ..
-  * [info]   | +-org.elasticsearch.client:elasticsearch-rest-client:6.3.1
-  *
+  * Doc:
+  * https://doc.akka.io/docs/alpakka/current/elasticsearch.html
   */
-object SSEtoElasticsearch {
+object SSEtoElasticsearch extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("SSEtoElasticsearch")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val decider: Supervision.Decider = {
     case NonFatal(e) =>
@@ -48,114 +53,197 @@ object SSEtoElasticsearch {
       Supervision.Restart
   }
 
-  case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
+  val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/en-token.bin").toFile))
+  val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
 
-  implicit val format: JsonFormat[Change] = jsonFormat8(Change)
+  case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
-  val elasticsearchVersion = "7.6.2"
-  val elasticsearchContainer = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch-oss:" + elasticsearchVersion)
+  // Helps to carry the data through the stages, although this violates functional principles
+  case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String = "")
+
+  implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
+  implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
+
+  val dockerImageName = DockerImageName
+    .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
+    .withTag("7.10.2")
+  val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
   elasticsearchContainer.start()
-  val elasticsearchAddress: Array[String] = elasticsearchContainer.getHttpHostAddress.split(":")
 
-  implicit val elasticSearchClient: RestClient = RestClient.builder(new HttpHost(elasticsearchAddress(0), elasticsearchAddress(1).toInt)).build()
+  val address = elasticsearchContainer.getHttpHostAddress
+  val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
 
+  // This index will be created in Elasticsearch on the fly
   val indexName = "wikipediaedits"
-  val typeName = "_doc"
-  val elasticsearchSink: Sink[WriteMessage[Change, NotUsed], Future[Done]] = ElasticsearchSink.create[Change](indexName, typeName, ElasticsearchWriteSettings().withApiVersion(ApiVersion.V7))
-  val elasticsearchSource: Source[ReadResult[json.JsObject], NotUsed] = ElasticsearchSource.create(indexName, typeName, """{"match_all": {}}""")
+  val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
+  val matchAllQuery = """{"match_all": {}}"""
+
+  val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
+  val elasticsearchSourceTyped = ElasticsearchSource
+    .typed[Ctx](
+      elasticsearchParamsV7,
+      query = matchAllQuery,
+      settings = sourceSettings
+    )
+  val elasticsearchSourceRaw = ElasticsearchSource
+    .create(
+      elasticsearchParamsV7,
+      query = matchAllQuery,
+      settings = sourceSettings
+    )
+
+  val sinkSettings =
+    ElasticsearchWriteSettings(connectionSettings)
+      .withBufferSize(10)
+      .withVersionType("internal")
+      .withRetryLogic(RetryAtFixedRate(maxRetries = 5, retryInterval = 1.second))
+      .withApiVersion(ApiVersion.V7)
+  val elasticsearchSink =
+    ElasticsearchSink.create[Ctx](
+      elasticsearchParamsV7,
+      settings = sinkSettings
+    )
 
 
-  def main(args: Array[String]) : Unit = {
-    logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
+  import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
-    readFromWikipediaAndWriteToElasticsearch()
-
-    //Wait for the index to populate
-    Thread.sleep(10.seconds.toMillis)
-    browserClient()
-    queryOnce()
+  val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+  val restartSource = RestartSource.withBackoff(restartSettings) { () =>
+    Source.futureSource {
+      Http()
+        .singleRequest(HttpRequest(
+          uri = "https://stream.wikimedia.org/v2/stream/recentchange"
+        ))
+        .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
+    }.withAttributes(ActorAttributes.supervisionStrategy(decider))
   }
 
-  private def readFromWikipediaAndWriteToElasticsearch() = {
+  val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
+    event: ServerSentEvent => {
 
-    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+      def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
 
-    val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
-    val restartSource = RestartSource.withBackoff(restartSettings) { () =>
-      Source.futureSource {
-        Http()
-          .singleRequest(HttpRequest(
-            uri = "https://stream.wikimedia.org/v2/stream/recentchange"
-          ))
-          .flatMap(Unmarshal(_).to[Source[ServerSentEvent, NotUsed]])
-      }.withAttributes(ActorAttributes.supervisionStrategy(decider))
-    }
+      def isNamedBot(bot: Boolean, user: String): Boolean = {
+        if (bot) user.toLowerCase().contains("bot") else false
+      }
 
-    val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
-      event: ServerSentEvent => {
+      // We use the title as identifier
+      val title = (Json.parse(event.data) \ "title").as[String]
 
-        def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
+      val timestamp = (Json.parse(event.data) \ "timestamp").as[Long]
 
-        def isNamedBot(bot: Boolean, user: String): Boolean = {
-          if (bot) user.toLowerCase().contains("bot") else false
-        }
+      val serverName = (Json.parse(event.data) \ "server_name").as[String]
 
-        val timestamp = (Json.parse(event.data) \ "timestamp").as[Long]
+      val user = (Json.parse(event.data) \ "user").as[String]
 
-        val serverName = (Json.parse(event.data) \ "server_name").as[String]
+      val cmdType = (Json.parse(event.data) \ "type").as[String]
 
-        val user = (Json.parse(event.data) \ "user").as[String]
+      val bot = (Json.parse(event.data) \ "bot").as[Boolean]
 
-        val cmdType = (Json.parse(event.data) \ "type").as[String]
-
-        val bot = (Json.parse(event.data) \ "bot").as[Boolean]
-
-        if (cmdType == "new" || cmdType == "edit") {
-          val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
-          val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
-          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
-        } else {
-          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
-        }
+      if (cmdType == "new" || cmdType == "edit") {
+        val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
+        val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
+        Change(timestamp, title, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
+      } else {
+        Change(timestamp, title, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
       }
     }
+  }
 
-    val done = restartSource
-      .via(parserFlow)
-      .map(change => createIndexMessage(change))
-      .wireTap(each => logger.info(s"Add to index: $each"))
-      .runWith(elasticsearchSink)
-    done.onComplete { _ =>
-      elasticSearchClient.close()
-      elasticsearchContainer.stop()
+  def fetchContent(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
+    val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
+
+    val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
+    Http().singleRequest(HttpRequest(uri = requestURL))
+      // Consume the streamed response entity
+      // Doc: https://doc.akka.io/docs/akka-http/current/client-side/request-level.html
+      .flatMap(_.entity.toStrict(2.seconds))
+      .map(_.data.utf8String.split("\"extract\":").reverse.head)
+      .map(content => ctx.copy(content = content))
+  }
+
+
+  def findPersons(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"About to find person names in: ${ctx.change.title}")
+    val content = ctx.content
+
+    // We need a new instance because the access to TokenizerME is not thread safe
+    // Doc: https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html
+    val tokenizer = new TokenizerME(tokenModel)
+    val tokens = tokenizer.tokenize(content)
+
+    val personNameFinderME = new NameFinderME(personModel)
+    val spans = personNameFinderME.find(tokens)
+    val personsFound = Span.spansToStrings(spans, tokens).toList.distinct
+    personNameFinderME.clearAdaptiveData()
+
+    if (personsFound.isEmpty) {
+      Future(ctx)
+    } else {
+      logger.info(s"FOUND persons: $personsFound on content: $content")
+      Future(ctx.copy(personsFound = personsFound))
     }
   }
+
+  val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
+    .filter(change => !change.isBot)
+    .map(change => Ctx(change))
+    .mapAsync(3)(ctx => fetchContent(ctx))
+    .mapAsync(3)(ctx => findPersons(ctx))
+    .filter(ctx => ctx.personsFound.nonEmpty)
+
+  logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
+  logger.info("About to start processing flow...")
+
+  restartSource
+    .via(parserFlow)
+    .via(nerProcessingFlow)
+    .map(ctx => createIndexMessage(dateTimeFormatted(ctx.change.timestamp), ctx))
+    .wireTap(each => logger.info(s"Add to index: $each"))
+    .withAttributes(ActorAttributes.supervisionStrategy(decider))
+    .runWith(elasticsearchSink)
+
+
+  // Wait for the index to populate
+  Thread.sleep(10.seconds.toMillis)
+  browserClient()
+
+  Source.tick(1.seconds, 10.seconds, ())
+    .map(_ => query())
+    .runWith(Sink.ignore)
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://localhost:${elasticsearchAddress(1).toInt}/$indexName/_search?q=*").!
-  }
-
-  private def queryOnce() = {
-    for {
-      result <- readFromElasticsearch(indexName, typeName)
-      resultRaw <- readFromElasticsearchRaw()
-    } {
-      logger.info(s"Read: ${result.size} records. 1st: ${result.head}")
-      logger.info(s"ReadRaw: ${resultRaw.size} records. 1st: ${resultRaw.head}")
+    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*"
+    if (os == "mac os x") {
+      Process(s"open $searchURL").!
+    }
+    else {
+      logger.info(s"Please open a browser at: $searchURL")
     }
   }
 
-  private def readFromElasticsearchRaw() = {
-    elasticsearchSource
-      .map(_.source)
-      .runWith(Sink.seq)
+  private def dateTimeFormatted(timestamp: Long) = {
+    Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
   }
 
-  private def readFromElasticsearch(indexName: String, typeName: String) = {
-    ElasticsearchSource
-      .typed[Change](indexName, typeName, """{"match_all": {}}""")
-      .map(_.source)
-      .runWith(Sink.seq)
+  private def query() = {
+    logger.info(s"About to execute read queries...")
+    for {
+      result <- readFromElasticsearchTyped()
+      resultRaw <- readFromElasticsearchRaw()
+    } {
+      logger.info(s"Read typed: ${result.size}. 1st element: ${result.head}")
+      logger.info(s"Read raw: ${resultRaw.size}. 1st element: ${resultRaw.head}")
+    }
+  }
+
+  private def readFromElasticsearchTyped() = {
+    elasticsearchSourceTyped.runWith(Sink.seq)
+  }
+
+  private def readFromElasticsearchRaw() = {
+    elasticsearchSourceRaw.runWith(Sink.seq)
   }
 }

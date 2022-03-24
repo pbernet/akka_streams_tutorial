@@ -1,7 +1,5 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
-import java.util.Properties
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.kafka.ProducerSettings
@@ -17,6 +15,7 @@ import org.apache.kafka.clients.producer.{Producer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.Properties
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -41,8 +40,9 @@ import scala.util.{Failure, Success}
   */
 class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("Hl7Tcp2Kafka")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
   val topic = "hl7-input"
@@ -59,12 +59,15 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
 
   def run() = {
     serverBinding = server(address, port)
+    logger.info(s"Sending messages to Kafka on: $bootstrapServers")
   }
 
   def stop() = {
     serverBinding.map { b =>
       b.unbind().onComplete {
-        case _ => logger.info("TCP server stopped")
+        _ =>
+          logger.info("TCP server stopped, stopping producer flow...")
+          system.terminate()
       }
     }
   }
@@ -200,7 +203,7 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
     AdminClient.create(prop)
   }
 
-  sys.ShutdownHookThread{
+  sys.ShutdownHookThread {
     logger.info("Got control-c cmd from shell or SIGTERM, about to shutdown...")
     stop()
   }
@@ -209,7 +212,9 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 9092) extends MllpProtocol {
 object Hl7Tcp2Kafka extends App {
   val server = new Hl7Tcp2Kafka()
   server.run()
+
   def apply(mappedPort: Int) = new Hl7Tcp2Kafka(mappedPort)
+
   def stop() = server.stop()
 }
 

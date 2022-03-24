@@ -1,7 +1,5 @@
 package alpakka.jms
 
-import java.util.concurrent.ThreadLocalRandom
-
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.alpakka.jms._
@@ -9,10 +7,11 @@ import akka.stream.alpakka.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsPro
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.config.Config
-import javax.jms.{ConnectionFactory, Message, TextMessage}
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.concurrent.ThreadLocalRandom
+import javax.jms.{ConnectionFactory, Message, TextMessage}
 import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -20,25 +19,24 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * An Alpakka JMS client which consumes text messages from:
-  *  - Embedded ActiveMQ [[alpakka.env.jms.JMSServer]] which may be restarted manually
-  *  - Artemis JMS Broker on docker: /docker/docker-compose.yml
+  * An Alpakka JMS client which consumes text messages from either:
+  *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
+  *  - Preferred:    Embedded Artemis JMS Broker [[JMSServerArtemis]], started from IDE
+  *  - Experimental: Embedded ActiveMQ [[alpakka.env.jms.JMSServer]], started from IDE
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
-  * Up to Alpakka 1.0-M1 there was an issue discussed here:
-  * Alpakka JMS connector restart behaviour
-  * https://discuss.lightbend.com/t/alpakka-jms-connector-restart-behaviour/1883
-  * This was fixed with 1.0-M2
-  *
-  * This example has been "upcycled" to demonstrate a realistic consumer scenario,
-  * where non deliverable messages are written to an error queue. Watch for java.lang.RuntimeException: BOOM
-  *
+  * Features:
+  *  - non deliverable messages are acknowledged and written to an error queue (so that processing resumes)
+  *  - Failures in this client may be simulated by throwing random java.lang.RuntimeException: BOOM
+  *    see [[ProcessingApp.simulateFaultyDeliveryToExternalSystem]]
+  *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system = ActorSystem("ProcessingApp")
-  implicit val ec = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
@@ -47,13 +45,15 @@ object ProcessingApp {
     case _ => Supervision.Stop
   }
 
-  def main(args: Array[String]) : Unit = {
+  def main(args: Array[String]): Unit = {
 
     val control: JmsConsumerControl = jmsConsumerSource
-      .mapAsyncUnordered(10) (ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
+      .mapAsyncUnordered(10)(ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
       .map {
         ackEnvelope =>
+          // Ack this way ensures that messages are not replayed upon Broker restart
           ackEnvelope.acknowledge()
+          ackEnvelope.message.acknowledge()
           ackEnvelope.message
       }
       .wireTap(textMessage => logger.info(s"ACK Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))
@@ -64,7 +64,8 @@ object ProcessingApp {
     pendingMessageWatcher(control)
   }
 
-  //The "failover:" part in the brokerURL instructs the ActiveMQ client lib to reconnect on network failure
+  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
+  // Seems to work together with the new connection and send retry settings on the connector
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
@@ -77,18 +78,18 @@ object ProcessingApp {
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
       .withBufferSize(0)
-      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge)  //Default
+      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge) //Default
   )
 
   val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
   val errorQueue = Source
     .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
-    .toMat(errorQueueSink) (Keep.left)
+    .toMat(errorQueueSink)(Keep.left)
     .run()
 
 
-  //We may do a (blocking) retry in this method to handle recoverable conditions of the external system
+  // We may do a (blocking) retry in this method to handle recoverable conditions of the external system
   private def simulateFaultyDeliveryToExternalSystem(ackEnvelope: AckEnvelope) = {
     try {
       val traceID = ackEnvelope.message.getIntProperty("TRACE_ID")
@@ -97,7 +98,8 @@ object ProcessingApp {
       logger.info(s"RECEIVED Msg with TRACE_ID: $traceID and payload: $payload - Working for: $randomTime ms")
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < randomTime) {
-        if (randomTime >= 400) throw new RuntimeException("BOOM") //comment out for "happy path"
+        // Activate to simulate failure
+        //if (randomTime >= 400) throw new RuntimeException("BOOM - simulated failure in delivery")
       }
       Future(ackEnvelope)
     } catch {
@@ -114,7 +116,7 @@ object ProcessingApp {
 
   private def sendOriginalMessageToErrorQueue(ackEnvelope: AckEnvelope, e: Exception): Unit = {
 
-    val origMessage =  ackEnvelope.message.asInstanceOf[TextMessage]
+    val origMessage = ackEnvelope.message.asInstanceOf[TextMessage]
     val traceID = origMessage.getIntProperty("TRACE_ID")
 
     val errorMessage = JmsTextMessage(origMessage.getText)
@@ -124,30 +126,30 @@ object ProcessingApp {
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
 
     errorQueue.offer(errorMessage).map {
-        case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
-        case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
-        case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
-      }
+      case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
+      case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
+      case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
+      case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
+    }
   }
 
- private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
-   val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
+  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
+    val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
 
-   val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
+    val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
       JmsBrowseSettings(system, connectionFactory)
         .withQueue("test-queue")
     )
 
     while (true) {
-      queue.pull().foreach{ each => logger.info(s"Connection state: $each")}
+      queue.pull().foreach { each => logger.info(s"Connection state: $each") }
       val browseResult: Future[immutable.Seq[Message]] = browseSource.runWith(Sink.seq)
       val pendingMessages = Await.result(browseResult, 600.seconds)
 
-      //Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
-      //The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
-      //After another restart of the JMS server these messages are then consumed
-      //If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
+      // Sometimes after "ungraceful shutdowns" of the JMS server or this client, there are pending messages
+      // The reason for this is faulty ack handling during shutdown (messages are consumed but never acknowledged)
+      // After another re-start of the JMS server or this client, these messages are consumed
+      // If the shutdowns are initiated gracefully with SIGTERM, there should be no pending messages
       logger.info(s"Pending Msg: ${pendingMessages.size} first 2 elements: ${pendingMessages.take(2)}")
       Thread.sleep(5000)
     }

@@ -17,8 +17,9 @@ import scala.util.{Failure, Success}
   *  - keep order of elements downstream
   */
 object DivertTo extends App {
-  implicit val system = ActorSystem("DivertTo")
-  implicit val executionContext = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
 
   val source = Source(1 to 10)
 

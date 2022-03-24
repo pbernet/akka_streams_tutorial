@@ -2,7 +2,8 @@
 <configuration scan="true" scanPeriod="5 seconds">
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd} | %d{HH:mm:ss.SSS} | %-20.20thread | %5p | %-25.25logger{25} | %m%n</pattern>
+            <!-- Use short version -->
+            <pattern>%d{HH:mm:ss.SSS} | %-10.10thread | %5p | %-25.25logger{25} | %m%n</pattern>
             <charset>utf8</charset>
         </encoder>
     </appender>
@@ -24,9 +25,14 @@
 
     <!-- Turn down Kafka noise -->
     <logger name="kafka" level="WARN"/>
-    <!-- Turn down sshj noise in sftp -->
-    <logger name="net.schmizz.sshj" level="ERROR"/>
+    <!-- Turn down sshj noise in SftpEcho -->
     <logger name="com.hierynomus.sshj" level="ERROR"/>
+    <logger name="net.schmizz.sshj" level="ERROR"/>
+    <!-- Turn up Akka and control level in application.conf -->
+    <logger name="akka" level="DEBUG"/>
+
+    <!-- Turn up Eclipse Paho logging in MqttPahoEcho
+    <logger name="org.eclipse.paho" level="DEBUG"/>  -->
 
     <!-- Turn down noise from netty in gRPC example -->
     <logger name="io.grpc.netty" level="INFO"/>
