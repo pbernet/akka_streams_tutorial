@@ -39,30 +39,30 @@ object GreeterClient extends App {
 
 
   // Comment out to run examples in isolation
-  (1 to 1).par.foreach(each => runSingleRequestReplyExample(each))
-  (1 to 1).par.foreach(each => runStreamingRequestExample(each))
-  (1 to 1).par.foreach(each => runStreamingReplyExample(each))
+  (1 to 2).par.foreach(each => runSingleRequestReplyExample(each))
+  (1 to 2).par.foreach(each => runStreamingRequestExample(each))
+  (1 to 2).par.foreach(each => runStreamingReplyExample(each))
 
 
   // Send single message and wait for ACK (to get message serialisation). Retry on failure
   def runSingleRequestReplyExample(id: Int): Unit = {
 
-    def sendAndReceive(i: Int): Future[Done] = {
+    def sendAndReceive(each: Int): Future[Done] = {
       Source.single(id)
-        .mapAsync(1)(each => client.sayHello(HelloRequest(s"$each-$i", id)))
+        .mapAsync(1)(id => client.sayHello(HelloRequest(s"$id-$each/$maxElements", id)))
         .runForeach(reply => logger.info(s"Client: $id received single reply: $reply"))
         .recoverWith {
           case ex: RuntimeException =>
-            logger.warn(s"Client: $id about to retry for element $i, because of: $ex")
+            logger.warn(s"Client: $id about to retry for element: $each, because of: $ex")
             Thread.sleep(1000)
-            sendAndReceive(i)
+            sendAndReceive(each)
           case e: Throwable => Future.failed(e)
         }
     }
 
     Source(1 to maxElements)
       .throttle(1, 1.second)
-      .mapAsync(1)(i => sendAndReceive(i))
+      .mapAsync(1)(each => sendAndReceive(each))
       .runWith(Sink.ignore)
   }
 
@@ -83,7 +83,7 @@ object GreeterClient extends App {
     }
 
     val done = restartSource
-      .runForeach(reply => logger.info(s"Client: $id got streaming reply: ${reply.timestamp}"))
+      .runForeach(reply => logger.info(s"Client: $id got streamingReply: ${reply.timestamp}"))
 
     done.onComplete {
       case Success(_) =>
@@ -106,7 +106,7 @@ object GreeterClient extends App {
 
     retried.onComplete {
       case Success(msg) =>
-        logger.info(s"Client: $id received streamed reply: $msg")
+        logger.info(s"Client: $id received streamingReply: $msg")
       case Failure(e) =>
         logger.info(s"Server not reachable on initial request after: $maxAttempts attempts within ${maxAttempts*delay} seconds. Give up. Ex: $e")
     }

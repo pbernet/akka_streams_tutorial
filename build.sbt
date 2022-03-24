@@ -1,5 +1,3 @@
-import sbt.Keys.libraryDependencies
-
 name := "akka-streams-tutorial"
 
 version := "1.0"
@@ -28,7 +26,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  
+
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
@@ -131,3 +129,11 @@ run / fork := true
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
+
+enablePlugins(AkkaGrpcPlugin)
+
+// TODO enable gRPC with metadata accessible API on server
+// see:
+// https://doc.akka.io/docs/akka-grpc/current/buildtools/sbt.html#generating-server-
+// https://doc.akka.io/docs/akka-grpc/current/server/details.html#accessing-request-metadata
+//akkaGrpcCodeGeneratorSettings += "server_power_apis"
