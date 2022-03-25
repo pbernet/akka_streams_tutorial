@@ -77,7 +77,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.opennlp" % "opennlp-tools" % "1.9.4",
 
-  "com.typesafe.play" %% "play" % "2.8.7",
+  "com.typesafe.play" %% "play" % "2.8.14",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents" % "httpclient" % "4.5.13",
