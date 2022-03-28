@@ -14,7 +14,7 @@ val alpakkaKafkaConnector = "3.0.0"
 val kafkaVersion = "3.1.0"
 
 val activemqVersion =  "5.16.3"
-val artemisVersion =  "2.20.0"
+val artemisVersion =  "2.21.0"
 val testContainersVersion = "1.16.3"
 val keycloakVersion = "17.0.0"
 val sttpVersion = "3.5.1"
