@@ -28,8 +28,8 @@ import scala.util.{Failure, Success}
   * Remarks:
   *  - For AES/CBC: initialisationVector is at the first 16 Bytes of the encrypted file
   *  - For AES/GCM: initialisationVector is at the first 12 Bytes of the encrypted file
-  *  - Run with a recent Java 8 openjdk or with graalvm to get the 256 Bit key size
-  *  - For cipher "ChaCha20-Poly1305/None/NoPadding" on Java 11 comment in the code bits below
+  *  - Run with a recent Java 11 openjdk or with graalvm to get the 256 Bit key size
+  *  - For cipher "ChaCha20-Poly1305/None/NoPadding" comment in the code bits below
   *
   * A word of caution of this concept PoC regarding AES 256 GCM encryption/decryption:
   *
@@ -78,17 +78,16 @@ object ZipCryptoEcho extends App {
 
   import system.dispatcher
 
-  //For AES/CBC or AES/GCM
   val aesKeySize = 256
   val aesKey = generateAesKey()
-  val aesMode = "AES/CBC" //Switch to AES/GCM
+  val aesMode = "AES/CBC" // Switch to "AES/GCM" or "ChaCha20"
   val ivLengthBytes = if (aesMode == "AES/CBC") 16 else 12
   val initialisationVector = generateNonce(ivLengthBytes)
 
-  //Activate for ChaCha20-Poly1305/None/NoPadding
-  //Uses built in Java 11 cipher: https://openjdk.java.net/jeps/329
-  //To run at least openjdk 11.0.8_10 is required
-  //This Issue is fixed there: https://github.com/eclipse/openj9/issues/9535
+  // Activate for ChaCha20-Poly1305/None/NoPadding
+  // Uses built in Java 11 cipher: https://openjdk.java.net/jeps/329
+  // To run at least openjdk 11.0.8_10 is required
+  // This Issue is fixed there: https://github.com/eclipse/openj9/issues/9535
   //val chaCha20Nonce = generateNonce(ivLengthBytes)
   //val chaCha20Key = generateChaCha20Key()
 
@@ -113,22 +112,22 @@ object ZipCryptoEcho extends App {
   logger.info("Start archiving...")
   val sourceZipped = filesStream.via(Archive.zip())
 
-  logger.info(s"Start encryption $aesMode...")
+  logger.info(s"Start encryption zip file with: $aesMode...")
   val sourceEnc = encryptAes(sourceZipped, aesKey, initialisationVector, aesMode)
   //val sourceEnc = encryptChaCha20(sourceZipped, chaCha20Key)
 
-  //Prepend IV
+  // Prepend IV
   val ivSource = Source.single(ByteString(initialisationVector))
 
   val doneEnc = sourceEnc
-    //Comment out for ChaCha20-Poly1305/None/NoPadding
+    // Comment out "merge" for ChaCha20-Poly1305/None/NoPadding
     .merge(ivSource)
     .runWith(sinkEnc)
 
 
   doneEnc.onComplete {
     case Success(_) =>
-      logger.info(s"Start decryption $aesMode...")
+      logger.info(s"Start decryption zip file with: $aesMode...")
 
 
       val doneDec = decryptAesFromFile(encFileName, aesKey, aesMode).runWith(sinkDec)
@@ -175,7 +174,7 @@ object ZipCryptoEcho extends App {
   private def aesCipherGCM(mode: Int, keySpec: SecretKeySpec, ivBytes: Array[Byte]) = {
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
 
-    //For GCM we need additional "Authentication Tag length in bits"
+    // For GCM we need additional "Authentication Tag length in bits"
     val gcmParameterSpec = new GCMParameterSpec(16 * 8, ivBytes)
     cipher.init(mode, keySpec, gcmParameterSpec)
     cipher
@@ -214,19 +213,19 @@ object ZipCryptoEcho extends App {
                           aesMode: String
                         ): Source[ByteString, Any] = {
 
-    //Read IV (first n bytes from stream), good old Java to the rescue
-    //Surprisingly difficult in akka streams
-    //https://stackoverflow.com/questions/61822306/reading-first-bytes-from-akka-stream-scaladsl-source
-    //https://stackoverflow.com/questions/40743047/handle-akka-streams-first-element-specially
+    // Read IV (first n bytes from stream), good old Java to the rescue
+    // Surprisingly difficult in akka streams
+    // https://stackoverflow.com/questions/61822306/reading-first-bytes-from-akka-stream-scaladsl-source
+    // https://stackoverflow.com/questions/40743047/handle-akka-streams-first-element-specially
 
     val ivBytesBuffer = new Array[Byte](ivLengthBytes)
     val is = new FileInputStream(fileName)
     is.read(ivBytesBuffer)
 
-    //We need a large chunk size here to speed up the AES/GCM decryption
-    //This is an issue in the Java world, because CipherInputStream has a limited buffer size of 512 bytes
-    //https://stackoverflow.com/questions/60575897/cipherinputstream-hangs-while-reading-data
-    //However, even if we stream all the data, it looks as if everything is loaded into memory
+    // We need a large chunk size here to speed up the AES/GCM decryption
+    // This is an issue in the Java world, because CipherInputStream has a limited buffer size of 512 bytes
+    // https://stackoverflow.com/questions/60575897/cipherinputstream-hangs-while-reading-data
+    // However, even if we stream all the data, it looks as if everything is loaded into memory
     val source = StreamConverters.fromInputStream(() => is, chunkSize = 10000 * 1024)
     decryptAes(source, keySpec, ivBytesBuffer, aesMode)
   }

@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
   * Inspired by:
   * http://akka.io/blog/2016/07/06/threading-and-concurrency-in-akka-streams-explained
   *
-  * See also [[sample.stream.WaitForThreeFlowsToComplete]]
+  * See also [[sample.stream.WaitForFlowsToComplete]]
   *
   */
 object AsyncExecution extends App {

@@ -14,6 +14,7 @@ import akka.stream.{ActorAttributes, RestartSettings, Supervision}
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
+import org.apache.commons.text.StringEscapeUtils
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.elasticsearch.ElasticsearchContainer
 import org.testcontainers.utility.DockerImageName
@@ -34,7 +35,8 @@ import scala.util.control.NonFatal
 
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
-  * fetch the abstract from Wikipedia API, do NER processing
+  * fetch the abstract from Wikipedia API,
+  * do NER processing for persons in EN
   * and write the results to Elasticsearch version 7.x server
   *
   * Doc:
@@ -57,7 +59,8 @@ object SSEtoElasticsearch extends App {
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
-  case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String)
+  // Helps to carry the data through the stages, although this violates functional principles
+  case class Ctx(change: Change, personsFound: List[String] = List.empty, content: String = "")
 
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
   implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
@@ -162,7 +165,7 @@ object SSEtoElasticsearch extends App {
   }
 
 
-  def findPersons(ctx: Ctx) = {
+  def findPersons(ctx: Ctx): Future[Ctx] = {
     logger.info(s"About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
@@ -173,20 +176,21 @@ object SSEtoElasticsearch extends App {
 
     val personNameFinderME = new NameFinderME(personModel)
     val spans = personNameFinderME.find(tokens)
-    val personsFound = Span.spansToStrings(spans, tokens).toList.distinct
+    val personsFound = Span.spansToStrings(NameFinderME.dropOverlappingSpans(spans), tokens).toList.distinct
     personNameFinderME.clearAdaptiveData()
 
     if (personsFound.isEmpty) {
       Future(ctx)
     } else {
-      logger.info(s"FOUND persons: $personsFound on content: $content")
-      Future(ctx.copy(personsFound = personsFound))
+      val personsFoundCleaned = personsFound.map(each => StringEscapeUtils.unescapeJava(each))
+      logger.info(s"FOUND persons: $personsFoundCleaned from content: $content")
+      Future(ctx.copy(personsFound = personsFoundCleaned))
     }
   }
 
   val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
     .filter(change => !change.isBot)
-    .map(change => Ctx(change, List.empty, ""))
+    .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
     .mapAsync(3)(ctx => findPersons(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
@@ -213,7 +217,7 @@ object SSEtoElasticsearch extends App {
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*"
+    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
     if (os == "mac os x") {
       Process(s"open $searchURL").!
     }

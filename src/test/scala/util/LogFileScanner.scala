@@ -77,7 +77,7 @@ class LogFileScanner(localLogFilePath: String = "logs/application.log") {
       }
       else {
         println(s"Unable to detected line.separator, fallback to separator for: ${System.getProperty("os.name")}")
-        System.getProperty("line.separator")
+        System.lineSeparator()
       }
     } finally {
       scanner.close()

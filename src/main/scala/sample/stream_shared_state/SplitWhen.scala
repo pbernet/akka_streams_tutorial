@@ -54,7 +54,7 @@ object SplitWhen extends App {
 
     def fileSink(filename: String): Sink[String, Future[IOResult]] =
       Flow[String]
-        .map(s => ByteString(s + "\n"))
+        .map(s => ByteString(s + System.lineSeparator))
         .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right)
 
     Source.fromIterator(() => (1 to nonLinearCapacityFactor).toList.combinations(2))
@@ -63,7 +63,7 @@ object SplitWhen extends App {
   }
 
   val sourceOfLines = FileIO.fromPath(Paths.get(filename))
-    .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024, allowTruncation = true)
+    .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
 
   val csvToRecord: Flow[String, Record, NotUsed] = Flow[String]

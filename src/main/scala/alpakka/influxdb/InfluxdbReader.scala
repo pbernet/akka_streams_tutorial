@@ -19,7 +19,7 @@ import scala.util.control.NonFatal
 
 /**
   *
-  * Doc read data via akka-streams:
+  * Doc read data via akka-streams via Scala client:
   * https://github.com/influxdata/influxdb-client-java/tree/master/client-scala
   *
   * Doc Flux query lang:
@@ -47,7 +47,7 @@ class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bu
 
   private val query =
     """
-    interval = 10m
+    interval = 1m
 
     from(bucket: "testbucket")
        |> range(start: -interval)
@@ -58,13 +58,13 @@ class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bu
     .query(query)
 
   def getQuerySync(mem: String) = {
-    logger.info("About to query with with stream result")
+    logger.info(s"Query raw for measurements of type: $mem")
     val result = source()
       .filter(fluxRecord => fluxRecord.getMeasurement().equals(mem) )
       .wireTap(fluxRecord => {
         val measurement = fluxRecord.getMeasurement()
         val value = fluxRecord.getValue()
-        logger.info(s"About to process measurement: $measurement with value: $value")
+        logger.debug(s"About to process measurement: $measurement with value: $value")
       })
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .runWith(Sink.seq)
@@ -73,19 +73,38 @@ class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bu
   }
 
   def fluxQueryCount(mem: String) : Long = {
-    logger.info(s"About to query with flux DSL for measurements of type: $mem")
+    logger.info(s"Query with flux DSL for measurements of type: $mem")
     val flux = Flux
-      .from(this.bucket)
-      .range(-1L, ChronoUnit.DAYS)
+      .from(bucket)
+      .range(-1L, ChronoUnit.MINUTES)
       .filter(Restrictions.measurement().equal(mem))
       .count()
-    val out: util.List[FluxTable] = this.influxDBClient.getQueryApi().query(flux.toString)
+    val out: util.List[FluxTable] = influxDBClient.getQueryApi().query(flux.toString)
     if (out.isEmpty || out.get(0).getRecords.isEmpty) 0
     else out.size()
+  }
+
+  def run(): Unit = {
+    system.scheduler.scheduleWithFixedDelay(10.second, 10.seconds)(() =>
+      logger.info("Records for this period: {}", fluxQueryCount("testMem")))
   }
 
   def shutdown() = {
     influxDBClient.close()
     influxdbClientScala.close()
   }
+}
+
+case class CompressedObservation(
+                                  sensorID: String = "uninitialised", // per sensor
+                                  traceID: String = "", // per measurement
+                                  avgValue: Float = 0,
+                                  minValue: Float = 0,
+                                  maxValue: Float = 0,
+                                  valueType: String = "",
+                                  nPoints: Int = 0,
+                                  startTimestamp: String = "",
+                                  stopTimestamp: String = ""
+                                ) {
+  override def toString = s"For sensorID: $sensorID - nPoints: $nPoints between: $startTimestamp/$stopTimestamp avg value: $avgValue"
 }

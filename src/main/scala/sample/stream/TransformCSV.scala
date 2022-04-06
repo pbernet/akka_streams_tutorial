@@ -13,9 +13,9 @@ import scala.sys.process._
   * Inspired by:
   * https://discuss.lightbend.com/t/transform-a-csv-file-into-multiple-csv-files-using-akka-stream/3142
   *
-  * Solution proposal in three steps according to "use the best tool available" strategy.
-  * Thus we use linux tools instead of akka-streams
-  * because we only have "chainsaw style operations" and no business logic.
+  * Solution proposal in three steps (sort/split/count) according to "use the best tool available" strategy.
+  * Thus instead of akka-streams we use linux tools for each step (sort/awk/wc) to apply the "chainsaw style"
+  * transformations
   *
   * Remarks:
   *  - Instead of putting all steps in a shell script, we want to use Scala [[Process]] for each step
@@ -30,11 +30,12 @@ object TransformCSV extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   val sourceFile = "src/main/resources/2008_subset.csv"
+  val resultsDir = "results"
+  val countPlaceholder = "_count_"
 
   val os = System.getProperty("os.name").toLowerCase
   if (os == "mac os x") {
-    val tmpSortedFile = sort(sourceFile)
-    val resultsDir = split(tmpSortedFile)
+    split(sort(sourceFile))
     countLines(resultsDir)
   } else {
     logger.warn("OS not supported")
@@ -42,39 +43,45 @@ object TransformCSV extends App {
   system.terminate()
 
 
-  def sort(sourceFile: String) = {
-    val pwd = "pwd".!!
-    logger.info(s"Running with base path: $pwd")
+  def sort(sourceFile: String): File = {
+    val op = "sort"
     val tmpSortedFile = File.createTempFile("sorted_tmp", ".csv")
 
     // Remove csv header and use linux sort on the 9th column (= UniqueCarrier)
-    val resultSort = exec("sort") { (Process(s"tail -n+2 $sourceFile") #| Process(s"sort -t\",\" -k9,9") #>> tmpSortedFile).!}
-    logger.info(s"Exit code sort: $resultSort")
+    val resultSort = exec(op) {
+      (Process(s"tail -n+2 $sourceFile") #| Process(s"sort -t\",\" -k9,9") #>> tmpSortedFile).!
+    }
+    logger.info(s"Exit code '$op': $resultSort")
     tmpSortedFile
   }
 
-  def split(tmpSortedFile: File)  = {
-    "rm -rf results".!
-    "mkdir -p results".!
+  def split(tmpSortedFile: File): Unit = {
+    val op = "split"
+    s"rm -rf $resultsDir".!
+    s"mkdir -p $resultsDir".!
 
     // Split into files according to value of 9th column (incl. file closing)
-    // TODO Make dynamic, but still readable ($ is used in both contexts...)
-    val bashLine = """awk -F ',' '{out=("results/"$9"-xx.csv")} out!=prev {close(prev)} {print > out; prev=out}' """ + s"$tmpSortedFile"
-    val resultSplit = exec("split") { Seq("bash", "-c", bashLine).!}
-    logger.info(s"Exit code split: $resultSplit")
-    "results"
+    // Note that the $ operator is used in the linux cmd
+    val bashCmdSplit = s"""awk -F ',' '{out=("$resultsDir""" + """/"$9"-_count_.csv")} out!=prev {close(prev)} {print > out; prev=out}' """ + s"$tmpSortedFile"
+    val resultSplit = exec(op) {
+      Seq("bash", "-c", bashCmdSplit).!
+    }
+    logger.info(s"Exit code '$op': $resultSplit")
   }
 
-  def countLines(results: String) = {
-    val bashLine = s"""wc -l `find $results -type f`"""
-    val resultCountLines = exec("count") {Seq("bash", "-c", bashLine).!!}
+  def countLines(results: String): Unit = {
+    val op = "count"
+    val bashCmdCountLines = s"""wc -l `find $results -type f`"""
+    val resultCountLines = exec(op) {
+      Seq("bash", "-c", bashCmdCountLines).!!
+    }
     logger.info(s"Line count report:\n $resultCountLines")
 
     val reportCleaned = resultCountLines.split("\\s+").tail.reverse.tail.tail
     reportCleaned.sliding(2, 2).foreach { each =>
       val (path, count) = (each.head, each.last)
-      logger.info(s"About to rename file: $path , with count: $count")
-      FileUtils.moveFile(FileUtils.getFile(path), FileUtils.getFile(path.replace("xx", count)))
+      logger.info(s"About to rename file: $path with count value: $count")
+      FileUtils.moveFile(FileUtils.getFile(path), FileUtils.getFile(path.replace(countPlaceholder, count)))
     }
   }
 
