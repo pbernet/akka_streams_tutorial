@@ -15,10 +15,10 @@ val kafkaVersion = "3.1.0"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.21.0"
-val testContainersVersion = "1.16.3"
+val testContainersVersion = "1.17.1"
 val keycloakVersion = "17.0.0"
-val sttpVersion = "3.5.1"
-val influxdbVersion = "5.0.0"
+val sttpVersion = "3.5.2"
+val influxdbVersion = "6.0.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -32,7 +32,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
-  // sttp wraps around akka-http to allow for consice clients
+  // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
   "com.softwaremill.sttp.client3" %% "akka-http-backend" % sttpVersion,
 
@@ -86,9 +86,9 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "org.apache.camel" % "camel-core" % "3.15.0",
-  "org.apache.camel" % "camel-reactive-streams" % "3.15.0",
-  "io.projectreactor" % "reactor-core" % "3.4.16",
+  "org.apache.camel" % "camel-core" % "3.16.0",
+  "org.apache.camel" % "camel-reactive-streams" % "3.16.0",
+  "io.projectreactor" % "reactor-core" % "3.4.17",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
