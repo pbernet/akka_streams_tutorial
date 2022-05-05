@@ -27,9 +27,10 @@
     <logger name="kafka" level="WARN"/>
     <!-- Turn down sshj noise in SftpEcho -->
     <logger name="com.hierynomus.sshj" level="ERROR"/>
-    <logger name="net.schmizz.sshj" level="ERROR"/>
     <!-- Turn up Akka and control level in application.conf -->
     <logger name="akka" level="DEBUG"/>
+    <!-- Turn down Docker noise -->
+    <logger name="com.github.dockerjava" level="INFO"/>
 
     <!-- Turn up Eclipse Paho logging in MqttPahoEcho
     <logger name="org.eclipse.paho" level="DEBUG"/>  -->
