@@ -57,10 +57,11 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
 
   def runKeycloak() = {
-    val keycloak = new KeycloakContainer()
+    // Pin to same version as "keycloakVersion" in build.sbt
+    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:17.0.0")
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
-      .withRealmImportFile("/keycloak_realm_config.json")
+      .withRealmImportFile("keycloak_realm_config.json")
       .withStartupTimeout(Duration.ofSeconds(120))
 
     keycloak.start()
