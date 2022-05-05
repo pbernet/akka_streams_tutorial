@@ -36,7 +36,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
 
   import system.dispatcher
 
-  val faultyActor = system.actorOf(Props[FaultyActor], "FaultyActor")
+  val faultyActor = system.actorOf(Props[FaultyActor](), "FaultyActor")
 
   case class FaultyActorResponse(totalAttempts: Int)
 
@@ -48,10 +48,10 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
     .result()
 
   val exceptionHandler: ExceptionHandler = ExceptionHandler {
-    case e: RuntimeException =>
-      complete(HttpResponse(InternalServerError, entity = e.getMessage))
     case _: IllegalArgumentException =>
       complete(StatusCodes.BadRequest, "Illegal argument passed")
+    case e: RuntimeException =>
+      complete(HttpResponse(InternalServerError, entity = e.getMessage))
   }
 
   val getFromBrowsableDir: Route = {
