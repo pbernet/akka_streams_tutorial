@@ -109,7 +109,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql" % "postgresql" % "42.3.3",
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "org.scalatest" %% "scalatest" % "3.1.4" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
   "org.assertj" % "assertj-core" % "3.22.0" % Test,
 
