@@ -89,7 +89,7 @@ libraryDependencies ++= Seq(
   "org.apache.camel" % "camel-core" % "3.16.0",
   "org.apache.camel" % "camel-reactive-streams" % "3.16.0",
   "io.projectreactor" % "reactor-core" % "3.4.17",
-  "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.2.11",
