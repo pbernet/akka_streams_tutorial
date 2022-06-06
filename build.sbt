@@ -111,7 +111,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "org.assertj" % "assertj-core" % "3.22.0" % Test,
+  "org.assertj" % "assertj-core" % "3.23.1" % Test,
 
   "org.junit.jupiter" % "junit-jupiter-engine" % "5.8.2" % Test,
   "org.junit.jupiter" % "junit-jupiter-api" % "5.8.2" % Test,
