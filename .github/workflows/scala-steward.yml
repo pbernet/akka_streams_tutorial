@@ -19,4 +19,4 @@ jobs:
         uses: scala-steward-org/scala-steward-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-repository: owner/repository
+          github-repository: pbernet/akka_streams_tutorial
