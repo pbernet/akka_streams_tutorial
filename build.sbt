@@ -10,12 +10,12 @@ val akkaVersion = "2.6.19"
 val akkaHTTPVersion = "10.2.9"
 val alpakkaVersion = "3.0.4"
 
-val alpakkaKafkaConnector = "3.0.0"
-val kafkaVersion = "3.1.0"
+val alpakkaKafkaConnectorVersion = "3.0.0"
+val kafkaVersion = "3.2.0"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.21.0"
-val testContainersVersion = "1.17.1"
+val testContainersVersion = "1.17.2"
 val keycloakVersion = "18.0.0"
 val sttpVersion = "3.5.2"
 val influxdbVersion = "6.0.0"
@@ -28,7 +28,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  
+
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
@@ -47,7 +47,7 @@ libraryDependencies ++= Seq(
 
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
 
-  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
+  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
   "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
