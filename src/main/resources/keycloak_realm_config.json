@@ -783,7 +783,6 @@
   ],
   "defaultLocale": "en",
   "eventsListeners": [
-    "jboss-logging",
-    "event-queue"
+    "jboss-logging"
   ]
 }

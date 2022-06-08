@@ -32,7 +32,7 @@ class FaultyActor extends Actor {
       sender() ! FaultyActorResponse(totalAttempts)
   }
 
-  override def preRestart(reason: Throwable, message: Option[Any]) {
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     logger.error(s"Failed with original failure: $reason")
     super.preRestart(reason, message)
     sender() ! Status.Failure(reason)

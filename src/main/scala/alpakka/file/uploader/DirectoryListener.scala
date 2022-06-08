@@ -23,6 +23,7 @@ import scala.concurrent.Future
   *  - [[FileAlterationListenerAdaptor]] allows to recursively listen to file changes at runtime
   *  - Currently Alpakka DirectoryChangesSource can not do this, see:
   *    https://discuss.lightbend.com/t/using-directorychangessource-recursively/7630
+  *  - Alternative Impl: https://github.com/gmethvin/directory-watcher
   */
 class DirectoryListener(uploadDir: Path, processedDir: Path) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)

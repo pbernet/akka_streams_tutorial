@@ -32,7 +32,7 @@ import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 /**
-  * A one-click Keycloak OIDC sample using akka-http.
+  * A "one-click" Keycloak OIDC server with a akka-http frontend
   *
   * Inspired by:
   * https://scalac.io/blog/user-authentication-keycloak-1
@@ -57,15 +57,15 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
 
 
   def runKeycloak() = {
-    val keycloak = new KeycloakContainer()
+    // Pin to same version as "keycloakVersion" in build.sbt
+    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:18.0.0")
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
-      .withRealmImportFile("/keycloak_realm_config.json")
+      .withRealmImportFile("keycloak_realm_config.json")
       .withStartupTimeout(Duration.ofSeconds(120))
 
     keycloak.start()
-    val url = keycloak.getAuthServerUrl
-    logger.info("Running Keycloak on URL:{}", url)
+    logger.info("Running Keycloak on URL: {}", keycloak.getAuthServerUrl)
     keycloak
   }
 
@@ -129,7 +129,7 @@ object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
       clientRepresentation.setWebOrigins(webOriginsTestingOnly)
 
       val resp = keycloakAdminClient.realm("test").clients().create(clientRepresentation)
-      logger.info(s"Created client config for clientId: $clientId, response status: " + resp.getStatus)
+      logger.info(s"Successfully created client config for clientId: $clientId, response status: " + resp.getStatus)
 
       val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm("test").clients().findByClientId(clientId)
       logger.info(s"Successfully read ClientRepresentation for clientId: ${clients.get(0).getClientId}")

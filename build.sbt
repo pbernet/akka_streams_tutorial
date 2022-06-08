@@ -1,3 +1,5 @@
+import sbt.Keys.libraryDependencies
+
 name := "akka-streams-tutorial"
 
 version := "1.0"
@@ -8,15 +10,15 @@ val akkaVersion = "2.6.19"
 val akkaHTTPVersion = "10.2.9"
 val alpakkaVersion = "3.0.4"
 
-val alpakkaKafkaConnector = "3.0.0"
-val kafkaVersion = "3.1.0"
+val alpakkaKafkaConnectorVersion = "3.0.0"
+val kafkaVersion = "3.2.0"
 
-val activemqVersion =  "5.16.3"
-val artemisVersion =  "2.20.0"
-val testContainersVersion = "1.16.3"
-val keycloakVersion = "17.0.0"
-val sttpVersion = "3.5.1"
-val influxdbVersion = "4.3.0"
+val activemqVersion = "5.16.3"
+val artemisVersion = "2.21.0"
+val testContainersVersion = "1.17.2"
+val keycloakVersion = "18.0.0"
+val sttpVersion = "3.5.2"
+val influxdbVersion = "6.0.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -26,12 +28,13 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+
   "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
 
-  // sttp wraps around akka-http to allow for consice clients
+  // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
   "com.softwaremill.sttp.client3" %% "akka-http-backend" % sttpVersion,
 
@@ -46,7 +49,7 @@ libraryDependencies ++= Seq(
 
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
 
-  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnector,
+  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
   "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
@@ -85,6 +88,11 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
+  "org.apache.camel" % "camel-core" % "3.16.0",
+  "org.apache.camel" % "camel-reactive-streams" % "3.16.0",
+  "io.projectreactor" % "reactor-core" % "3.4.17",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
+
   "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.2.11",
 
@@ -94,7 +102,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.1.1",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.2.2",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),

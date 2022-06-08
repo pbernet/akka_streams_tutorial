@@ -32,7 +32,7 @@ object AmqpEcho extends App {
 
   val rabbitMQContainer = new RabbitMQContainer("rabbitmq:management")
   rabbitMQContainer.start()
-  logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getContainerIpAddress}:${rabbitMQContainer.getMappedPort(port)}")
+  logger.info(s"Started RabbitMQ on: ${rabbitMQContainer.getHost}:${rabbitMQContainer.getMappedPort(port)}")
 
   (1 to 2).par.foreach(each => sendReceiveClient(each, rabbitMQContainer))
   (1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
