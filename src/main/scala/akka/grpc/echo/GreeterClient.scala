@@ -32,7 +32,7 @@ object GreeterClient extends App {
   // and metadata:
   // https://doc.akka.io/docs/akka-grpc/current/client/details.html#request-metadata
   val clientSettings = GrpcClientSettings
-    .connectToServiceAt("127.0.0.1", 8080)
+    .connectToServiceAt("127.0.0.1", 8081)
     .withTls(false)
 
   val client: GreeterService = GreeterServiceClient(clientSettings)

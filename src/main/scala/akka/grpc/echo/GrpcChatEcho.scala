@@ -28,7 +28,7 @@ object GrpcChatEcho extends App {
   val systemServer = ActorSystem("GrpcChatEchoServer")
   val systemClient = ActorSystem("GrpcChatEchoClient")
 
-  val (host, port) = ("127.0.0.1", 8080)
+  val (host, port) = ("127.0.0.1", 8081)
 
   server(systemServer, host, port)
   (1 to 2).par.foreach(each => client(each, systemClient, host, port))

@@ -29,6 +29,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
 
+  // Allows a gRPC client to switch between discovering services via DNS
+  // Doc: https://doc.akka.io/docs/akka-grpc/current/client/configuration.html
   "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
@@ -133,11 +135,6 @@ scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
 run / fork := true
-
-// Needed as long as this lib is in the dependencies
-// https://eed3si9n.com/sbt-1.5.0
-// https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
-ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
 
 enablePlugins(AkkaGrpcPlugin)
 
