@@ -12,6 +12,10 @@ import scala.util.{Failure, Success}
 /**
   * gRPC server for [[GreeterClient]]
   *
+  * Additionally run grpcui on docker with shell cmd:
+  * docker run -it --rm -p 0.0.0.0:8090:8090 fullstorydev/grpcui:latest -plaintext -port 8090 -vv host.docker.internal:8081
+  *
+  * and then access grpcui via: http://localhost:8090
   */
 object GreeterServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)

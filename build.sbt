@@ -136,9 +136,14 @@ scalacOptions += "-feature"
 
 run / fork := true
 
+// Needed as long as this lib is in the dependencies
+// https://eed3si9n.com/sbt-1.5.0
+// https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
+ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
+
 enablePlugins(AkkaGrpcPlugin)
 
-// TODO enable gRPC with metadata accessible API on server
+// Enable gRPC with metadata accessible API on server
 // see:
 // https://doc.akka.io/docs/akka-grpc/current/buildtools/sbt.html#generating-server-
 // https://doc.akka.io/docs/akka-grpc/current/server/details.html#accessing-request-metadata
