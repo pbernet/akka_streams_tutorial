@@ -5,11 +5,12 @@ import akka.stream.scaladsl.Source
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
 
 /**
-  * Stolen from:
+  * Stolen from, inspired by:
   * https://gist.github.com/adamw/3803e2361daae5bdc0ba097a60f2d554
   *
   * Doc:
@@ -37,7 +38,7 @@ object WindowingExample extends App {
   val random = new Random()
 
   val delayFactor = 8
-  val acceptedMaxDelay = 5.seconds.toMillis
+  val acceptedMaxDelay = 4.seconds.toMillis // Lower value leads to dropping of events
 
   Source
     .tick(0.seconds, 1.second, "")
@@ -48,11 +49,11 @@ object WindowingExample extends App {
     }
     .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
     .takeWhile(!_.isInstanceOf[CloseWindow])
-    .fold(AggregateEventData(Window(0L, 0L), 0)) {
-      case (agg, OpenWindow(window)) => agg.copy(w = window)
-      // always filtered out by takeWhile
+    .fold(AggregateEventData(Window(0L, 0L), new ListBuffer[MyEvent])) {
+      case (_, OpenWindow(window)) => AggregateEventData(w = window, new ListBuffer[MyEvent])
+      // always filtered out by takeWhile above
       case (agg, CloseWindow(_)) => agg
-      case (agg, AddToWindow(_, _)) => agg.copy(eventCount = agg.eventCount + 1)
+      case (agg, AddToWindow(ev, _)) => agg.copy(events = agg.events += ev)
     }
     .async
     .mergeSubstreams
@@ -105,6 +106,7 @@ object WindowingExample extends App {
     private val openWindows = mutable.Set[Window]()
 
     def forEvent(ev: MyEvent): List[WindowCommand] = {
+      // watermark: the timestamp of the *newest* event minus acceptedMaxDelay
       watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
       if (ev.timestamp < watermark) {
         println(s"Dropping $ev, watermark is at: ${tsToString(watermark)}")
@@ -135,9 +137,9 @@ object WindowingExample extends App {
     }
   }
 
-  case class AggregateEventData(w: Window, eventCount: Int) {
+  case class AggregateEventData(w: Window, events: ListBuffer[MyEvent]) {
     override def toString =
-      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were $eventCount events"
+      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were: ${events.size} events. Details: $events"
   }
 
   def tsToString(ts: Long) = OffsetDateTime
