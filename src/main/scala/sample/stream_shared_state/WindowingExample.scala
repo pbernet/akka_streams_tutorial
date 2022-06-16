@@ -5,7 +5,6 @@ import akka.stream.scaladsl.Source
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -40,6 +39,14 @@ object WindowingExample extends App {
   val delayFactor = 8
   val acceptedMaxDelay = 4.seconds.toMillis // Lower value leads to dropping of events
 
+  implicit val ordering = new Ordering[MyEvent]{
+    def compare(x: MyEvent, y: MyEvent): Int = {
+      if (x.timestamp < y.timestamp) -1
+      else if (x.timestamp > y.timestamp) 1
+      else 0
+    }
+  }
+
   Source
     .tick(0.seconds, 1.second, "")
     .map(_ => createEvent())
@@ -49,8 +56,8 @@ object WindowingExample extends App {
     }
     .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
     .takeWhile(!_.isInstanceOf[CloseWindow])
-    .fold(AggregateEventData(Window(0L, 0L), new ListBuffer[MyEvent])) {
-      case (_, OpenWindow(window)) => AggregateEventData(w = window, new ListBuffer[MyEvent])
+    .fold(AggregateEventData(Window(0L, 0L), mutable.TreeSet[MyEvent]())) {
+      case (_, OpenWindow(window)) => AggregateEventData(w = window, new mutable.TreeSet[MyEvent])
       // always filtered out by takeWhile above
       case (agg, CloseWindow(_)) => agg
       case (agg, AddToWindow(ev, _)) => agg.copy(events = agg.events += ev)
@@ -137,7 +144,7 @@ object WindowingExample extends App {
     }
   }
 
-  case class AggregateEventData(w: Window, events: ListBuffer[MyEvent]) {
+ case class AggregateEventData(w: Window, events: mutable.TreeSet[MyEvent]) {
     override def toString =
       s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were: ${events.size} events. Details: $events"
   }
