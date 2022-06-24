@@ -4,8 +4,8 @@
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
-* [HTTP file download with local cache](#HTTP-file-download-with-local-cache)
-* [Windturbine example](#Windturbine-example) 
+* [Element deduplication](#Element-deduplication)
+* [Windturbine example](#Windturbine-example)
 * [Apache Kafka WordCount](#Apache-Kafka-WordCount)
 * [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
 * [Analyse Wikipedia edits live stream](#Analyse-Wikipedia-edits-live-stream)
@@ -20,29 +20,56 @@ Remarks:
 * Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala), [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala), [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
+* The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (
+  eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala)
+  , [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala)
+  , [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
 
 Other resources:
-* Official maintained examples are in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl), the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
-* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and this popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
-* The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html) and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html) provide useful background
-* The concept of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams) is also explained in this [blog](http://nivox.github.io/posts/akka-stream-materialized-values), this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
 
-## HTTP file download with local cache ##
-Use case with shared state:
-  * Process a stream of incoming messages with reoccurring TRACE_ID
-  * For the first message: download a .zip file from a `FileServer` and add TRACE_ID&rarr;Path to the local cache
-  * For subsequent messages with the same TRACE_ID: fetch file from cache to avoid duplicate downloads per TRACE_ID
+* Official maintained examples are
+  in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl)
+  , the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in
+  the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
+* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and
+  this
+  popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
+* The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html)
+  and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html)
+  provide useful background
+* The concept
+  of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams)
+  is also explained in this [blog](http://nivox.github.io/posts/akka-stream-materialized-values),
+  this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in
+  this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
+
+## Element deduplication ##
+
+Dropping identical (consecutive or non-consecutive) elements in an unbounded stream can be done:
+
+* [DeduplicateConsecutiveElements](src/main/scala/sample/stream_shared_state/DeduplicateConsecutiveElements.scala) shows
+  the usage of the `sliding` operator
+* [Dedupe](src/main/scala/sample/stream_shared_state/Dedupe.scala) shows the squbs `Deduplicate` GraphStage which allows
+  to dedupe both types
+
+The following use case uses a local caffeine cache to avoid duplicate HTTP file downloads:
+
+* Process a stream of incoming messages with reoccurring TRACE_ID
+* For the first message: download a .zip file from a `FileServer` and add TRACE_ID&rarr;Path to the local cache
+* For subsequent messages with the same TRACE_ID: fetch file from cache to avoid duplicate downloads per TRACE_ID
+* Use time based cache eviction to get rid of old downloads
 
 | Class                     | Description     |
 | -------------------       |-----------------|
 | [FileServer.scala](src/main/scala/alpakka/env/FileServer.scala)|Local HTTP `FileServer` for non-idempotent file download simulation|
 | [LocalFileCacheCaffeine.scala](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams client flow, with cache implemented with [caffeine](https://github.com/ben-manes/caffeine "")|
 
-
 ## Windturbine example ##
-Working sample from the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
- from Colin Breck where classic Actors are used to model shared state, life-cycle management and fault-tolerance in combination with akka-streams.
+
+Working sample from
+the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
+from Colin Breck where classic Actors are used to model shared state, life-cycle management and fault-tolerance in
+combination with akka-streams.
  Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
 Islands in the Stream: Integrating Akka Streams and Akka Actors
 ](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
