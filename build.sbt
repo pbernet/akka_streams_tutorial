@@ -69,7 +69,7 @@ libraryDependencies ++= Seq(
 
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
   "com.influxdb" % "flux-dsl" % influxdbVersion,
-  "org.influxdb" % "influxdb-java" % "2.22",
+  "org.influxdb" % "influxdb-java" % "2.23",
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
