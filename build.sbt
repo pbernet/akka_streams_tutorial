@@ -88,8 +88,8 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "org.apache.camel" % "camel-core" % "3.16.0",
-  "org.apache.camel" % "camel-reactive-streams" % "3.16.0",
+  "org.apache.camel" % "camel-core" % "3.18.0",
+  "org.apache.camel" % "camel-reactive-streams" % "3.18.0",
   "io.projectreactor" % "reactor-core" % "3.4.17",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
