@@ -1,4 +1,5 @@
 [![Build Status](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml/badge.svg)](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml)
+[![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 # Akka streams tutorial #
 
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
@@ -99,9 +100,9 @@ Start the classes in the order below and watch the console output.
 ## HL7 V2 over TCP via Kafka to Websockets ##
 This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
 
-`Hl7TcpClient` &rarr; `Hl7Tcp2Kafka` &rarr; `KafkaServer` &rarr; `Kafka2Websocket` &rarr; `WebsocketServer`
+[Hl7TcpClient](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7TcpClient.scala) &rarr; [Hl7Tcp2Kafka](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7Tcp2Kafka.scala) &rarr; [KafkaServer](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala) &rarr; [Kafka2Websocket](src/main/scala/alpakka/tcp_to_websockets/websockets/Kafka2Websocket.scala) &rarr; [WebsocketServer](src/main/scala/alpakka/env/WebsocketServer.scala)
 
-The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages might reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
+The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages may reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
 Start each stage separate in the IDE, or together via the integration test [AlpakkaTrophySpec.scala](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
 
