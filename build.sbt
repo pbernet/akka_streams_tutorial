@@ -15,10 +15,10 @@ val kafkaVersion = "3.2.0"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.21.0"
-val testContainersVersion = "1.17.2"
+val testContainersVersion = "1.17.3"
 val keycloakVersion = "18.0.0"
 val sttpVersion = "3.5.2"
-val influxdbVersion = "6.0.0"
+val influxdbVersion = "6.3.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -69,9 +69,11 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
 
+  "org.squbs" %% "squbs-ext" % "0.15.0",
+
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
   "com.influxdb" % "flux-dsl" % influxdbVersion,
-  "org.influxdb" % "influxdb-java" % "2.22",
+  "org.influxdb" % "influxdb-java" % "2.23",
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
