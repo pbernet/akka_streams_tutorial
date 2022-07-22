@@ -10,12 +10,20 @@ import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 /**
-  * gRPC server for [[GreeterClient]]
+  * gRPC server to serve [[GreeterClient]]
+  * Protobuf resource file: src/main/protobuf/grpcecho.proto
   *
-  * Additionally run grpcui on docker with shell cmd:
+  * As an additional client you may run grpcui,
+  * a command-line tool that lets you interact with gRPC servers via a browser
+  *
+  * Run on docker with cmd:
   * docker run -it --rm -p 0.0.0.0:8090:8090 fullstorydev/grpcui:latest -plaintext -port 8090 -vv host.docker.internal:8081
   *
-  * and then access grpcui via: http://localhost:8090
+  * and then access grpcui via:
+  * http://localhost:8090
+  *
+  * Doc:
+  * https://github.com/fullstorydev/grpcui
   */
 object GreeterServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -24,7 +32,7 @@ object GreeterServer extends App {
 
   val (host, port) = ("127.0.0.1", 8081)
 
-  // For serving multiple services, see:
+  // To serve multiple services, see:
   // https://doc.akka.io/docs/akka-grpc/current/server/walkthrough.html#serving-multiple-services
   val service = GreeterServiceHandler.withServerReflection(new GreeterServiceImpl())
 
