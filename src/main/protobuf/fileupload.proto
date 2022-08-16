@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package file;
+
+option java_package = "akka.grpc.fileupload.gen";
+option java_multiple_files = true;
+
+message MetaData {
+  string name = 1;
+  string type = 2; // contentType
+}
+
+message File {
+  bytes content = 1;
+}
+
+enum Status {
+  PENDING = 0;
+  IN_PROGRESS = 1;
+  SUCCESS = 2;
+  FAILED = 3;
+}
+
+message FileUploadRequest {
+  // https://developers.google.com/protocol-buffers/docs/proto3#oneof
+  oneof request {
+    MetaData metadata = 1;
+    File file = 2;
+  }
+}
+
+message FileUploadResponse {
+  string name = 1;
+  Status status = 2;
+}
+
+service FileService {
+  // client streaming call
+  rpc upload(stream FileUploadRequest) returns(FileUploadResponse);
+}
