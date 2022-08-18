@@ -32,7 +32,7 @@ Remarks:
 
 Other resources:
 
-* Other maintained examples are
+* Maintained examples are
   in [akka-stream-tests](https://github.com/akka/akka/tree/main/akka-stream-tests/src/test/scala/akka/stream/scaladsl)
   , the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in
   the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
@@ -54,7 +54,8 @@ Dropping identical (consecutive or non-consecutive) elements in an unbounded str
 
 * [DeduplicateConsecutiveElements](src/main/scala/sample/stream_shared_state/DeduplicateConsecutiveElements.scala) shows
   the usage of the `sliding` operator
-* [Dedupe](src/main/scala/sample/stream_shared_state/Dedupe.scala) shows the squbs `Deduplicate` GraphStage which allows
+* [Dedupe](src/main/scala/sample/stream_shared_state/Dedupe.scala) shows
+  the [squbs Deduplicate GraphStage](https://squbs.readthedocs.io/en/latest/deduplicate) which allows
   to dedupe both types
 
 The following use case uses a local caffeine cache to avoid duplicate HTTP file downloads:
