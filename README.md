@@ -14,8 +14,12 @@ See the class comment on how to run each example. These more complex examples ar
 Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful operators in action.
 
 Other noteworthy examples:
-* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala) and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala)
-* Basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) are in branch `grpc`. Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources
+* The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala)
+  and [WebsocketEcho.scala](src/main/scala/akkahttp/WebsocketEcho.scala)
+* The branch `grpc` contains the
+  basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) and
+  a [chunked file upload](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/fileupload/FileServiceImpl.scala)
+  . Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources via the `sbt-akka-grpc` plugin.
 
 Remarks:
 * Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
