@@ -5,11 +5,11 @@
 "It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
-* [Element deduplication](#Element-deduplication)
-* [Windturbine example](#Windturbine-example)
-* [Apache Kafka WordCount](#Apache-Kafka-WordCount)
-* [HL7 V2 over TCP via Kafka to Websockets](#HL7-V2-over-TCP-via-Kafka-to-Websockets)
-* [Analyse Wikipedia edits live stream](#Analyse-Wikipedia-edits-live-stream)
+* [Element deduplication](#element-deduplication)
+* [Windturbine example](#windturbine-example)
+* [Apache Kafka WordCount](#apache-kafka-wordcount)
+* [HL7 V2 over TCP via Kafka to Websockets](#hl7-v2-over-tcp-via-kafka-to-websockets)
+* [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
 
 Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful operators in action.
 
@@ -32,8 +32,8 @@ Remarks:
 
 Other resources:
 
-* Official maintained examples are
-  in [akka-stream-tests](https://github.com/akka/akka/tree/master/akka-stream-tests/src/test/scala/akka/stream/scaladsl)
+* Other maintained examples are
+  in [akka-stream-tests](https://github.com/akka/akka/tree/main/akka-stream-tests/src/test/scala/akka/stream/scaladsl)
   , the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in
   the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
 * Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and
