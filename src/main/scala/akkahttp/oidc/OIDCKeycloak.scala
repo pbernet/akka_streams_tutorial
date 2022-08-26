@@ -32,7 +32,7 @@ import scala.sys.process.Process
 import scala.util.{Failure, Success}
 
 /**
-  * A "one-click" Keycloak OIDC server with a akka-http frontend
+  * A "one-click" Keycloak OIDC server with akka-http frontend
   *
   * Inspired by:
   * https://scalac.io/blog/user-authentication-keycloak-1
@@ -50,15 +50,16 @@ import scala.util.{Failure, Success}
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/security-directives/index.html
   *
   */
-object OIDCwithKeycloak extends App with CORSHandler with JsonSupport {
+object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext = system.dispatcher
 
 
   def runKeycloak() = {
     // Pin to same version as "keycloakVersion" in build.sbt
-    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:18.0.0")
+    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:18.0.2")
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
       .withRealmImportFile("keycloak_realm_config.json")
