@@ -17,16 +17,15 @@ import java.util.Properties;
  * Inspired by:
  * https://github.com/aseigneurin/kafka-sandbox
  * http://aseigneurin.github.io/2016/03/04/kafka-spark-avro-producing-and-consuming-avro-messages.html
- *
+ * <p>
  * Prerequisite:
- * Run alpakka.env.KafkaServer
- *
+ * Run [[alpakka.env.KafkaServerEmbedded]]
  */
 public class SimpleAvroProducer {
 
     public static void main(String[] args) throws InterruptedException, IOException {
         Properties props = new Properties();
-        props.put("bootstrap.servers", "localhost:9092");
+        props.put("bootstrap.servers", "localhost:29092");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
         props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
 
