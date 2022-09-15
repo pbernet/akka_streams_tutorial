@@ -6,8 +6,8 @@ version := "1.0"
 
 scalaVersion := "2.13.8"
 
-val akkaVersion = "2.6.19"
-val akkaHTTPVersion = "10.2.9"
+val akkaVersion = "2.6.20"
+val akkaHTTPVersion = "10.2.10"
 val alpakkaVersion = "3.0.4"
 
 val alpakkaKafkaConnectorVersion = "3.0.0"
@@ -16,7 +16,7 @@ val kafkaVersion = "3.2.0"
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.21.0"
 val testContainersVersion = "1.17.3"
-val keycloakVersion = "18.0.0"
+val keycloakVersion = "18.0.2"
 val sttpVersion = "3.5.2"
 val influxdbVersion = "6.3.0"
 
@@ -59,7 +59,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.32.0",
+  "com.hierynomus" % "sshj" % "0.34.0",
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
@@ -92,8 +92,8 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "org.apache.camel" % "camel-core" % "3.16.0",
-  "org.apache.camel" % "camel-reactive-streams" % "3.16.0",
+  "org.apache.camel" % "camel-core" % "3.18.1",
+  "org.apache.camel" % "camel-reactive-streams" % "3.18.1",
   "io.projectreactor" % "reactor-core" % "3.4.17",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
@@ -106,7 +106,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.2.2",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.3.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
