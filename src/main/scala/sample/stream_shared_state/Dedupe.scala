@@ -16,6 +16,8 @@ import scala.util.{Failure, Success}
   *
   * More general than: [[DeduplicateConsecutiveElements]]
   *
+  * Similar example implemented with Apache Flink:
+  * https://github.com/pbernet/flink-scala-3/blob/main/src/main/scala/com/ververica/Example_05_DataStream_Deduplicate.scala
   */
 object Dedupe extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
