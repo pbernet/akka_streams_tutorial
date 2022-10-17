@@ -17,14 +17,14 @@ import java.util.Properties;
 
 /**
  * Prerequisite:
- * Run alpakka.env.KafkaServer
- *
+ * Run [[alpakka.env.KafkaServerEmbedded]]
+ * Run [[alpakka.kafka.avro.SimpleAvroProducer]]
  */
 public class SimpleAvroConsumer {
 
     public static void main(String[] args) throws IOException {
         Properties props = new Properties();
-        props.put("bootstrap.servers", "localhost:9092");
+        props.put("bootstrap.servers", "localhost:29092");
         props.put("group.id", "mygroup");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");

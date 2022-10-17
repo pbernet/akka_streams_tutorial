@@ -4,18 +4,18 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.10"
 
-val akkaVersion = "2.6.19"
-val akkaHTTPVersion = "10.2.9"
-val alpakkaVersion = "3.0.4"
+val akkaVersion = "2.6.20"
+val akkaHTTPVersion = "10.2.10"
+val alpakkaVersion = "4.0.0"
 
-val alpakkaKafkaConnectorVersion = "3.0.0"
-val kafkaVersion = "3.2.0"
+val alpakkaKafkaConnectorVersion = "3.0.1"
+val kafkaVersion = "3.2.3"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.21.0"
-val testContainersVersion = "1.17.3"
+val testContainersVersion = "1.17.5"
 val keycloakVersion = "18.0.2"
 val sttpVersion = "3.5.2"
 val influxdbVersion = "6.3.0"
@@ -94,7 +94,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.11",
+  "ch.qos.logback" % "logback-classic" % "1.4.3",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -113,10 +113,10 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "org.assertj" % "assertj-core" % "3.22.0" % Test,
+  "org.assertj" % "assertj-core" % "3.23.1" % Test,
 
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.8.2" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.8.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.1" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.1" % Test,
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
 
 )
