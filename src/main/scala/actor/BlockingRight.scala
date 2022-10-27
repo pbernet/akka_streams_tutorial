@@ -18,9 +18,9 @@ object BlockingRight extends App {
 
   val root = Behaviors.setup[Nothing] { context =>
     (1 to 50).foreach { i =>
-      //non blocking actor running on default-dispatcher
+      // non blocking actor running on default-dispatcher
       context.spawn(PrintActor(), s"nonblocking-$i") ! i
-      //blocking actor running on custom-dispatcher
+      // blocking actor running on custom-dispatcher
       context.spawn(
         BlockingActor(),
         s"blocking-$i",
