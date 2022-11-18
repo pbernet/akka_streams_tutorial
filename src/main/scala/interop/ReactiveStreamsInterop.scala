@@ -15,11 +15,14 @@ import scala.concurrent.duration.DurationInt
 
 /**
   * Show reactive streams interop by using Apache Camel "Reactive Streams" component
-  * to distribute messages to the consumers
+  * to distribute messages to different consumers:
+  *  - Reactor
+  *  - RxJava
+  *  - akka-streams
   *
   * Doc:
   * https://doc.akka.io/docs/akka/current/stream/reactive-streams-interop.html
-  * https://camel.apache.org/components/3.15.x/reactive-streams-component.html
+  * https://camel.apache.org/components/3.18.x/reactive-streams-component.html
   * https://projectreactor.io/docs/core/release/reference/
   * https://github.com/ReactiveX/RxJava
   */
