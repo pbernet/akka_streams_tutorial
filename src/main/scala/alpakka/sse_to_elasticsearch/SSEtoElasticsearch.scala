@@ -54,7 +54,9 @@ object SSEtoElasticsearch extends App {
       Supervision.Restart
   }
 
-  val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/en-token.bin").toFile))
+  // 2.x model from https://opennlp.apache.org/models.html
+  val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.0-1.9.3.bin").toFile))
+  // 1.5 model from https://opennlp.sourceforge.net/models-1.5
   val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
@@ -169,8 +171,9 @@ object SSEtoElasticsearch extends App {
     logger.info(s"About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
-    // We need a new instance because the access to TokenizerME is not thread safe
-    // Doc: https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html
+    // We need a new instance, because TokenizerME is not thread safe
+    // Doc: https://opennlp.apache.org/docs/2.0.0/manual/opennlp.html
+    // Chapter: Name Finder API
     val tokenizer = new TokenizerME(tokenModel)
     val tokens = tokenizer.tokenize(content)
 
