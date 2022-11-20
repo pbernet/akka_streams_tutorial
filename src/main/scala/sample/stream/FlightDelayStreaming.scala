@@ -17,24 +17,38 @@ import scala.util.{Failure, Success, Try}
   * https://blog.redelastic.com/diving-into-akka-streams-2770b3aeabb0
   *
   * Features:
-  *  - evaluates a csv file with flight delay records in streaming fashion
-  *  - uses akka stream operators (no graph)
-  *  - shows "stateful processing" with reduce-by-key
-  *
-  * Doc reduce-by-key:
-  * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#implementing-reduce-by-key
+  *  - aggregates flight delay records per carrier from a csv file
+  *  - uses akka stream operators (no graphs)
+  *  - shows "stateful processing" with reduce-by-key, see
+  *    https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#implementing-reduce-by-key
+  *  - uses [[sample.graphstage.ThroughputMonitor]] to collect benchmarks
   *
   * For testing, we use the shortened csv data file: 2008_subset.csv
-  * Download csv file with data from 2008 (689MB):
+  *
+  * Micro benchmarks:
+  *
+  * Download csv file with data from 2008 (689MB, 7'009'729 records):
   * http://stat-computing.org/dataexpo/2009/the-data.html
   * and store locally, eg to src/main/resources/2008.csv
+  *
+  * Typical results on 2012 vintage MacBook Pro with 8 cores
+  * with default dispatcher and default JVM param:
+  * JDK 11.0.11   6925126 elements in 41 seconds (168905/sec)
+  * JDK 17.0.2    6876230 elements in 33 seconds (208370/sec)
+  * JDK 19.0.1    6975988 elements in 29 seconds (240551/sec)
+  * graalvm-ce-19 6977018 elements in 28 seconds (249179/sec)
+  *
+  * Doc:
+  * https://fullgc.github.io/how-to-tune-akka-to-get-the-most-from-your-actor-based-system-part-1
+  * https://letitcrash.com/post/20397701710/50-million-messages-per-second-on-a-single
+  * https://shekhargulati.com/2017/09/30/understanding-akka-dispatchers/
   */
 object FlightDelayStreaming extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
-  val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
+  val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008.csv"))
     .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
       .map(_.utf8String))
 
@@ -42,24 +56,25 @@ object FlightDelayStreaming extends App {
   val csvToFlightEvent: Flow[String, FlightEvent, NotUsed] = Flow[String]
     .map(_.split(",").map(_.trim))
     .map(stringArrayToFlightEvent)
+  // A custom dispatcher with fork/join executor may help on certain machines
+  //.withAttributes(ActorAttributes.dispatcher("custom-dispatcher-fork-join"))
 
   def stringArrayToFlightEvent(cols: Array[String]) = FlightEvent(cols(0), cols(1), cols(2), cols(3), cols(4), cols(5), cols(6), cols(7), cols(8), cols(9), cols(10), cols(11), cols(12), cols(13), cols(14), cols(15), cols(16), cols(17), cols(18), cols(19), cols(20), cols(21), cols(22), cols(23), cols(24), cols(25), cols(26), cols(27), cols(28))
 
   // Transform FlightEvent to FlightDelayRecord (only for records with a delay)
   // Note that with this approach the average is calculated across delayed flights only
   val filterAndConvert: Flow[FlightEvent, FlightDelayRecord, NotUsed] =
-    Flow[FlightEvent]
-      .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
-      .mapAsyncUnordered(parallelism = 2) { r =>
-        Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
+  Flow[FlightEvent]
+    .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
+    .mapAsyncUnordered(parallelism = 2) { r =>
+      Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
       }
 
   // Aggregate number of delays and totalMins
   val averageCarrierDelay: Flow[FlightDelayRecord, FlightDelayAggregate, NotUsed] =
     Flow[FlightDelayRecord]
       // maxSubstreams must be larger than the number of UniqueCarrier in the file
-      // on large dataset you may set allowClosedSubstreamRecreation to true
-      .groupBy(30, _.uniqueCarrier, allowClosedSubstreamRecreation = false)
+      .groupBy(30, _.uniqueCarrier, allowClosedSubstreamRecreation = true)
       //.wireTap(each => println(s"Processing FlightDelayRecord: $each"))
       .fold(FlightDelayAggregate("", 0, 0)) {
         (x: FlightDelayAggregate, y: FlightDelayRecord) =>
@@ -67,7 +82,6 @@ object FlightDelayStreaming extends App {
           val totalMins = x.totalMins + Try(y.arrDelayMins.toInt).getOrElse(0)
           FlightDelayAggregate(y.uniqueCarrier, count, totalMins)
       }
-      .async //for maximizing throughput
       .mergeSubstreams
 
   def averageSink[A](avg: A): Unit = {
@@ -81,6 +95,7 @@ object FlightDelayStreaming extends App {
 
   var stats: List[Stats] = Nil
 
+
   val done = sourceOfLines
     .via(ThroughputMonitor(1000.millis, { st => stats = st :: stats }))
     .via(csvToFlightEvent)
@@ -93,7 +108,7 @@ object FlightDelayStreaming extends App {
   def terminateWhen(done: Future[Done]) = {
     done.onComplete {
       case Success(_) =>
-        println("Perf report:")
+        println(s"Run with: " + Runtime.getRuntime.availableProcessors + " cores")
         ThroughputMonitor.avgThroughputReport(stats)
         println("Flow Success. About to terminate...")
         system.terminate()

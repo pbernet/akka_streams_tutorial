@@ -1,0 +1,8 @@
+akhq:
+  connections:
+    docker-kafka-server:
+      properties:
+        bootstrap.servers: "broker:9092"
+      schema-registry:
+        type: confluent
+        url: "http://apicurio:8080/api"

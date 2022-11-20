@@ -6,17 +6,17 @@ version := "1.0"
 
 scalaVersion := "2.13.10"
 
-val akkaVersion = "2.6.20"
-val akkaHTTPVersion = "10.2.10"
-val alpakkaVersion = "4.0.0"
+val akkaVersion = "2.7.0"
+val akkaHTTPVersion = "10.4.0"
+val alpakkaVersion = "5.0.0"
 
-val alpakkaKafkaConnectorVersion = "3.0.1"
-val kafkaVersion = "3.2.3"
+val alpakkaKafkaConnectorVersion = "4.0.0"
+val kafkaVersion = "3.3.1"
 
 val activemqVersion = "5.16.3"
-val artemisVersion = "2.21.0"
+val artemisVersion = "2.27.0"
 val testContainersVersion = "1.17.5"
-val keycloakVersion = "18.0.2"
+val keycloakVersion = "20.0.1"
 val sttpVersion = "3.5.2"
 val influxdbVersion = "6.3.0"
 
@@ -77,7 +77,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "1.9.4",
+  "org.apache.opennlp" % "opennlp-tools" % "2.0.0",
 
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
@@ -88,13 +88,16 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "org.apache.camel" % "camel-core" % "3.18.1",
-  "org.apache.camel" % "camel-reactive-streams" % "3.18.1",
+  //"io.apicurio" % "apicurio-registry-utils-serde" % "1.3.2.Final",
+
+
+  "org.apache.camel" % "camel-core" % "3.18.3",
+  "org.apache.camel" % "camel-reactive-streams" % "3.18.3",
   "io.projectreactor" % "reactor-core" % "3.4.17",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.4.3",
+  "ch.qos.logback" % "logback-classic" % "1.4.4",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -102,14 +105,14 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.3.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.4.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.3.3",
+  "org.postgresql" % "postgresql" % "42.5.0",
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
