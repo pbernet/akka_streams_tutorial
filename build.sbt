@@ -96,7 +96,7 @@ libraryDependencies ++= Seq(
   "io.projectreactor" % "reactor-core" % "3.4.17",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
 
-  "com.github.blemale" %% "scaffeine" % "5.2.1",
+  "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.4.4",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
