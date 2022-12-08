@@ -82,8 +82,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play" % "2.8.7",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
-  "org.apache.httpcomponents" % "httpclient" % "4.5.13",
-  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
+  "org.apache.httpcomponents" % "httpclient" % "4.5.14",
+  "org.apache.httpcomponents" % "httpmime" % "4.5.14",
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
