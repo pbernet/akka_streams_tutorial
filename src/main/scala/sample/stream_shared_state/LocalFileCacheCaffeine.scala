@@ -8,7 +8,7 @@ import com.github.benmanes.caffeine
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
-import org.apache.http.client.HttpResponseException
+import org.apache.hc.client5.http.HttpResponseException
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.net.URI
@@ -29,7 +29,7 @@ import scala.util.control.NonFatal
   *  - On restart: populate cache from local filesystem
   *
   * Before running this class: start [[alpakka.env.FileServer]] to simulate non idempotent responses
-  * Monitor localFileCache dir with:  watch ls -ltr
+  * Monitor localFileCache dir with cmd:  watch ls -ltr
   *
   * Doc:
   *  - Caffeine: https://github.com/ben-manes/caffeine
@@ -44,13 +44,13 @@ object LocalFileCacheCaffeine {
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
       val rootCause = ExceptionUtils.getRootCause(e)
-      logger.error(s"Stream failed with: $rootCause, going to restart",e)
+      logger.error(s"Stream failed with: ${rootCause.getMessage}, going to restart", e)
       Supervision.Restart
     case _ => Supervision.Stop
   }
 
-  val scaleFactor = 1 //Raise to widen range of IDs and thus have more traffic
-  val evictionTime: FiniteDuration = 5.minutes //Lower eg to 5.seconds to see cache and file system deletes
+  val scaleFactor = 1 // Raise to widen range of IDs and thus have more traffic
+  val evictionTime: FiniteDuration = 5.minutes // Lower eg to 5.seconds to see cache and file system deletes
   val evictionTimeOnError: FiniteDuration = 10.minutes
   val localFileCache: Path = Paths.get(System.getProperty("java.io.tmpdir")).resolve("localFileCache")
 
@@ -99,7 +99,7 @@ object LocalFileCacheCaffeine {
           Message(message.group, message.id, downloadedFile)
         }
 
-        // If we get a 404 from the server, use this "optimistic approach" to retry
+        // If we get a 404 from the quirky server, we use this "optimistic approach" to retry
         def attemptToRecover(message: Message, e: RuntimeException) = {
           val rootCause = ExceptionUtils.getRootCause(e)
           val status = rootCause.asInstanceOf[HttpResponseException].getStatusCode
@@ -113,7 +113,7 @@ object LocalFileCacheCaffeine {
               logger.info(s"TRACE_ID: ${message.id} CACHE hit")
               resultPromise.success(Message(message.group, message.id, value))
             } else {
-              logger.info(s"TRACE_ID: ${message.id} CACHE miss")
+              logger.info(s"TRACE_ID: ${message.id} CACHE miss, this should not happen - this download is lost")
               resultPromise.failure(e)
             }
           }
@@ -130,7 +130,7 @@ object LocalFileCacheCaffeine {
     val faultyDownstreamFlow: Flow[Message, Message, NotUsed] = Flow[Message]
       .map { message: Message =>
         if (message.group == 0) {
-          //Force an update (= replacement of value) to extend time in cache. evictionTimeOnError will be used
+          // Force an update (= replacement of value) to extend time in cache. evictionTimeOnError will be used
           logger.info(s"TRACE_ID: ${message.id} extend eviction time for message in group: ${message.group}")
           cache.put(message.id, message.file)
 

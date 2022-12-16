@@ -18,7 +18,7 @@ import org.apache.commons.text.StringEscapeUtils
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.elasticsearch.ElasticsearchContainer
 import org.testcontainers.utility.DockerImageName
-import play.api.libs.json._
+import play.api.libs.json.{JsArray, JsString, Json}
 import spray.json.DefaultJsonProtocol._
 import spray.json.JsonFormat
 
@@ -32,7 +32,6 @@ import scala.sys.process.Process
 import scala.util.Try
 import scala.util.control.NonFatal
 
-
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
   * fetch the abstract from Wikipedia API,
@@ -41,6 +40,7 @@ import scala.util.control.NonFatal
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/elasticsearch.html
+  * https://www.testcontainers.org/modules/elasticsearch
   */
 object SSEtoElasticsearch extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -167,8 +167,8 @@ object SSEtoElasticsearch extends App {
   }
 
 
-  def findPersons(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"About to find person names in: ${ctx.change.title}")
+  def findPersonsLocalNER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"LocalNER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     // We need a new instance, because TokenizerME is not thread safe
@@ -191,11 +191,30 @@ object SSEtoElasticsearch extends App {
     }
   }
 
+  def findPersonsRemoteGpt3NER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"GPT-3 NER: About to find person names in: ${ctx.change.title}")
+    val content = ctx.content
+    val resultRaw = new NerRequestOpenAI().run(content)
+
+    val choices: JsArray = (Json.parse(resultRaw) \ "choices").as[JsArray]
+    val text = (Json.parse(choices.value(0).toString()) \ "text").as[String]
+    val personsFound = text.split("\n").filter(_.nonEmpty).toList
+    if (personsFound.isEmpty) {
+      Future(ctx)
+    } else {
+      val personsFoundCleaned = personsFound.map(each => StringEscapeUtils.unescapeJava(each))
+      logger.info(s"FOUND persons: $personsFoundCleaned from content: $content")
+      Future(ctx.copy(personsFound = personsFoundCleaned))
+    }
+  }
+
   val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
     .filter(change => !change.isBot)
     .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
-    .mapAsync(3)(ctx => findPersons(ctx))
+    .mapAsync(3)(ctx => findPersonsLocalNER(ctx))
+    //TODO Activate, when results are better
+    //.mapAsync(3)(ctx => findPersonsRemoteGpt3NER(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
 
   logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
