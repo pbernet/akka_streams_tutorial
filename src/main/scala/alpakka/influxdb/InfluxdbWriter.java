@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -63,13 +62,12 @@ public class InfluxdbWriter {
     }
 
     public CompletionStage<Done> writeTestPoints(int nPoints, String sensorID) {
-        List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().collect(Collectors.toList());
+        List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().toList();
         Source<Integer, NotUsed> source = Source.from(range);
-        CompletionStage<Done> done = source
+        return source
                 .groupedWithin(10, Duration.ofMillis(100))
                 .mapAsyncUnordered(10, each -> this.eventHandlerPointBatch(each, influxDBClient.getWriteApiBlocking(), nPoints, sensorID))
                 .runWith(Sink.ignore(), system);
-        return done;
     }
 
     public void writeTestPointEverySecond(String sensorID) throws ExecutionException, InterruptedException {
@@ -118,7 +116,7 @@ public class InfluxdbWriter {
 
     private CompletionStage<Done> eventHandlerPointBatch(List<Integer> hrs, WriteApiBlocking writeApi, int nPoints, String sensorID) {
         LOGGER.info("Writing points: {}-{} ", sensorID, hrs);
-        List<Point> points = hrs.stream().map(each -> createPoint(nPoints, sensorID, System.nanoTime(), each)).collect(Collectors.toList());
+        List<Point> points = hrs.stream().map(each -> createPoint(nPoints, sensorID, System.nanoTime(), each)).toList();
         writeApi.writePoints(points);
         return CompletableFuture.completedFuture(Done.done());
     }
