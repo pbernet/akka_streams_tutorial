@@ -28,7 +28,7 @@ import java.nio.file.Paths
 import java.time.{Instant, ZoneId}
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -239,13 +239,10 @@ object SSEtoElasticsearch extends App {
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
-    if (os == "mac os x") {
-      Process(s"open $searchURL").!
-    }
-    else {
-      logger.info(s"Please open a browser at: $searchURL")
-    }
+    val url = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
+    if (os == "mac os x") Process(s"open $url").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start $url").!
+    else logger.info(s"Please open a browser at: $url")
   }
 
   private def dateTimeFormatted(timestamp: Long) = {

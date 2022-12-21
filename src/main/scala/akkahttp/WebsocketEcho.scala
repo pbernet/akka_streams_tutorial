@@ -22,7 +22,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
 import scala.language.postfixOps
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 trait ClientCommon {
@@ -53,8 +53,8 @@ trait ClientCommon {
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process("open src/main/resources/WebsocketEcho.html").!
+    else if (os == "windows 10") Seq("cmd", "/c", "start src/main/resources/WebsocketEcho.html").!
   }
-
 }
 
 /**
