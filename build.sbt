@@ -16,7 +16,7 @@ val kafkaVersion = "3.3.1"
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.27.0"
 val testContainersVersion = "1.17.6"
-val keycloakVersion = "20.0.1"
+val keycloakVersion = "20.0.2"
 val sttpVersion = "3.5.2"
 val influxdbVersion = "6.3.0"
 
@@ -115,7 +115,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql" % "postgresql" % "42.5.0",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.1.0" % Test pomOnly(),
-  "io.zonky.test" % "embedded-postgres" % "2.0.1" % Test,
+  "io.zonky.test" % "embedded-postgres" % "2.0.2" % Test,
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
