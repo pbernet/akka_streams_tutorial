@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -62,7 +63,7 @@ public class InfluxdbWriter {
     }
 
     public CompletionStage<Done> writeTestPoints(int nPoints, String sensorID) {
-        List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().toList();
+        List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().collect(Collectors.toList());
         Source<Integer, NotUsed> source = Source.from(range);
         return source
                 .groupedWithin(10, Duration.ofMillis(100))
@@ -116,7 +117,7 @@ public class InfluxdbWriter {
 
     private CompletionStage<Done> eventHandlerPointBatch(List<Integer> hrs, WriteApiBlocking writeApi, int nPoints, String sensorID) {
         LOGGER.info("Writing points: {}-{} ", sensorID, hrs);
-        List<Point> points = hrs.stream().map(each -> createPoint(nPoints, sensorID, System.nanoTime(), each)).toList();
+        List<Point> points = hrs.stream().map(each -> createPoint(nPoints, sensorID, System.nanoTime(), each)).collect(Collectors.toList());
         writeApi.writePoints(points);
         return CompletableFuture.completedFuture(Done.done());
     }
