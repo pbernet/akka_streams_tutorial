@@ -18,7 +18,7 @@ import java.nio.file.Paths
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
@@ -224,5 +224,6 @@ object HttpFileEcho extends App with JsonProtocol {
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://$address:$port").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start http://$address:$port").!
   }
 }

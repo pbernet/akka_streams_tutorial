@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Read files ordered by lastModified, so new files are loaded at the end
@@ -24,9 +25,8 @@ public class FileLister {
         AtomicInteger filesCounter = new AtomicInteger(0);
         List<Path> resultList = null;
 
-        try {
-            resultList = Files
-                    .walk(directory.toPath(), 2)
+        try (Stream<Path> walk = Files.walk(directory.toPath(), 2)) {
+            resultList = walk
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".zip"))
                     .sorted(Comparator.comparing(zipFile -> {

@@ -2,16 +2,19 @@ package sample.stream_shared_state;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpRequestRetryHandler;
-import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.ServiceUnavailableRetryStrategy;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.protocol.HttpContext;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.HttpResponseException;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,156 +26,126 @@ import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A simple sync http file downloader with internal retry.
- *
- * Exponential backoff could be added:
- * https://stackoverflow.com/questions/35391005/how-to-use-an-exponential-backoff-strategy-with-apache-httpclient
+ * A sync http file downloader with internal retry
  */
 public class DownloaderRetry {
-	private static final Logger LOGGER = LoggerFactory.getLogger(DownloaderRetry.class);
-	private static final int DELAY_TO_RETRY_SECONDS = 20;
+    private static final Logger LOGGER = LoggerFactory.getLogger(DownloaderRetry.class);
+    private static final int DELAY_TO_RETRY_SECONDS = 20;
 
-	public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {
 
-		//URI url = new URI("http://httpstat.us/503");
-		URI url = new URI("http://127.0.0.1:6001/download/30");
-		//URI url = new URI("http://127.0.0.1:6001/downloadflaky/30");
+        URI url = new URI("http://httpstat.us/503");
+        //URI url = new URI("http://127.0.0.1:6001/download/30");
 
-		Path resFile = new DownloaderRetry().download(0, url, LocalFileCacheCaffeine.localFileCache().resolve(Paths.get("test.zip")));
-		System.out.print("Downloaded file: " + resFile.toFile().getName() + " with size: " + resFile.toFile().length() + " bytes");
-	}
+        Path resFile = new DownloaderRetry().download(0, url, Paths.get(System.getProperty("java.io.tmpdir")).resolve(Paths.get("test.zip")));
+        System.out.print("Downloaded file: " + resFile.toFile().getName() + " with size: " + resFile.toFile().length() + " bytes");
+    }
 
-	public Path download(int traceID, URI url, Path destinationFile) {
-		LOGGER.info("TRACE_ID: " + traceID + " about to download...");
-		RequestConfig timeoutsConfig = RequestConfig.custom()
+    public Path download(int traceID, URI url, Path destinationFile) {
+        LOGGER.info("TRACE_ID: {} about to download...", traceID);
+        RequestConfig timeoutsConfig = RequestConfig.custom()
+                .setConnectTimeout(Timeout.of(DELAY_TO_RETRY_SECONDS, TimeUnit.SECONDS)).build();
 
-				// The time to establish the connection with the remote host [http.connection.timeout].
-				// Responsible for java.net.SocketTimeoutException: connect timed out.
-				.setConnectTimeout(DELAY_TO_RETRY_SECONDS * 1000)
+        try (CloseableHttpClient httpClient = HttpClientBuilder.create()
+                .setDefaultRequestConfig(timeoutsConfig)
+                .setRetryStrategy(new CustomHttpRequestRetryStrategy())
+                .build()) {
+            Path localPath = httpClient.execute(new HttpGet(url), new HttpResponseHandler(destinationFile));
+            LOGGER.info("TRACE_ID: {} successfully downloaded", traceID);
+            return localPath;
 
-				// The time to wait for a connection from the connection manager/pool [http.connection-manager.timeout].
-				// Responsible for org.apache.http.conn.ConnectionPoolTimeoutException.
-				.setConnectionRequestTimeout(DELAY_TO_RETRY_SECONDS * 1000)
+        } catch (IOException e) {
+            throw new RuntimeException(String.format(
+                    "Cannot download file %s or save it to %s.", url, destinationFile), e);
+        }
+    }
 
-				// The time waiting for data after the connection was established [http.socket.timeout]. The maximum time
-				// of inactivity between two data packets. Responsible for java.net.SocketTimeoutException: Read timed out.
-				.setSocketTimeout(DELAY_TO_RETRY_SECONDS * 1000).build();
+    /**
+     * Customize retries for different types of (temporary) network related issues, which
+     * manifest in IOException and HTTP 503
+     */
+    private static class CustomHttpRequestRetryStrategy implements HttpRequestRetryStrategy {
 
-		try (CloseableHttpClient httpClient = HttpClientBuilder.create()
-				.setDefaultRequestConfig(timeoutsConfig)
-				.setRetryHandler(new CustomHttpRequestRetryHandler())
-				.setServiceUnavailableRetryStrategy(new CustomServiceUnavailableRetryStrategy())
-				.build()) {
-			return httpClient.execute(new HttpGet(url), new HttpResponseHandler(destinationFile));
+        private final Logger logger = LoggerFactory.getLogger(this.getClass());
+        private final int maxRetriesCount = 3;
+        private final int maxDurationMinutes = 1;
 
-		} catch (IOException e) {
-			throw new RuntimeException(String.format(
-					"Cannot download file %s or save it to %s", url, destinationFile), e);
-		}
-	}
+        /**
+         * Triggered in case of exception
+         *
+         * @param exception The cause
+         * @param execCount Retry attempt sequence number
+         * @param context   {@link HttpContext}
+         * @return True if we want to retry request, false otherwise
+         */
+        @Override
+        public boolean retryRequest(HttpRequest request, IOException exception, int execCount, HttpContext context) {
+            Throwable rootCause = ExceptionUtils.getRootCause(exception);
+            logger.warn("Request attempt failed, root cause: {}", rootCause.toString());
 
-	/**
-	 * Custom HttpRequestRetryHandler implementation to customize retries for different IOException
-	 */
-	private class CustomHttpRequestRetryHandler implements HttpRequestRetryHandler {
+            if (execCount >= maxRetriesCount) {
+                logger.warn("Request failed after {} retries in {} minute(s)",
+                        execCount, maxDurationMinutes);
+                return false;
 
-		private final Logger logger             = LoggerFactory.getLogger(this.getClass());
-		private final int    maxRetriesCount    = 3;
-		private final int    maxDurationMinutes = 1;
+            } else if (rootCause instanceof SocketTimeoutException) {
+                return true;
 
-		/**
-		 * Triggered only in case of exception
-		 *
-		 * @param exception      The cause
-		 * @param executionCount Retry attempt sequence number
-		 * @param context        {@link HttpContext}
-		 * @return True if we want to retry request, false otherwise
-		 */
-		public boolean retryRequest(IOException exception, int executionCount, HttpContext context) {
+            } else if (rootCause instanceof SocketException
+                    || rootCause instanceof InterruptedIOException
+                    || exception instanceof SSLException) {
+                try {
+                    Thread.sleep(DELAY_TO_RETRY_SECONDS * 1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace(); // do nothing
+                }
+                return true;
+            } else
+                return false;
+        }
 
-			Throwable rootCause = ExceptionUtils.getRootCause(exception);
-			logger.warn("File downloading attempt failed, root cause: {}", rootCause.toString());
+        @Override
+        public boolean retryRequest(HttpResponse response, int execCount, HttpContext context) {
+            int httpStatusCode = response.getCode();
+            if (httpStatusCode != 503)
+                return false; // retry only on HTTP 503
 
-			if (executionCount >= maxRetriesCount) {
-				logger.warn("File downloading failed after {} retries in {} minute(s)",
-						executionCount, maxDurationMinutes);
-				return false;
+            if (execCount >= maxRetriesCount) {
+                logger.warn("File downloading failed after {} retries in {} minute(s)",
+                        execCount, maxDurationMinutes);
+                return false;
 
-			} else if (rootCause instanceof SocketTimeoutException) {
-				return true;
+            } else {
+                logger.warn("File downloading attempt failed, HTTP status code: {}", httpStatusCode);
+                return true;
+            }
+        }
 
-			} else if (rootCause instanceof SocketException
-					|| rootCause instanceof InterruptedIOException
-					|| exception instanceof SSLException) {
-				try {
-					Thread.sleep(DELAY_TO_RETRY_SECONDS * 1000);
+        @Override
+        public TimeValue getRetryInterval(org.apache.hc.core5.http.HttpResponse response, int execCount, HttpContext context) {
+            return TimeValue.ofSeconds(DELAY_TO_RETRY_SECONDS);
+        }
+    }
 
-				} catch (InterruptedException e) {
-					e.printStackTrace(); // do nothing
-				}
-				return true;
+    private static class HttpResponseHandler implements HttpClientResponseHandler<Path> {
 
-			} else
-				return false;
-		}
-	}
+        private final Path targetFile;
 
-	/**
-	 * Custom ServiceUnavailableRetryStrategy implementation to retry on HTTP 503 (= service unavailable)
-	 */
-	private class CustomServiceUnavailableRetryStrategy implements ServiceUnavailableRetryStrategy {
+        private HttpResponseHandler(Path targetFile) {
+            this.targetFile = targetFile;
+        }
 
-		private final Logger logger             = LoggerFactory.getLogger(this.getClass());
-		private final int    maxRetriesCount    = 3;
-		private final int    maxDurationMinutes = 1;
+        @Override
+        public Path handleResponse(ClassicHttpResponse response) throws IOException {
+            int httpStatusCode = response.getCode();
+            if (httpStatusCode >= 300)
+                throw new HttpResponseException(httpStatusCode, "HTTP error during file download. Cause: " + httpStatusCode);
 
-		@Override
-		public boolean retryRequest(final HttpResponse response, final int executionCount, final HttpContext context) {
-
-			int httpStatusCode = response.getStatusLine().getStatusCode();
-			if (httpStatusCode != 503)
-				return false; // retry only on HTTP 503
-
-			if (executionCount >= maxRetriesCount) {
-				logger.warn("File downloading failed after {} retries in {} minute(s)",
-						executionCount, maxDurationMinutes);
-				return false;
-
-			} else {
-				logger.warn("File downloading attempt failed, HTTP status code: {}", httpStatusCode);
-				return true;
-			}
-		}
-
-		@Override
-		public long getRetryInterval() {
-
-			// Retry interval between subsequent requests, in milliseconds.
-			// If not set, the default value is 1000 milliseconds.
-
-			return DELAY_TO_RETRY_SECONDS * 1000;
-		}
-	}
-
-	private static class HttpResponseHandler implements ResponseHandler<Path> {
-
-		private Path targetFile;
-
-		private HttpResponseHandler(Path targetFile) {
-			this.targetFile = targetFile;
-		}
-
-		@Override
-		public Path handleResponse(HttpResponse response) throws IOException {
-
-			int httpStatusCode = response.getStatusLine().getStatusCode();
-			if (httpStatusCode >= 300)
-				throw new HttpResponseException(httpStatusCode, "HTTP error during file download");
-
-			FileUtils.copyInputStreamToFile(response.getEntity().getContent(), targetFile.toFile()); // input stream is auto closed after
-			return targetFile;
-		}
-	}
+            FileUtils.copyInputStreamToFile(response.getEntity().getContent(), targetFile.toFile());
+            return targetFile;
+        }
+    }
 }

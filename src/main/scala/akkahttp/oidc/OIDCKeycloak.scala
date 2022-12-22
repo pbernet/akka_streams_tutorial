@@ -28,7 +28,7 @@ import java.util.{Base64, Collections}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.CollectionHasAsScala
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 /**
@@ -254,6 +254,7 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://127.0.0.1:6002").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start http://127.0.0.1:6002").!
   }
 
 
