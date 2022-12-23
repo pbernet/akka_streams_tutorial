@@ -48,16 +48,16 @@ object SSEtoElasticsearch extends App {
 
   import system.dispatcher
 
-  val decider: Supervision.Decider = {
+  private val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")
       Supervision.Restart
   }
 
   // 2.x model from https://opennlp.apache.org/models.html
-  val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.0-1.9.3.bin").toFile))
+  private val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.0-1.9.3.bin").toFile))
   // 1.5 model from https://opennlp.sourceforge.net/models-1.5
-  val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
+  private val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
@@ -67,41 +67,43 @@ object SSEtoElasticsearch extends App {
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
   implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
 
-  val dockerImageName = DockerImageName
+  private val dockerImageName = DockerImageName
     .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
     .withTag("7.10.2")
-  val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
+  private val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
   elasticsearchContainer.start()
 
   val address = elasticsearchContainer.getHttpHostAddress
   val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
 
   // This index will be created in Elasticsearch on the fly
-  val indexName = "wikipediaedits"
-  val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
-  val matchAllQuery = """{"match_all": {}}"""
+  private val indexName = "wikipediaedits"
+  private val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
+  private val matchAllQuery = """{"match_all": {}}"""
 
-  val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
-  val elasticsearchSourceTyped = ElasticsearchSource
+  private val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
+
+  // Note that ElasticsearchSource reads are scroll requests, where you are able to fetch even the entire collection of documents
+  private val elasticsearchSourceTyped = ElasticsearchSource
     .typed[Ctx](
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
     )
-  val elasticsearchSourceRaw = ElasticsearchSource
+  private val elasticsearchSourceRaw = ElasticsearchSource
     .create(
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
     )
 
-  val sinkSettings =
+  private val sinkSettings =
     ElasticsearchWriteSettings(connectionSettings)
       .withBufferSize(10)
       .withVersionType("internal")
       .withRetryLogic(RetryAtFixedRate(maxRetries = 5, retryInterval = 1.second))
       .withApiVersion(ApiVersion.V7)
-  val elasticsearchSink =
+  private val elasticsearchSink =
     ElasticsearchSink.create[Ctx](
       elasticsearchParamsV7,
       settings = sinkSettings
@@ -249,8 +251,10 @@ object SSEtoElasticsearch extends App {
     Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
   }
 
+  // Note that the size of the collection can also be fetched via a GET request, eg
+  // http://localhost:57321/wikipediaedits/_count
   private def query() = {
-    logger.info(s"About to execute read queries...")
+    logger.info(s"About to execute scrolled read queries...")
     for {
       result <- readFromElasticsearchTyped()
       resultRaw <- readFromElasticsearchRaw()

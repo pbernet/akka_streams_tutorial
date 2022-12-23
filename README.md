@@ -2,7 +2,8 @@
 [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 # Akka streams tutorial #
 
-"It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred
+"It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
+hundred
 meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from
 various [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html)
@@ -29,8 +30,9 @@ Other noteworthy examples:
   . Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources via the `sbt-akka-grpc` plugin.
 
 Remarks:
-* Starting
-  with [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
+
+* As
+  of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
   the licensing model has changed
 * Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well
   as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
