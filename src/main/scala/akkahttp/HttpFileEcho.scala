@@ -15,6 +15,7 @@ import spray.json.DefaultJsonProtocol
 
 import java.io.File
 import java.nio.file.Paths
+import java.time.LocalTime
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -35,8 +36,9 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   * Upload/download files up to the configured size in application.conf
   *
   * Added:
-  *  - Retry on upload, Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
-  *  - On the fly gzip compression on upload and gunzip decompression on download,
+  *  - Retry on upload/download
+  *    Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
+  *  - On the fly gzip compression on upload and gunzip decompression on download
   *    Doc: https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dealing-with-compressed-data-streams
   *  - Browser client for manual upload of uncompressed files
   *
@@ -45,9 +47,6 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
   *
-  * TODO:
-  *  - Retry on download
-  *  - Investigate why chuckSizeBytes must be so large to handle large files
   */
 object HttpFileEcho extends App with JsonProtocol {
   implicit val system: ActorSystem = ActorSystem()
@@ -56,13 +55,22 @@ object HttpFileEcho extends App with JsonProtocol {
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6002)
-  val chuckSizeBytes = 100 * 1024
+  val chuckSizeBytes = 100 * 1024 // to handle large files
 
   server(address, port)
   (1 to 10).par.foreach(each => roundtripClient(each, address, port))
   browserClient()
 
   def server(address: String, port: Int): Unit = {
+
+    def throwRndRuntimeException(operation: String): Unit = {
+      val time = LocalTime.now()
+      if (time.getSecond % 2 == 0) {
+        val msg = s"Server RuntimeException during $operation at: $time"
+        println(msg)
+        throw new RuntimeException(s"BOOM - $msg")
+      }
+    }
 
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
@@ -71,6 +79,9 @@ object HttpFileEcho extends App with JsonProtocol {
           println(s"Server received request with additional form data: $payload")
 
           def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+
+          // Activate to simulate rnd server ex during upload and thus provoke retry on client
+          throwRndRuntimeException("upload")
 
           storeUploadedFile("binary", tempDestination) {
             case (metadataFromClient: FileInfo, uploadedFile: File) =>
@@ -83,6 +94,10 @@ object HttpFileEcho extends App with JsonProtocol {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
               println(s"Server received download request for: ${fileHandle.fileName}")
+
+              // Activate to simulate rnd server ex during download and thus provoke retry on client
+              //throwRndRuntimeException("download")
+
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
           }
@@ -159,11 +174,7 @@ object HttpFileEcho extends App with JsonProtocol {
             case HttpResponse(statusCode, _, _, _) =>
               throw new RuntimeException(s"Response has status code: $statusCode")
           }
-      }
-        .runWith(Sink.head)
-        .recover {
-          case ex => throw new RuntimeException(s"Exception occurred: $ex")
-        }
+      }.runWith(Sink.head)
     }
 
     def upload(file: File): Future[FileHandle] = {
@@ -194,9 +205,24 @@ object HttpFileEcho extends App with JsonProtocol {
   }
 
   def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
-
     val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
-    val httpClient = Http(system).outgoingConnection(address, port)
+
+    def getResponseDownload(request: HttpRequest): Future[HttpResponse] = {
+      val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+      RestartSource.withBackoff(restartSettings) { () =>
+        val responseFuture = Http().singleRequest(request)
+
+        Source.future(responseFuture)
+          .mapAsync(parallelism = 1) {
+            case resp@HttpResponse(StatusCodes.OK, _, _, _) => Future(resp)
+            case HttpResponse(StatusCodes.InternalServerError, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: ${StatusCodes.InternalServerError}")
+            case HttpResponse(statusCode, _, _, _) =>
+              throw new RuntimeException(s"Response has status code: $statusCode")
+          }
+      }.runWith(Sink.head)
+    }
+
 
     def saveResponseToFile(response: HttpResponse, localFile: File) = {
       response.entity.dataBytes
@@ -208,11 +234,11 @@ object HttpFileEcho extends App with JsonProtocol {
 
       val result = for {
         reqEntity <- Marshal(remoteFileHandle).to[RequestEntity]
-        response <- Source.single(HttpRequest(HttpMethods.GET, uri = target, entity = reqEntity)).via(httpClient).runWith(Sink.head)
+        response <- getResponseDownload(HttpRequest(HttpMethods.GET, uri = target, entity = reqEntity))
         downloaded <- saveResponseToFile(response, localFile)
       } yield downloaded
 
-      val ioresult = Await.result(result, 10.seconds)
+      val ioresult = Await.result(result, 1.minute)
       println(s"DownloadClient with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
     }
 
