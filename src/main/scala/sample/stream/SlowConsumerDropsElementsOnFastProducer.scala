@@ -3,7 +3,7 @@ package sample.stream
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
-import akka.stream.{DelayOverflowStrategy, ThrottleMode}
+import akka.stream.{DelayOverflowStrategy, OverflowStrategy, ThrottleMode}
 
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import scala.concurrent.duration._
@@ -19,6 +19,7 @@ case class DomainEvent(id: Integer, timeDate: ZonedDateTime)
   * https://github.com/DimaD/akka-streams-slow-consumer/blob/master/src/main/scala/Example.scala
   *
   * Doc:
+  * https://doc.akka.io/docs/akka/current/stream/stream-rate.html#understanding-conflate
   * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/conflate.html
   * https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html#dropping-elements
   *
@@ -61,6 +62,7 @@ object SlowConsumerDropsElementsOnFastProducer extends App {
   val slowSink: Sink[DomainEvent, NotUsed] =
     Flow[DomainEvent]
       // Internal buffer in delay operator has default capacity 16
+      .buffer(1, OverflowStrategy.backpressure)
       .delay(10.seconds, DelayOverflowStrategy.backpressure)
       .to(Sink.foreach(e => println(s"Reached Sink: $e")))
 
