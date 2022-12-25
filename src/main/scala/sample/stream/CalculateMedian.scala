@@ -13,7 +13,6 @@ import scala.language.postfixOps
   * Inspired by:
   * https://stackoverflow.com/questions/4662292/scala-median-implementation
   *
-  * TODO
   * To calculate the "all time median of medians grouped by 5" we would need to store the values (eg in an actor)
   *
   */

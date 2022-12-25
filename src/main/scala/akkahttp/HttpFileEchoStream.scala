@@ -16,6 +16,7 @@ import spray.json.DefaultJsonProtocol
 
 import java.io.File
 import java.nio.file.Paths
+import java.time.LocalTime
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
@@ -51,6 +52,15 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
   def server(address: String, port: Int): Unit = {
 
+    def throwRndRuntimeException(operation: String): Unit = {
+      val time = LocalTime.now()
+      if (time.getSecond % 2 == 0) {
+        val msg = s"Server RuntimeException during $operation at: $time"
+        println(msg)
+        throw new RuntimeException(s"BOOM - $msg")
+      }
+    }
+
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
 
@@ -58,16 +68,22 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            //throw new RuntimeException("BOOM - server error during upload")
             println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+
+            // Activate to simulate rnd server ex during upload
+            //throwRndRuntimeException("upload")
+
             complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
         }
       } ~
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle: FileHandle =>
-              //throw new RuntimeException("BOOM - server error during download")
               println(s"Server: Received download request for: ${fileHandle.fileName}")
+
+              // Activate to simulate rnd server ex during download
+              throwRndRuntimeException("download")
+
               getFromFile(new File(fileHandle.absolutePath), MediaTypes.`application/octet-stream`)
             }
           }
@@ -98,7 +114,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
     val filesToUpload =
     // Unbounded stream. Limited for testing purposes by appending eg .take(5)
-      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"src/main/resources/$resourceFileName").toString))).take(5)
+      Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"src/main/resources/$resourceFileName").toString))).take(10)
 
     val hostConnectionPoolUpload = Http().cachedHostConnectionPool[FileHandle](address, port)
 
@@ -170,12 +186,11 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
                 println(s"Client: Finished download file: $response (size: ${ioresult.count} bytes)")
             }
           } else {
-            println(s"About to retry, because of: $response")
             throw new RuntimeException("Retry")
           }
         ).recoverWith {
           case ex: RuntimeException =>
-            println(s"About to retry, because of: $ex")
+            println(s"About to retry download, because of: $ex")
             downloadRetry(fileHandle)
           case e: Throwable => Future.failed(e)
         }

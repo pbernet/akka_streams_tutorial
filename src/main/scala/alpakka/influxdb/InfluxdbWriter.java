@@ -65,11 +65,10 @@ public class InfluxdbWriter {
     public CompletionStage<Done> writeTestPoints(int nPoints, String sensorID) {
         List<Integer> range = IntStream.rangeClosed(1, nPoints).boxed().collect(Collectors.toList());
         Source<Integer, NotUsed> source = Source.from(range);
-        CompletionStage<Done> done = source
+        return source
                 .groupedWithin(10, Duration.ofMillis(100))
                 .mapAsyncUnordered(10, each -> this.eventHandlerPointBatch(each, influxDBClient.getWriteApiBlocking(), nPoints, sensorID))
                 .runWith(Sink.ignore(), system);
-        return done;
     }
 
     public void writeTestPointEverySecond(String sensorID) throws ExecutionException, InterruptedException {

@@ -6,9 +6,9 @@ import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, RequestContext, Route, ValidationRejection}
+import akka.http.scaladsl.server._
 import akka.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import spray.json.DefaultJsonProtocol
@@ -17,7 +17,7 @@ import java.io.File
 import java.nio.file.Paths
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 /**
@@ -34,9 +34,8 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
-
   import spray.json._
+  import system.dispatcher
 
   val faultyActor = system.actorOf(Props[FaultyActor](), "FaultyActor")
 
@@ -141,6 +140,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://127.0.0.1:6002").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start http://127.0.0.1:6002").!
   }
 
   browserClient()

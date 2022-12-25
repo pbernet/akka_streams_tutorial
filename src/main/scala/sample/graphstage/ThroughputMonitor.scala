@@ -122,7 +122,6 @@ object ThroughputMonitor {
   def apply[A](statsInterval: FiniteDuration, onStats: Stats => Unit): Graph[FlowShape[A, A], NotUsed] =
     apply(Flow.fromGraph(new Pulse[Stats](statsInterval)).to(Sink.foreach(onStats)).mapMaterializedValue(_ => NotUsed))
 
-  // TODO Add simple way to visualize Stats collection
   def avgThroughputReport(stats: Seq[Stats]): Long = {
     val threshold = 5
     val processedElements =  stats.map(_.count).sum
