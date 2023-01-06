@@ -14,11 +14,11 @@ val alpakkaKafkaConnectorVersion = "4.0.0"
 val kafkaVersion = "3.3.1"
 
 val activemqVersion = "5.16.3"
-val artemisVersion = "2.27.0"
+val artemisVersion = "2.27.1"
 val testContainersVersion = "1.17.6"
 val keycloakVersion = "20.0.2"
-val sttpVersion = "3.5.2"
-val influxdbVersion = "6.3.0"
+val sttpVersion = "3.8.5"
+val influxdbVersion = "6.7.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.72",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -80,7 +80,9 @@ libraryDependencies ++= Seq(
 
   "org.apache.opennlp" % "opennlp-tools" % "2.1.0",
 
-  "com.typesafe.play" %% "play" % "2.8.7",
+  "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
+
+  "com.typesafe.play" %% "play" % "2.8.18",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
@@ -92,10 +94,10 @@ libraryDependencies ++= Seq(
   //"io.apicurio" % "apicurio-registry-utils-serde" % "1.3.2.Final",
 
 
-  "org.apache.camel" % "camel-core" % "3.18.3",
-  "org.apache.camel" % "camel-reactive-streams" % "3.18.3",
-  "io.projectreactor" % "reactor-core" % "3.4.17",
-  "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
+  "org.apache.camel" % "camel-core" % "3.19.0",
+  "org.apache.camel" % "camel-reactive-streams" % "3.19.0",
+  "io.projectreactor" % "reactor-core" % "3.4.26",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
   "ch.qos.logback" % "logback-classic" % "1.4.5",
@@ -113,7 +115,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.5.0",
+  "org.postgresql" % "postgresql" % "42.5.1",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.1.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.0.2" % Test,
 
