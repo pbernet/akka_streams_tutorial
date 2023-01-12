@@ -12,12 +12,13 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
 /**
-  * DB access via Slick
+  * DB access via Slick, for simplicity using the 'public' schema
   * Run with integration test: alpakka.slick.SlickIT
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/slick.html
-  *
+  * https://scala-slick.org/docs
+  * https://blog.rockthejvm.com/slick
   */
 class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -32,7 +33,7 @@ class SlickRunner(urlWithMappedPort: String) {
     .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPort))
     .withFallback(ConfigFactory.load())
 
-  implicit val session = SlickSession.forConfig("slick-postgres", tweakedConf)
+  implicit val session: SlickSession = SlickSession.forConfig("slick-postgres", tweakedConf)
 
   import session.profile.api._
 
