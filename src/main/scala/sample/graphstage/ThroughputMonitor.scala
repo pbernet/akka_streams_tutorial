@@ -18,8 +18,8 @@ import scala.concurrent.duration.FiniteDuration
   *                         |
   *                         |
   *                     +---v---+
-  *                     | Stats |
-  *                     +-------+
+  * | Stats |
+  * +-------+
   *
   * A graph stage measuring the element throughput at a given point in a graph. The stage emits through `out` all
   * elements received at `in`, while a second output port `statsOut` emits statistics of the number of elements passing
@@ -28,7 +28,7 @@ import scala.concurrent.duration.FiniteDuration
   * `statsOut` emits continuously as demanded by downstream; the connected `Sink` is responsible for throttling demand,
   * controlling that way the update frequency of the stats (or, equivalently, the size of the buckets they represent).
   *
-  * Microbenchmarks like this only make sense over a longer period of time, see avgThroughputReport
+  * Micro benchmarks like this only make sense over a longer period of time, see avgThroughputReport
   * The gold standard would be to use (licenced) Lightbend telemetry:
   * https://developer.lightbend.com/docs/telemetry/current//home.html
   *
@@ -122,7 +122,6 @@ object ThroughputMonitor {
   def apply[A](statsInterval: FiniteDuration, onStats: Stats => Unit): Graph[FlowShape[A, A], NotUsed] =
     apply(Flow.fromGraph(new Pulse[Stats](statsInterval)).to(Sink.foreach(onStats)).mapMaterializedValue(_ => NotUsed))
 
-  // TODO Add simple way to visualize Stats collection
   def avgThroughputReport(stats: Seq[Stats]): Long = {
     val threshold = 5
     val processedElements =  stats.map(_.count).sum

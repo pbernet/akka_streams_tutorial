@@ -4,10 +4,12 @@
 name: Scala Steward
 
 on:
-  schedule:
-    # Run every Sunday @ 12PM UTC
-    - cron: "0 0 * * 0"
-  #  Run via "Run workflow" button at the Github workflow page
+  # Disable to avoid duplicate PRs,
+  # because https://github.com/scala-steward-org/scala-steward is active again
+  # schedule:
+  # # Run every Sunday @ 12PM UTC
+  #  - cron: "0 0 * * 0"
+  #  Possible to execute via "Run workflow" button at the Github workflow page
   workflow_dispatch:
 
 jobs:

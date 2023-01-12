@@ -4,21 +4,21 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.10"
 
-val akkaVersion = "2.6.20"
-val akkaHTTPVersion = "10.2.10"
-val alpakkaVersion = "3.0.4"
+val akkaVersion = "2.7.0"
+val akkaHTTPVersion = "10.4.0"
+val alpakkaVersion = "5.0.0"
 
-val alpakkaKafkaConnectorVersion = "3.0.0"
-val kafkaVersion = "3.2.0"
+val alpakkaKafkaConnectorVersion = "4.0.0"
+val kafkaVersion = "3.3.1"
 
 val activemqVersion = "5.16.3"
-val artemisVersion = "2.21.0"
-val testContainersVersion = "1.17.3"
-val keycloakVersion = "18.0.2"
-val sttpVersion = "3.5.2"
-val influxdbVersion = "6.3.0"
+val artemisVersion = "2.27.1"
+val testContainersVersion = "1.17.6"
+val keycloakVersion = "20.0.2"
+val sttpVersion = "3.8.5"
+val influxdbVersion = "6.7.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -35,6 +35,7 @@ libraryDependencies ++= Seq(
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
+  "org.json" % "json" % "20220924",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
@@ -49,7 +50,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.70",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.72",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -81,24 +82,29 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "1.9.4",
+  "org.apache.opennlp" % "opennlp-tools" % "2.1.0",
 
-  "com.typesafe.play" %% "play" % "2.8.7",
+  "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
+
+  "com.typesafe.play" %% "play" % "2.8.18",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
-  "org.apache.httpcomponents" % "httpclient" % "4.5.13",
-  "org.apache.httpcomponents" % "httpmime" % "4.5.13",
+  "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.2",
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
 
-  "org.apache.camel" % "camel-core" % "3.18.1",
-  "org.apache.camel" % "camel-reactive-streams" % "3.18.1",
-  "io.projectreactor" % "reactor-core" % "3.4.17",
-  "io.reactivex.rxjava3" % "rxjava" % "3.1.4",
+  //"io.apicurio" % "apicurio-registry-utils-serde" % "1.3.2.Final",
+
+
+  "org.apache.camel" % "camel-core" % "3.20.1",
+  "org.apache.camel" % "camel-reactive-streams" % "3.20.1",
+  "io.projectreactor" % "reactor-core" % "3.4.26",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.2.11",
+  "ch.qos.logback" % "logback-classic" % "1.4.5",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -106,21 +112,23 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.3.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.4.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.3.3",
+  "org.postgresql" % "postgresql" % "42.5.1",
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.1.0" % Test pomOnly(),
+  "io.zonky.test" % "embedded-postgres" % "2.0.2" % Test,
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "org.assertj" % "assertj-core" % "3.22.0" % Test,
+  "org.assertj" % "assertj-core" % "3.23.1" % Test,
 
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.8.2" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.8.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.1" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.1" % Test,
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
 
 )

@@ -50,6 +50,7 @@ object SSEClientWikipediaEdits extends App {
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process("open src/main/resources/SSEClientWikipediaEdits.html").!
+    else if (os == "windows 10") Seq("cmd", "/c", "start src/main/resources/SSEClientWikipediaEdits.html").!
   }
 
   private def sseClient() = {

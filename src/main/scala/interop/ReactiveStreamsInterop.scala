@@ -11,15 +11,21 @@ import org.reactivestreams.Publisher
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.Flux
 
+import java.time.Duration
+import java.util.concurrent.TimeUnit
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
   * Show reactive streams interop by using Apache Camel "Reactive Streams" component
-  * to distribute messages to the consumers
+  * to distribute messages to different consumers:
+  *  - Reactor
+  *  - RxJava
+  *  - akka-streams
   *
   * Doc:
   * https://doc.akka.io/docs/akka/current/stream/reactive-streams-interop.html
-  * https://camel.apache.org/components/3.15.x/reactive-streams-component.html
+  * https://camel.apache.org/components/3.18.x/reactive-streams-component.html
   * https://projectreactor.io/docs/core/release/reference/
   * https://github.com/ReactiveX/RxJava
   */
@@ -28,25 +34,30 @@ object ReactiveStreamsInterop extends App {
 
   implicit val system: ActorSystem = ActorSystem()
 
+  import system.dispatcher
+
   val camel = new DefaultCamelContext()
   val rsCamel: CamelReactiveStreamsService = CamelReactiveStreams.get(camel)
   camel.start()
 
+  // Consumer endpoint with Camel
   val publisher: Publisher[String] = rsCamel.from("vm:words", classOf[String])
 
-  // Consumer endpoint with Reactor 3
+  // Slow consumer with Reactor 3
   Flux.from(publisher)
+    .delayElements(Duration.ofMillis(2000))
     .map(each => each.toUpperCase())
     .doOnNext(each => logger.info(s"Consumed with Reactor: $each"))
     .subscribe()
 
-  // Consumer endpoint with RxJava 3
+  // Slow consumer with RxJava 3
   Flowable.fromPublisher(publisher)
+    .delay(2L, TimeUnit.SECONDS)
     .map(each => each.toUpperCase())
     .doOnNext(each => logger.info(s"Consumed with RxJava: $each"))
     .subscribe()
 
-  // Consumer endpoint with akka-streams
+  // Slow consumer with akka-streams
   Source.fromPublisher(publisher)
     .throttle(2, 2.seconds, 2, ThrottleMode.shaping)
     .map(each => each.toUpperCase())
@@ -55,10 +66,14 @@ object ReactiveStreamsInterop extends App {
 
   // Sender endpoint with Camel
   val template: FluentProducerTemplate = camel.createFluentProducerTemplate
-  (1 to 10).foreach { i =>
-    template
-      .withBody(s"Camel$i")
-      .to("vm:words")
-      .send
-  }
+
+  Source(1 to 10)
+    .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
+    .mapAsync(1) { i =>
+      template
+        .withBody(s"Camel$i")
+        .to("vm:words")
+        .send
+      Future(i)
+    }.runWith(Sink.ignore)
 }

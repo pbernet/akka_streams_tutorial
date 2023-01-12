@@ -2,8 +2,13 @@
 [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 # Akka streams tutorial #
 
-"It works!" a colleague used to shout across the office when another proof of concept was running it's first few hundred meters along the happy path, well aware that the real work started right there.
-This repo contains a collection of runnable and self-contained examples from various [akka streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.htmldocs) tutorials, blogs and postings to provide you with exactly this feeling.
+"It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
+hundred
+meters along the happy path, well aware that the real work started right there.
+This repo contains a collection of runnable and self-contained examples from
+various [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html)
+and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.html) tutorials, blogs and postings to provide you with
+exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * [Element deduplication](#element-deduplication)
 * [Windturbine example](#windturbine-example)
@@ -11,7 +16,10 @@ See the class comment on how to run each example. These more complex examples ar
 * [HL7 V2 over TCP via Kafka to Websockets](#hl7-v2-over-tcp-via-kafka-to-websockets)
 * [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
 
-Most of these examples deal with some kind of (shared) state. While most akka-streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful operators in action.
+Many of the examples deal with some kind of (shared) state. While most Akka
+Streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in
+package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful
+operators in action.
 
 Other noteworthy examples:
 * The `*Echo` examples series implement round trips eg [HttpFileEcho.scala](src/main/scala/akkahttp/HttpFileEcho.scala)
@@ -22,10 +30,15 @@ Other noteworthy examples:
   . Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources via the `sbt-akka-grpc` plugin.
 
 Remarks:
-* Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
+
+* As
+  of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
+  the licensing model has changed
+* Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well
+  as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening
 * Some examples deliberately throw `RuntimeException`, so you can observe recovery behaviour
-* The use of [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (
+* Using [testcontainers](https://www.testcontainers.org) allows running realistic scenarios (
   eg [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala)
   , [KafkaServerTestcontainers](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala)
   , [SlickIT](src/test/scala/alpakka/slick/SlickIT.java))
@@ -75,8 +88,8 @@ The following use case uses a local caffeine cache to avoid duplicate HTTP file 
 Working sample from
 the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
 from Colin Breck where classic Actors are used to model shared state, life-cycle management and fault-tolerance in
-combination with akka-streams.
- Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
+combination with Akka Streams.
+Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
 Islands in the Stream: Integrating Akka Streams and Akka Actors
 ](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
 

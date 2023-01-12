@@ -59,7 +59,7 @@ public class WordCountKStreams {
         wordCount.toStream().to("wordcount-output", Produced.with(Serdes.String(), Serdes.Long()));
 
         KTable<String, Long> messageCount = textLines
-                .filter((key, value) -> ((value.contains("fakeNews"))))
+                .filter((key, value) -> value.contains("fakeNews"))
                 //.peek((key, value) -> System.out.println("Processing MESSAGE count key: " + key + " with value: " + value))
                 .map((key, value) -> new KeyValue<>("total", value))
                 .groupByKey()
@@ -74,7 +74,7 @@ public class WordCountKStreams {
             app.start();
             interactiveQuery(app);
             latch.await();
-        } catch (Throwable e) {
+        } catch (Exception e) {
             System.out.println("Exception occurred: " + e.getMessage());
             System.exit(1);
         }
@@ -109,7 +109,7 @@ public class WordCountKStreams {
             public void run() {
                 System.out.println("Got control-c cmd from shell, about to close stream...");
 
-                Boolean shutdownResult = app.close(Duration.ofMillis(10000));
+                boolean shutdownResult = app.close(Duration.ofMillis(10000));
                 // cleanUp() deletes the application's *local* state dir (= STATE_DIR_CONFIG)
                 // On restart of Kafka this local state dir folder will be restored
 

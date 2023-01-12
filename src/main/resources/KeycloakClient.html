@@ -6,12 +6,15 @@
 <html>
 <head>
     <script src="http://localhost:%%PORT%%/js/keycloak.js"></script>
+    <title>Keycloak test page</title>
 </head>
 <body>
 
 <div>
     <button onclick="keycloak.login()"><b>Login test/test</b></button>
     <button onclick="loadUsers()"><b>Load Users</b></button>
+    <!-- TODO Redirect after logout does not work anymore in 20.0.1  -->
+    <!-- Change: https://www.keycloak.org/docs/latest/upgrading/#openid-connect-logout  -->
     <button onclick="keycloak.logout()">Logout</button>
 </div>
 <br/>
@@ -45,9 +48,9 @@
 <script>
     function loadUsers() {
         console.log("About to load users...")
-        var url = 'http://127.0.0.1:6002/users';
+        const url = 'http://127.0.0.1:6002/users';
 
-        var req = new XMLHttpRequest();
+        const req = new XMLHttpRequest();
         req.open('GET', url, true);
         req.setRequestHeader('Accept', 'application/json');
         req.setRequestHeader('Authorization', 'Bearer ' + keycloak.token);
@@ -55,16 +58,11 @@
         req.onreadystatechange = function () {
             if (req.readyState === 4) {
                 if (req.status === 200) {
-                    var obj = JSON.parse(req.responseText);
+                    const obj = JSON.parse(req.responseText);
                     output(JSON.stringify(obj, undefined, 2));
                 } else if (req.status === 401) {
                     output('Not authenticated, need to login...');
-                    // Redirect to home is OK
                     keycloak.login();
-                    // TODO This does not work, the token is not in request
-                    // keycloak.login({
-                    //     redirectUri: 'http://127.0.0.1:6002/users'
-                    // });
                 }
             }
         }
@@ -81,16 +79,16 @@
     }
 
     function updateProfile() {
-        var url = keycloak.createAccountUrl().split('?')[0];
-        var req = new XMLHttpRequest();
+        const url = keycloak.createAccountUrl().split('?')[0];
+        const req = new XMLHttpRequest();
         req.open('POST', url, true);
         req.setRequestHeader('Accept', 'application/json');
         req.setRequestHeader('Content-Type', 'application/json');
         req.setRequestHeader('Authorization', 'bearer ' + keycloak.token);
 
         req.onreadystatechange = function () {
-            if (req.readyState == 4) {
-                if (req.status == 200) {
+            if (req.readyState === 4) {
+                if (req.status === 200) {
                     output('Success');
                 } else {
                     output('Failed');
@@ -127,7 +125,7 @@
             return;
         }
 
-        var o = 'Token Expires:\t\t' + new Date((keycloak.tokenParsed.exp + keycloak.timeSkew) * 1000).toLocaleString() + '\n';
+        let o = 'Token Expires:\t\t' + new Date((keycloak.tokenParsed.exp + keycloak.timeSkew) * 1000).toLocaleString() + '\n';
         o += 'Token Expires in:\t' + Math.round(keycloak.tokenParsed.exp + keycloak.timeSkew - new Date().getTime() / 1000) + ' seconds\n';
 
         if (keycloak.refreshTokenParsed) {
@@ -146,11 +144,11 @@
     }
 
     function event(event) {
-        var e = document.getElementById('events').innerHTML;
+        const e = document.getElementById('events').innerHTML;
         document.getElementById('events').innerHTML = new Date().toLocaleString() + "\t" + event + "\n" + e;
     }
 
-    // We init here to handle dynamic port (vs in json file)
+    // We initialize here to handle dynamic port (vs in json file)
     let keycloak = new Keycloak({
         url: 'http://localhost:%%PORT%%',
         realm: 'test',
@@ -179,7 +177,7 @@
     };
 
     keycloak.onTokenExpired = function () {
-        event('Access token expired.');
+        event('Access token expired');
     };
 
     keycloak.onActionUpdate = function (status) {
@@ -194,7 +192,7 @@
     };
 
     // Flow can be changed to 'implicit' or 'hybrid', but then client must enable implicit flow in admin console too
-    var initOptions = {
+    const initOptions = {
         responseMode: 'fragment',
         flow: 'standard'
     };
