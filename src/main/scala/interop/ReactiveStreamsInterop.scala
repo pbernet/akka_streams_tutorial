@@ -11,6 +11,9 @@ import org.reactivestreams.Publisher
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.Flux
 
+import java.time.Duration
+import java.util.concurrent.TimeUnit
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
@@ -31,25 +34,30 @@ object ReactiveStreamsInterop extends App {
 
   implicit val system: ActorSystem = ActorSystem()
 
+  import system.dispatcher
+
   val camel = new DefaultCamelContext()
   val rsCamel: CamelReactiveStreamsService = CamelReactiveStreams.get(camel)
   camel.start()
 
+  // Consumer endpoint with Camel
   val publisher: Publisher[String] = rsCamel.from("vm:words", classOf[String])
 
-  // Consumer endpoint with Reactor 3
+  // Slow consumer with Reactor 3
   Flux.from(publisher)
+    .delayElements(Duration.ofMillis(2000))
     .map(each => each.toUpperCase())
     .doOnNext(each => logger.info(s"Consumed with Reactor: $each"))
     .subscribe()
 
-  // Consumer endpoint with RxJava 3
+  // Slow consumer with RxJava 3
   Flowable.fromPublisher(publisher)
+    .delay(2L, TimeUnit.SECONDS)
     .map(each => each.toUpperCase())
     .doOnNext(each => logger.info(s"Consumed with RxJava: $each"))
     .subscribe()
 
-  // Consumer endpoint with akka-streams
+  // Slow consumer with akka-streams
   Source.fromPublisher(publisher)
     .throttle(2, 2.seconds, 2, ThrottleMode.shaping)
     .map(each => each.toUpperCase())
@@ -58,10 +66,14 @@ object ReactiveStreamsInterop extends App {
 
   // Sender endpoint with Camel
   val template: FluentProducerTemplate = camel.createFluentProducerTemplate
-  (1 to 10).foreach { i =>
-    template
-      .withBody(s"Camel$i")
-      .to("vm:words")
-      .send
-  }
+
+  Source(1 to 10)
+    .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
+    .mapAsync(1) { i =>
+      template
+        .withBody(s"Camel$i")
+        .to("vm:words")
+        .send
+      Future(i)
+    }.runWith(Sink.ignore)
 }
