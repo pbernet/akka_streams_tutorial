@@ -82,7 +82,7 @@ libraryDependencies ++= Seq(
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
-  "com.typesafe.play" %% "play" % "2.8.18",
+  "com.typesafe.play" %% "play" % "2.8.19",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
