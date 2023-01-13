@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Same as SlickIT, but with local embedded Postgres DB
  */
-public class SlickEmbeddedIT {
+class SlickEmbeddedIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(SlickEmbeddedIT.class);
     private static SlickRunner SLICK_RUNNER;
 
@@ -24,7 +24,6 @@ public class SlickEmbeddedIT {
     private static final PostgresClusterEmbedded POSTGRES = new PostgresClusterEmbedded();
 
     private static final String DB_NAME = "test";
-    private static final String SCHEMA = "test";
     private static final String USER_NAME = "test";
     private static final String PASSWORD = "test";
 
@@ -33,32 +32,29 @@ public class SlickEmbeddedIT {
         POSTGRES.executeStatement("CREATE DATABASE " + DB_NAME);
         POSTGRES.executeStatement("CREATE USER " + USER_NAME + " with encrypted PASSWORD '" + PASSWORD + "'");
         POSTGRES.executeStatement("grant all privileges on database " + DB_NAME + " to " + USER_NAME);
-        POSTGRES.executeStatement("CREATE SCHEMA " + SCHEMA);
 
         SLICK_RUNNER = SlickRunner.apply(POSTGRES.getJdbcUrl());
         SLICK_RUNNER.createTableOnSession();
-
         LOGGER.info("DB: {} created at URL: {}, USER_NAME: {}, PASSWORD: {}", DB_NAME, POSTGRES.getJdbcUrl(), USER_NAME, PASSWORD);
     }
 
     @AfterEach
-    void tearDown() throws SQLException {
+    void teardown() throws SQLException {
         SLICK_RUNNER.dropTableOnSession();
         SLICK_RUNNER.terminate();
         POSTGRES.executeStatement("DROP DATABASE " + DB_NAME);
         POSTGRES.executeStatement("DROP USER " + USER_NAME);
-        POSTGRES.executeStatement("DROP SCHEMA " + SCHEMA);
     }
 
     @Test
-    public void populateAndReadUsers() {
+    void populateAndReadUsers() {
         int noOfUsers = 100;
         SLICK_RUNNER.populateSync(noOfUsers);
         assertThat(SLICK_RUNNER.readUsersSync().size()).isEqualTo(noOfUsers);
     }
 
     @Test
-    public void populateAndReadUsersPaged() {
+    void populateAndReadUsersPaged() {
         int noOfUsers = 20000;
         SLICK_RUNNER.populateSync(noOfUsers);
 
@@ -68,7 +64,7 @@ public class SlickEmbeddedIT {
     }
 
     @Test
-    public void populateAndCountUsers() {
+    void populateAndCountUsers() {
         int noOfUsers = 100;
         SLICK_RUNNER.populateSync(noOfUsers);
         assertThat(SLICK_RUNNER.getTotal()).isEqualTo(noOfUsers);
