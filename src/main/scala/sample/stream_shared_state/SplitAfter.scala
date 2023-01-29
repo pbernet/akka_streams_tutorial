@@ -11,7 +11,8 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Split time series data into sub-streams for each second
+  * Split time series data into sub-streams per second
+  * Thus we have a `session window` using processing time
   * Similar to: [[SplitWhen]]
   * Similar streams operator: groupedWithin
   *
@@ -31,6 +32,7 @@ object SplitAfter extends App {
   private def hasSecondChanged: () => Seq[(Int, Instant)] => Iterable[(Instant, Boolean)] = {
     () => {
       slidingElements => {
+        // TODO With sliding(2) we always have size 2
         if (slidingElements.size == 2) {
           val current = slidingElements.head
           val next = slidingElements.tail.head
