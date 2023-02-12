@@ -117,7 +117,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql" % "postgresql" % "42.5.1",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.1.0" % Test pomOnly(),
-  "io.zonky.test" % "embedded-postgres" % "2.0.2" % Test,
+  "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test,
 
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
