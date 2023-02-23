@@ -33,7 +33,7 @@ Remarks:
 
 * As
   of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
-  the licensing model has changed
+  Lightbend has changed the licensing model 
 * Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well
   as [ZipCryptoEcho.scala](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening
