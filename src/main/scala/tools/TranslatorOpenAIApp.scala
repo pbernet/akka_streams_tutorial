@@ -8,7 +8,6 @@ import com.crowdscriber.caption.common.Vocabulary.{Srt, SubtitleBlock}
 import com.crowdscriber.caption.srtdissector.SrtDissector
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json.{JsArray, Json}
 
 import java.io.FileInputStream
 import java.nio.file.Paths
@@ -17,28 +16,32 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Translate an English .srt file to a target lang using OpenAI API.
+  * Translate an English .srt file to a target lang using OpenAI API
   *
   * Workflow:
-  *  - Load all blocks from .srt file
+  *  - Load all blocks from the .srt source file
   *  - Split blocks to scenes (= all blocks in a session window), depending on maxGap
   *  - Translate all blocks of a scene in one prompt via the openAI API
   *  - Continuously write translations to target file
   *
+  * Works for these OpenAI API endpoints:
+  *  - /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
+  *  - /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
+  *    switch in method: translateScene()
   */
 object TranslatorOpenAIApp extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  var totalTokens = 0
-  val maxGap = 2 // time in seconds between scenes
+  val sourceFilePath = "src/main/resources/EN_challenges.srt"
+  val targetFilePath = "DE_challenges_ChatCompletions.srt"
   val targetLanguage = "German"
 
-  val sourceFilePath = "src/main/resources/EN_challenges.srt"
-  val targetFilePath = "DE_challenges.srt"
+  val maxGap = 2 // time in seconds between scenes (session windows)
 
   val endBlockTag = "__ENDBLOCK__"
+  var totalTokens = 0
 
   // Extension methods for SubtitleBlock
   implicit class SubtitleBlockExt(block: SubtitleBlock) {
@@ -109,15 +112,14 @@ object TranslatorOpenAIApp extends App {
     val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEbNewLine)
     val toTranslate = generatePrompt(allLines)
     logger.info(s"RAW request prompt: $toTranslate")
-    val resultRaw = new TranslatorOpenAI().run(toTranslate)
 
-    val json = Json.parse(resultRaw)
-    val tokens = (json \ "usage" \ "total_tokens").as[Int]
-    totalTokens = totalTokens + tokens
+    // Switch here to use the models
+    val payload = new TranslatorOpenAI().runChatCompletions(toTranslate)
+    //val payload = new TranslatorOpenAI().runCompletions(toTranslate)
+    val newTokens = payload.getRight
+    totalTokens = totalTokens + newTokens
 
-    val choices: JsArray = (Json.parse(resultRaw) \ "choices").as[JsArray]
-    val rawResponseText = (Json.parse(choices.value(0).toString()) \ "text").as[String]
-
+    val rawResponseText = payload.getLeft
     logger.info("RAW response text: {}", rawResponseText)
     val seed: Vector[SubtitleBlock] = Vector.empty
     val sceneTranslated: Vector[SubtitleBlock] =
@@ -128,12 +130,12 @@ object TranslatorOpenAIApp extends App {
           val massagedResult = massageResultText(rawResponseTextSplit._1)
           val origBlock = sceneOrig(rawResponseTextSplit._2)
           val translatedBlock = origBlock.copy(lines = massagedResult)
-          logger.info(s"DE: ${translatedBlock.allLines} $totalTokens(+$tokens)")
+          logger.info(s"Translation: ${translatedBlock.allLines} $totalTokens(+$newTokens)")
           acc.appended(translatedBlock)
         }
     logger.info(s"Finished translation of scene with: ${sceneTranslated.size} translated blocks")
-    // Sometimes the endBlockTag is not there where it should be, reducing two orig blocks to one translated block
-    if (sceneOrig.size != sceneTranslated.size) logger.warn(s"Size of translated blocks: ${sceneTranslated.size} does not match orig blocks: ${sceneOrig.size}. Adjust target .srt file: $targetFilePath manually")
+    // Sometimes the endBlockTag is not present in the translation and thus reduces n original blocks to one translated block
+    if (sceneOrig.size != sceneTranslated.size) logger.warn(s"Size of translated blocks: ${sceneTranslated.size} does not match size of original blocks: ${sceneOrig.size}. Adjust target .srt file: $targetFilePath manually")
     sceneTranslated
   }
 
@@ -175,7 +177,7 @@ object TranslatorOpenAIApp extends App {
       val offset = 15
       // Comma must not be at beginning or at end
       if (indexFirstComma > offset && indexFirstComma < text.length - offset)
-        List(text.substring(0, indexFirstComma + 1), text.substring(indexFirstComma + 2, text.length))
+        List(text.substring(0, indexFirstComma + 1), text.substring(indexFirstComma + 1, text.length))
       else splitSentenceHonorWords(text)
     }
     else if (text.length > maxCharPerLine) {
