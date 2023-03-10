@@ -63,7 +63,7 @@ Other resources:
 
 ## Element deduplication ##
 
-Dropping identical (consecutive or non-consecutive) elements in an unbounded stream can be done:
+Dropping identical (consecutive or non-consecutive) elements in an unbounded stream:
 
 * [DeduplicateConsecutiveElements](src/main/scala/sample/stream_shared_state/DeduplicateConsecutiveElements.scala) shows
   the usage of the `sliding` operator
