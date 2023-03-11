@@ -33,7 +33,7 @@ public class TranslatorOpenAI {
     // API key: https://beta.openai.com/account/api-keys
     public static final String API_KEY = "***";
 
-    public static final int DELAY_TO_RETRY_SECONDS = 2;
+    public static final int DELAY_TO_RETRY_SECONDS = 10;
 
     public static void main(String[] args) throws IOException {
         String toTranslate = String.format("Translate the following subtitle text from English to German: %s", "This is fun.");

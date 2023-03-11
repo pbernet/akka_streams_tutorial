@@ -16,18 +16,17 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Translate an English .srt file to a target lang using OpenAI API
+  * Translate all blocks of an English .srt file to a target lang using OpenAI API
   *
   * Workflow:
   *  - Load all blocks from the .srt source file
-  *  - Split blocks to scenes (= all blocks in a session window), depending on maxGap
-  *  - Translate all blocks of a scene in one prompt via the openAI API
-  *  - Continuously write translations to target file
+  *  - Split blocks to scenes (= all blocks in a session window), depending on maxGapSeconds
+  *  - Translate all blocks of a scene in one prompt (one line per block) via the openAI API
+  *  - Continuously write translated blocks to target file
   *
-  * Works for these OpenAI API endpoints:
-  *  - /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
-  *  - /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
-  *    switch in method: translateScene()
+  * Works with these OpenAI API endpoints:
+  *  - Default:  /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
+  *  - Fallback: /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
   */
 object TranslatorOpenAIApp extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -35,21 +34,18 @@ object TranslatorOpenAIApp extends App {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   val sourceFilePath = "src/main/resources/EN_challenges.srt"
-  val targetFilePath = "DE_challenges_ChatCompletions.srt"
+  val targetFilePath = "DE_challenges.srt"
   val targetLanguage = "German"
 
-  val maxGap = 2 // time in seconds between scenes (session windows)
-
-  val endBlockTag = "__ENDBLOCK__"
-  var totalTokens = 0
+  val maxGapSeconds = 1 // time between scenes (session windows)
+  val endBlockTag = "\n" // one block per line
+  var totalTokensUsed = 0
 
   // Extension methods for SubtitleBlock
   implicit class SubtitleBlockExt(block: SubtitleBlock) {
     def allLines: String = block.lines.mkString(" ")
 
-    def allLinesEb: String = allLines + endBlockTag
-
-    def allLinesEbNewLine: String = allLinesEb + "\n"
+    def allLinesEbNewLine: String = allLines + endBlockTag + endBlockTag
   }
 
   // Source file must be in utf-8
@@ -60,7 +56,7 @@ object TranslatorOpenAIApp extends App {
   val source = Source.fromIterator(() => srt.get.iterator) ++ dummyLastElement
 
   val workflow = Flow[SubtitleBlock]
-    .via(partitionToScenes(maxGap))
+    .via(partitionToScenes(maxGapSeconds))
     .map(translateScene)
 
   val fileSink = FileIO.toPath(Paths.get(targetFilePath))
@@ -113,40 +109,62 @@ object TranslatorOpenAIApp extends App {
     val toTranslate = generatePrompt(allLines)
     logger.info(s"RAW request prompt: $toTranslate")
 
-    // Switch here to use the models
-    val payload = new TranslatorOpenAI().runChatCompletions(toTranslate)
-    //val payload = new TranslatorOpenAI().runCompletions(toTranslate)
-    val newTokens = payload.getRight
-    totalTokens = totalTokens + newTokens
+    // First try with the cheaper model
+    var translated = new TranslatorOpenAI().runChatCompletions(toTranslate)
 
-    val rawResponseText = payload.getLeft
+    if (!isTranslationPlausible(translated.getLeft, sceneOrig.size)) {
+      // Fallback to the more reliable model
+      translated = new TranslatorOpenAI().runCompletions(toTranslate)
+    }
+
+    val newTokens = translated.getRight
+    totalTokensUsed = totalTokensUsed + newTokens
+
+    val rawResponseText = translated.getLeft
     logger.info("RAW response text: {}", rawResponseText)
     val seed: Vector[SubtitleBlock] = Vector.empty
-    val sceneTranslated: Vector[SubtitleBlock] =
+
+    val sceneTranslatedManually: Vector[SubtitleBlock] =
       rawResponseText
         .split(endBlockTag)
+        .filterNot(each => each.isEmpty)
         .zipWithIndex
         .foldLeft(seed) { (acc: Vector[SubtitleBlock], rawResponseTextSplit: (String, Int)) =>
           val massagedResult = massageResultText(rawResponseTextSplit._1)
-          val origBlock = sceneOrig(rawResponseTextSplit._2)
+          val origBlock =
+            if (sceneOrig.isDefinedAt(rawResponseTextSplit._2)) {
+              sceneOrig(rawResponseTextSplit._2)
+            } else {
+              // Root cause: Not plausible translation, eg added lines at beginning or at end.
+              // TODO This workaround could corrupt .srt files because of duplicate timestamp entries
+              logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: ${rawResponseTextSplit._2} requested. Fallback to last original block")
+              sceneOrig.last
+            }
           val translatedBlock = origBlock.copy(lines = massagedResult)
-          logger.info(s"Translation: ${translatedBlock.allLines} $totalTokens(+$newTokens)")
+          logger.info(s"Translation: ${translatedBlock.allLines} $totalTokensUsed(+$newTokens)")
           acc.appended(translatedBlock)
         }
-    logger.info(s"Finished translation of scene with: ${sceneTranslated.size} translated blocks")
-    // Sometimes the endBlockTag is not present in the translation and thus reduces n original blocks to one translated block
-    if (sceneOrig.size != sceneTranslated.size) logger.warn(s"Size of translated blocks: ${sceneTranslated.size} does not match size of original blocks: ${sceneOrig.size}. Adjust target .srt file: $targetFilePath manually")
-    sceneTranslated
+    logger.info(s"Finished line by line translation of scene with: ${sceneTranslatedManually.size} blocks")
+    sceneTranslatedManually
+  }
+
+  private def isTranslationPlausible(rawResponseText: String, originalSize: Int) = {
+    val resultSize = rawResponseText
+      .split(endBlockTag)
+      .filterNot(each => each.isEmpty)
+      .length
+
+    resultSize == originalSize
   }
 
   private def generatePrompt(text: String) = {
     s"""
-       |Translate the text lines below to $targetLanguage.
+       |Translate the text lines below from English to $targetLanguage.
        |
        |Desired format:
-       |<line separated list of translated lines, honor line breaks and include all $endBlockTag tags>
+       |<line separated list of translated lines, honor line breaks>
        |
-       |Text:
+       |Text lines:
        |$text
        |
        |""".stripMargin
