@@ -2,9 +2,8 @@
 [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 # Akka streams tutorial #
 
-"It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
-hundred
-meters along the happy path, well aware that the real work started right there.
+"It's working!" a colleague used to shout across the office when yet another proof of concept was running its first few
+hundred meters along the happy path, well aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from
 various [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html)
 and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.html) tutorials, blogs and postings to provide you with
@@ -100,7 +99,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 
  The clients communicate via websockets with the `WindTurbineServer`. After a restart of `SimulateWindTurbines` the clients are able to resume. 
  Shutting down the `WindTurbineServer` results in reporting the clients that the server is not reachable.
- After restarting `WindTurbineServer` the clients are able to resume. Since there is no persistence, the processing just continuous.
+ After restarting `WindTurbineServer` the clients are able to resume. Since there is no persistence, the processing just continues.
 
 
 ## Apache Kafka WordCount ##
