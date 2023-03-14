@@ -15,6 +15,7 @@ See the class comment on how to run each example. These more complex examples ar
 * [Apache Kafka WordCount](#apache-kafka-wordcount)
 * [HL7 V2 over TCP via Kafka to Websockets](#hl7-v2-over-tcp-via-kafka-to-websockets)
 * [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
+* [Movie subtitle translation via OpenAI API](#movie-subtitle-translation-via-openai-api)
 
 Many of the examples deal with some kind of (shared) state. While most Akka
 Streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in
@@ -122,12 +123,37 @@ This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_we
 
 The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages may reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
-Start each stage separate in the IDE, or together via the integration test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
+Start each stage separate in the IDE, or together via the integration
+test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
 
 ## Analyse Wikipedia edits live stream ##
-Find out whose Wikipedia articles were changed in (near) real time by tapping into the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
-The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API, eg for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
-Text processing on this content using [opennlp](https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html) yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
+
+Find out whose Wikipedia articles were changed in (near) real time by tapping into
+the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
+The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a
+workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API,
+eg
+for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
+Text processing on this content using [opennlp](https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html)
+yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
 The index is queried periodically and the content may also be viewed with a Browser, eg
 
 `http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`
+
+## Movie subtitle translation via OpenAI API ##
+
+The class [SubtitleTranslator](src/main/scala/tools/SubtitleTranslator.scala) translates all blocks of an English
+source `.srt` file to a target language using the OpenAI API endpoints:
+
+* `/chat/completions` (gpt-3.5-turbo) used by default,
+  see [Doc](https://platform.openai.com/docs/guides/chat/chat-vs-completions)
+* `/completions`      (text-davinci-003) used as fallback,
+  see [Doc](https://beta.openai.com/docs/api-reference/completions/create)
+
+Akka streams helps in these areas:
+
+* Easy workflow modeling
+* Scene splitting with `session windows`. All blocks of a scene are grouped in one session and thus translated in one
+  API call
+* Throttling to not exceed the API rate-limits
+* Continuous writing of translated blocks to target file

@@ -1,8 +1,8 @@
 package tools
 
 import akka.actor.ActorSystem
-import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Flow, Source}
+import akka.stream.{IOResult, ThrottleMode}
 import akka.util.ByteString
 import com.crowdscriber.caption.common.Vocabulary.{Srt, SubtitleBlock}
 import com.crowdscriber.caption.srtdissector.SrtDissector
@@ -12,6 +12,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.io.FileInputStream
 import java.nio.file.Paths
 import java.time.Duration
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -28,7 +29,7 @@ import scala.util.{Failure, Success, Try}
   *  - Default:  /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
   *  - Fallback: /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
   */
-object TranslatorOpenAIApp extends App {
+object SubtitleTranslator extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -61,15 +62,16 @@ object TranslatorOpenAIApp extends App {
 
   val fileSink = FileIO.toPath(Paths.get(targetFilePath))
   val processingSink = Flow[SubtitleBlock]
-    // https://platform.openai.com/docs/guides/rate-limits/overview
-    //.throttle(2, 1.seconds, 2, ThrottleMode.shaping)
     .statefulMapConcat(addBlockCounter())
     .map { case (block: SubtitleBlock, blockCounter: Int) =>
       ByteString(formatOutBlock(block, blockCounter))
     }
     .toMat(fileSink)((_, bytesWritten) => bytesWritten)
 
-  val done = source.via(workflow)
+  val done = source
+    // https://platform.openai.com/docs/guides/rate-limits/overview
+    .throttle(25, 60.seconds, 25, ThrottleMode.shaping)
+    .via(workflow)
     .mapConcat(identity) // flatten
     .runWith(processingSink)
 
@@ -107,21 +109,21 @@ object TranslatorOpenAIApp extends App {
 
     val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEbNewLine)
     val toTranslate = generatePrompt(allLines)
-    logger.info(s"RAW request prompt: $toTranslate")
+    logger.info(s"Request prompt: $toTranslate")
 
     // First try with the cheaper model
-    var translated = new TranslatorOpenAI().runChatCompletions(toTranslate)
+    var translated = new OpenAICompletions().runChatCompletions(toTranslate)
 
     if (!isTranslationPlausible(translated.getLeft, sceneOrig.size)) {
       // Fallback to the more reliable model
-      translated = new TranslatorOpenAI().runCompletions(toTranslate)
+      translated = new OpenAICompletions().runCompletions(toTranslate)
     }
 
     val newTokens = translated.getRight
     totalTokensUsed = totalTokensUsed + newTokens
 
     val rawResponseText = translated.getLeft
-    logger.info("RAW response text: {}", rawResponseText)
+    logger.info("Response text: {}", rawResponseText)
     val seed: Vector[SubtitleBlock] = Vector.empty
 
     val sceneTranslatedManually: Vector[SubtitleBlock] =

@@ -27,17 +27,17 @@ import java.util.concurrent.TimeUnit;
  * https://platform.openai.com/docs/guides/chat/chat-vs-completions
  * https://beta.openai.com/docs/api-reference/completions/create
  */
-public class TranslatorOpenAI {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TranslatorOpenAI.class);
+public class OpenAICompletions {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenAICompletions.class);
 
     // API key: https://beta.openai.com/account/api-keys
     public static final String API_KEY = "***";
 
-    public static final int DELAY_TO_RETRY_SECONDS = 10;
+    public static final int RESPONSE_TIMEOUT_SECONDS = 180;
 
     public static void main(String[] args) throws IOException {
         String toTranslate = String.format("Translate the following subtitle text from English to German: %s", "This is fun.");
-        ImmutablePair<String, Integer> resultRaw = new TranslatorOpenAI().runChatCompletions(toTranslate);
+        ImmutablePair<String, Integer> resultRaw = new OpenAICompletions().runChatCompletions(toTranslate);
         //ImmutablePair<String, Integer> resultRaw = new TranslatorOpenAI().runCompletions(toTranslate);
         LOGGER.info("Translation: {}", resultRaw.getLeft());
         LOGGER.info("Total tokens: {}", resultRaw.getRight());
@@ -91,11 +91,12 @@ public class TranslatorOpenAI {
         request.setEntity(requestEntity);
 
         RequestConfig timeoutsConfig = RequestConfig.custom()
-                .setConnectTimeout(Timeout.of(DELAY_TO_RETRY_SECONDS, TimeUnit.SECONDS)).build();
+                .setResponseTimeout(Timeout.of(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                .build();
 
         try (CloseableHttpClient httpClient = HttpClientBuilder.create()
                 .setDefaultRequestConfig(timeoutsConfig)
-                .setRetryStrategy(new DefaultHttpRequestRetryStrategy(3, TimeValue.ofMinutes(1L)))
+                .setRetryStrategy(new DefaultHttpRequestRetryStrategy(5, TimeValue.ofMinutes(5L)))
                 .build()) {
             return IOUtils.toString(httpClient.execute(request).getEntity().getContent(), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -105,6 +106,7 @@ public class TranslatorOpenAI {
     }
 
     private static ImmutablePair<String, Integer> extractPayloadChatCompletions(String jsonResponseChatCompletions) {
+        LOGGER.debug("RAW Response JSON: " + jsonResponseChatCompletions);
         JSONObject obj = new JSONObject(jsonResponseChatCompletions);
 
         JSONArray arr = obj.getJSONArray("choices");
@@ -117,6 +119,7 @@ public class TranslatorOpenAI {
     }
 
     private ImmutablePair<String, Integer> extractPayloadCompletions(String jsonResponseCompletions) {
+        LOGGER.debug("RAW Response JSON: " + jsonResponseCompletions);
         JSONObject obj = new JSONObject(jsonResponseCompletions);
 
         JSONArray arr = obj.getJSONArray("choices");
