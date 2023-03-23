@@ -47,6 +47,9 @@ object SftpEcho extends App {
 
   import system.dispatcher
 
+  // Speed up random generation, but this leads to flaky behaviour...
+  //System.setProperty("java.security.egd", "file:/dev/./urandom")
+
   //we need a sub folder due to permissions set on on the atmoz_sftp docker image
   val sftpRootDir = "echo"
   val processedDir = "processed"
@@ -97,9 +100,10 @@ object SftpEcho extends App {
 
 
   def downloadClient(): Unit = {
-    Thread.sleep(5000) //wait to get some files for 1st run
+    Thread.sleep(5000) // wait to get some files for 1st run
     logger.info("Starting download run...")
 
+    //TODO This hangs after n files
     //processAndMove(s"/$sftpRootDir", (file: FtpFile) => s"/$sftpRootDir/$processedDir/${file.name}", sftpSettings).run()
     processAndMoveVerbose()
   }
@@ -108,7 +112,7 @@ object SftpEcho extends App {
   def processAndMoveVerbose(): Unit = {
     val fetchedFiles: Future[immutable.Seq[String]] =
       listFiles(s"/$sftpRootDir")
-        .take(50) //Try to batch
+        .take(50) // Try to batch
         .filter(ftpFile => ftpFile.isFile)
         .mapAsyncUnordered(parallelism = 10)(ftpFile => getFileAndMoveNative(ftpFile))
         //.mapAsyncUnordered(parallelism = 10)(ftpFile => getFileNativeAndMoveNative(ftpFile))
@@ -161,7 +165,6 @@ object SftpEcho extends App {
   }
 
 
-  //TODO This hangs after n files
   def processAndMove(sourcePath: String,
                      destinationPath: FtpFile => String,
                      sftpSettings: SftpSettings): RunnableGraph[NotUsed] =

@@ -22,8 +22,10 @@ services:
       - JMX_PORT=1199
       - JMX_RMI_PORT=1198
 
+  # There are alpine/debian dist
+  # https://hub.docker.com/r/atmoz/sftp/tags
   atmoz_sftp:
-    image: atmoz/sftp
+    image: atmoz/sftp:alpine
     ports:
       - "2222:22"
     command: echouser:password:::echo
