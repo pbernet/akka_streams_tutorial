@@ -137,8 +137,7 @@ object SubtitleTranslator extends App {
             if (sceneOrig.isDefinedAt(rawResponseTextSplit._2)) {
               sceneOrig(rawResponseTextSplit._2)
             } else {
-              // Root cause: Not plausible translation, eg added lines at beginning or at end.
-              // TODO This workaround could corrupt .srt files because of duplicate timestamp entries
+              // Root cause: No plausible translation provided by openAI, eg due to added lines at beginning or at end.
               logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: ${rawResponseTextSplit._2} requested. Fallback to last original block")
               sceneOrig.last
             }
