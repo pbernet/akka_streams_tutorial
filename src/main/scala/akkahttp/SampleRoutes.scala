@@ -13,7 +13,6 @@ import akka.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import spray.json.DefaultJsonProtocol
 
-import java.io.File
 import java.nio.file.Paths
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -56,7 +55,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   }
 
   val getFromBrowsableDir: Route = {
-    val dirToBrowse = File.separator + "tmp"
+    val dirToBrowse = System.getProperty("java.io.tmpdir")
     logger.info(s"Browse dir: $dirToBrowse")
 
     // pathPrefix allows loading dirs and files recursively
