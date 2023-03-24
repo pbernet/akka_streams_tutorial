@@ -31,11 +31,13 @@ import scala.util.{Failure, Success}
   *  - Start the docker SFTP server from: /docker/docker-compose.yml
   *    eg by cmd line: docker-compose up -d atmoz_sftp
   *
-  * Reproducer to show this issue:
-  *  - Method [[SftpEcho.processAndMove]] hangs
-  *    Alternative implementation: [[SftpEcho.processAndMoveVerbose]]
-  *
   * Remarks:
+  *  - Plain upload and download works fine, however in oder to not download forever,
+  *    the original files need to be moved on the server.
+  *    This move operation does not work as expected:
+  *     - [[SftpEcho.processAndMove]] hangs
+  *     - Alternative implementation: [[SftpEcho.processAndMoveVerbose]] has issues as well
+  *  - Note that the client parallelism needs to be limited, depending on the sftp server
   *  - Log noise from sshj lib is turned down in logback.xml
   *
   * Doc:
@@ -47,10 +49,10 @@ object SftpEcho extends App {
 
   import system.dispatcher
 
-  // Speed up random generation, but this leads to flaky behaviour...
-  //System.setProperty("java.security.egd", "file:/dev/./urandom")
+  // Speed up random generation
+  System.setProperty("java.security.egd", "file:/dev/./urandom")
 
-  //we need a sub folder due to permissions set on on the atmoz_sftp docker image
+  // we need a sub folder due to permissions set on on the atmoz_sftp docker image
   val sftpRootDir = "echo"
   val processedDir = "processed"
 
@@ -85,13 +87,13 @@ object SftpEcho extends App {
   def uploadClient() = {
     logger.info("Starting upload...")
 
-    // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets
-    Source(1 to 100)
-      .throttle(10, 1.second, 10, ThrottleMode.shaping)
-      .mapAsync(parallelism = 10) { id =>
+    // With the latest sshj lib explicitly included in build.sbt, we get a more robust behaviour on "large" data sets
+    Source(1 to 1000)
+      .throttle(5, 1.second, 5, ThrottleMode.shaping)
+      .mapAsync(parallelism = 5) { id =>
         val result = Source
           .single(genFileContent(id))
-          .runWith(uploadToPath(sftpRootDir + s"/file_$id.txt"))
+          .runWith(uploadToPath(s"$sftpRootDir/file_$id.txt"))
         result.onComplete(res => logger.info(s"Client uploaded file with TRACE_ID: $id. Result: $res"))
         result
       }
@@ -103,19 +105,18 @@ object SftpEcho extends App {
     Thread.sleep(5000) // wait to get some files for 1st run
     logger.info("Starting download run...")
 
-    //TODO This hangs after n files
+    // This hangs after n files
     //processAndMove(s"/$sftpRootDir", (file: FtpFile) => s"/$sftpRootDir/$processedDir/${file.name}", sftpSettings).run()
     processAndMoveVerbose()
   }
 
-  // Verbose implementations: using native SFTP client functions
+  // Verbose implementations( = use native SFTP client functions)
   def processAndMoveVerbose(): Unit = {
     val fetchedFiles: Future[immutable.Seq[String]] =
       listFiles(s"/$sftpRootDir")
         .take(50) // Try to batch
         .filter(ftpFile => ftpFile.isFile)
-        .mapAsyncUnordered(parallelism = 10)(ftpFile => getFileAndMoveNative(ftpFile))
-        //.mapAsyncUnordered(parallelism = 10)(ftpFile => getFileNativeAndMoveNative(ftpFile))
+        .mapAsyncUnordered(parallelism = 5)(ftpFile => getFileAndMoveNative(ftpFile))
         .runWith(Sink.seq)
 
     fetchedFiles.onComplete {
@@ -138,9 +139,9 @@ object SftpEcho extends App {
     fetchedFile.map { ioResult =>
       logger.debug(s"Fetched file: $ioResult")
       try {
-        // TODO This fails silently: the file is not moved
-        Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
-        // Alternative: Use SFTP function
+        // This fails silently: the file is not moved
+        //Sftp.move((ftpFile) => s"$sftpRootDir/$processedDir/$ftpFile", sftpSettings)
+        // Alternative
         moveFileNative(ftpFile)
       } catch {
         case ex: RuntimeException => logger.error("Exception", ex)
@@ -148,22 +149,6 @@ object SftpEcho extends App {
       ftpFile.path
     }
   }
-
-  // This may be a bit faster, but the reuse of the ssh client does not work here
-  def getFileNativeAndMoveNative(ftpFile: FtpFile) = {
-    val ssh = createSshClientAndConnect()
-
-    val start = System.currentTimeMillis()
-    val localPath = Files.createTempFile(ftpFile.name, ".tmp.client")
-    logger.info(s"About to fetch file: $ftpFile to local path: $localPath")
-    ssh.newSFTPClient().get(ftpFile.path, new FileSystemFile(localPath.toFile))
-    val end = System.currentTimeMillis()
-    logger.debug(s"SFTP get native get processed file: ${ftpFile.path} in: ${end - start} seconds")
-
-    moveFileNative(ftpFile)
-    Future(ftpFile.path)
-  }
-
 
   def processAndMove(sourcePath: String,
                      destinationPath: FtpFile => String,
@@ -193,18 +178,8 @@ object SftpEcho extends App {
     mkdir(s"/$sftpRootDir", s"/$sftpRootDir/$processedDir")
   }
 
-  //works
   private def removeAll() = {
     val source = listFiles("/")
-    val sink = Sftp.remove(sftpSettings)
-    source.runWith(sink)
-  }
-
-  //Passing the path of file to be removed does not work
-  //This works, but feels clumsy
-  private def remove(path: String) = {
-    val source = listFiles("/")
-      .filter(each => each.path.equals(path))
     val sink = Sftp.remove(sftpSettings)
     source.runWith(sink)
   }
@@ -213,16 +188,16 @@ object SftpEcho extends App {
     val sftpClient = newSftpClient()
 
     try {
-      //TODO moving/renaming via sshj leads to unknown (resource?)-exception in sshj after around 60 files
+      // produces an unknown (resource?)-exception in sshj after around 60 files
       //sftpClient.rename(ftpFile.path, s"/$sftpRootDir/$processedDir/${ftpFile.name}")
 
-      //rm native works
+      // For now use rm
       sftpClient.rm(ftpFile.path)
     } finally
       sftpClient.close()
   }
 
-  //works
+  // works as well
   private def uploadFileNative() = {
     val resourceFileName = "testfile.jpg"
     val resourceFilePath = Paths.get(s"src/main/resources/$resourceFileName")

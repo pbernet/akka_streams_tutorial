@@ -25,7 +25,7 @@ services:
   # There are alpine/debian dist
   # https://hub.docker.com/r/atmoz/sftp/tags
   atmoz_sftp:
-    image: atmoz/sftp:alpine
+    image: atmoz/sftp:debian
     ports:
       - "2222:22"
     command: echouser:password:::echo
