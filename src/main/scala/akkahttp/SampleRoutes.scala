@@ -8,16 +8,15 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
 import akka.http.scaladsl.model.{ContentTypes, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler, Route, ValidationRejection}
+import akka.http.scaladsl.server._
 import akka.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import spray.json.DefaultJsonProtocol
 
-import java.io.File
 import java.nio.file.Paths
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 /**
@@ -34,13 +33,14 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
+  import spray.json._
   import system.dispatcher
 
   val faultyActor = system.actorOf(Props[FaultyActor](), "FaultyActor")
 
   case class FaultyActorResponse(totalAttempts: Int)
 
-  implicit def fileInfoFormat = jsonFormat1(FaultyActorResponse)
+  implicit def fileInfoFormat: RootJsonFormat[FaultyActorResponse] = jsonFormat1(FaultyActorResponse)
 
   val rejectionHandler = RejectionHandler.newBuilder()
     .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }
@@ -55,7 +55,8 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   }
 
   val getFromBrowsableDir: Route = {
-    val dirToBrowse = File.separator + "tmp"
+    val dirToBrowse = System.getProperty("java.io.tmpdir")
+    logger.info(s"Browse dir: $dirToBrowse")
 
     // pathPrefix allows loading dirs and files recursively
     pathPrefix("entries") {
@@ -105,11 +106,23 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
       }
     }
 
+  // works with:
+  // curl -X GET localhost:6002/acceptAll -H "Accept: application/json"
+  // curl -X GET localhost:6002/acceptAll -H "Accept: text/csv"
+  // curl -X GET localhost:6002/acceptAll -H "Accept: text/plain"
+  // curl -X GET localhost:6002/acceptAll -H "Accept: text/xxx"
+  val acceptAll: Route = get {
+      path("acceptAll") { ctx: RequestContext =>
+          // withAcceptAll: Remove/Ignore accept headers and always return application/json
+         ctx.withAcceptAll.complete("""{ "foo": "bar" }""".parseJson)
+      }
+  }
+
   val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
 
   val routes = {
     handleErrors {
-      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor)
+      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor, acceptAll)
     }
   }
 
@@ -126,6 +139,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://127.0.0.1:6002").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start http://127.0.0.1:6002").!
   }
 
   browserClient()

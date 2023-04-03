@@ -11,11 +11,10 @@ import akka.util.ByteString
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.collection.immutable.Seq
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 
 
 /**
@@ -123,8 +122,11 @@ object MqttPahoEcho extends App {
     }.mapMaterializedValue(_ => fut.future)
   }
 
+  // No User/PW but change to ws port 9001 to connect
   private def browserClientAdminConsole() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open http://localhost:8090").!
+    val url = "http://localhost:8090"
+    if (os == "mac os x") Process(s"open $url").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start $url").!
   }
 }

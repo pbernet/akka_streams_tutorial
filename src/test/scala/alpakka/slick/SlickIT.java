@@ -16,10 +16,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * We use JUnit as test runner because of "type trouble"
  * when using PostgreSQLContainer with Scala
- *
+ * <br>
  * Doc:
  * https://www.testcontainers.org/modules/databases/postgres
- *
  */
 @Testcontainers
 public class SlickIT {

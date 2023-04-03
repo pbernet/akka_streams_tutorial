@@ -13,7 +13,7 @@ import org.testcontainers.containers.RabbitMQContainer
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Random, Success}
 
 /**
@@ -210,7 +210,9 @@ object AmqpEcho extends App {
   // Login with guest/guest
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process(s"open ${rabbitMQContainer.getHttpUrl}").!
+    val url = rabbitMQContainer.getHttpUrl
+    if (os == "mac os x") Process(s"open $url").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start $url").!
   }
 
   browserClient()

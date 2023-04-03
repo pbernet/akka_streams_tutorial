@@ -13,7 +13,6 @@ import scala.language.postfixOps
   * Inspired by:
   * https://stackoverflow.com/questions/4662292/scala-median-implementation
   *
-  * TODO
   * To calculate the "all time median of medians grouped by 5" we would need to store the values (eg in an actor)
   *
   */
@@ -36,11 +35,11 @@ object CalculateMedian extends App {
 
   @tailrec def findKMedian(arr: Array[Double], k: Int)(implicit choosePivot: Array[Double] => Double): Double = {
     val a = choosePivot(arr)
-    val (s, b) = arr partition (a >)
+    val (s, b) = arr.partition(a >)
     if (s.length == k) a
     // The following test is used to avoid infinite repetition
     else if (s.isEmpty) {
-      val (s, b) = arr partition (a ==)
+      val (s, b) = arr.partition(a ==)
       if (s.length > k) a
       else findKMedian(b, k - s.length)
     } else if (s.length < k) findKMedian(b, k - s.length)
@@ -50,8 +49,8 @@ object CalculateMedian extends App {
   def medianUpTo5(five: Array[Double]): Double = {
     def order2(a: Array[Double], i: Int, j: Int) = {
       if (a(i) > a(j)) {
-        val t = a(i);
-        a(i) = a(j);
+        val t = a(i)
+        a(i) = a(j)
         a(j) = t
       }
     }
@@ -77,17 +76,17 @@ object CalculateMedian extends App {
     order2(five, 2, 3)
     if (five.length < 5) pairs(five, 0, 1, 2, 3)
     else if (five(0) < five(2)) {
-      order2(five, 1, 4);
+      order2(five, 1, 4)
       pairs(five, 1, 4, 2, 3)
     }
     else {
-      order2(five, 3, 4);
+      order2(five, 3, 4)
       pairs(five, 0, 1, 3, 4)
     }
   }
 
   def medianOfMedians(arr: Array[Double]): Double = {
-    val medians = arr grouped 5 map medianUpTo5 toArray;
+    val medians = arr.grouped(5).map(medianUpTo5).toArray
     if (medians.length <= 5) medianUpTo5(medians)
     else medianOfMedians(medians)
   }

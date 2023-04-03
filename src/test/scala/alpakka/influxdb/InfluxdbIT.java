@@ -63,7 +63,7 @@ public class InfluxdbIT {
 
     @Test
     @Order(1)
-    public void testWriteAndRead() {
+    void testWriteAndRead() {
         int maxClients = 5;
         int nPoints = 1000;
 
@@ -74,12 +74,12 @@ public class InfluxdbIT {
 
         assertThat(influxDBReader.getQuerySync("testMem").length()).isEqualTo(nPoints * maxClients);
         assertThat(influxDBReader.fluxQueryCount("testMem")).isEqualTo(nPoints * maxClients);
-        assertThat(new LogFileScanner("logs/application.log").run(1, 2, searchAfterPattern, "ERROR").length()).isEqualTo(0);
+        assertThat(new LogFileScanner("logs/application.log").run(1, 2, searchAfterPattern, "ERROR").length()).isZero();
     }
 
     @Test
     @Order(2)
-    public void testWriteAndReadLineProtocol() throws ExecutionException, InterruptedException {
+    void testWriteAndReadLineProtocol() throws ExecutionException, InterruptedException {
         int nPoints = 10;
         influxDBWriter.writeTestPointsFromLineProtocolSync();
         assertThat(influxDBReader.getQuerySync("testMemLP").length()).isEqualTo(nPoints);
@@ -87,7 +87,7 @@ public class InfluxdbIT {
 
     @Test
     @Order(3)
-    public void testWriteContinuously() throws ExecutionException, InterruptedException {
+    void testWriteContinuously() throws ExecutionException, InterruptedException {
         influxDBReader.run();
         influxDBWriter.writeTestPointEverySecond("sensorPeriodic");
     }
@@ -95,9 +95,11 @@ public class InfluxdbIT {
     // login with admin/adminadmin
     private static void browserClient() throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
-        String influxURL = "http://localhost:" + influxDBContainer.getMappedPort(INFLUXDB_PORT);
+        String influxURL = String.format("http://localhost:%s", influxDBContainer.getMappedPort(INFLUXDB_PORT));
         if (os.equals("mac os x")) {
             Runtime.getRuntime().exec("open " + influxURL);
+        } else if (os.equals("windows 10")) {
+            Runtime.getRuntime().exec(String.format("cmd /c start %s", influxURL));
         } else {
             LOGGER.info("Please open a browser at: {}", influxURL);
         }

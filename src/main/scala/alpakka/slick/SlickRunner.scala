@@ -12,12 +12,13 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
 /**
-  * DB access via Slick
+  * DB access via Slick, for simplicity using the 'public' schema
   * Run with integration test: alpakka.slick.SlickIT
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/slick.html
-  *
+  * https://scala-slick.org/docs
+  * https://blog.rockthejvm.com/slick
   */
 class SlickRunner(urlWithMappedPort: String) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -27,17 +28,12 @@ class SlickRunner(urlWithMappedPort: String) {
 
   val counter = new AtomicInteger()
 
-  system.registerOnTermination(() => {
-    logger.info("About to close session...")
-    session.close()
-  })
-
-  // Tweak config url param dynamically with mapped port from container
+  // Tweak config url param with mapped port from container
   val tweakedConf = ConfigFactory.empty()
     .withValue("slick-postgres.db.url", ConfigValueFactory.fromAnyRef(urlWithMappedPort))
     .withFallback(ConfigFactory.load())
 
-  implicit val session = SlickSession.forConfig("slick-postgres", tweakedConf)
+  implicit val session: SlickSession = SlickSession.forConfig("slick-postgres", tweakedConf)
 
   import session.profile.api._
 
@@ -53,32 +49,31 @@ class SlickRunner(urlWithMappedPort: String) {
 
   implicit val getUserResult = GetResult(r => User(r.nextInt(), r.nextString()))
 
-  val createTable = sqlu"""CREATE TABLE public.users(id INTEGER, name VARCHAR(50))"""
-  val dropTable = sqlu"""DROP TABLE public.users"""
-  val selectAllUsers = sql"SELECT id, name FROM public.users".as[User]
-
-  val typedSelectAllUsers = TableQuery[Users]
-    .result
-    .withStatementParameters(
-      rsType = ResultSetType.ForwardOnly,
-      rsConcurrency = ResultSetConcurrency.ReadOnly,
-      fetchSize = 10
-    )
-    .transactionally
-
   def insertUser(user: User): DBIO[Int] =
     sqlu"INSERT INTO public.users VALUES(${user.id}, ${user.name})"
 
-  def getAllUsersFromDb: Future[Set[User]] = Slick.source(selectAllUsers).runWith(Sink.seq).map(_.toSet)
+  def readUsersAsync(): Future[Set[User]] = {
+    val selectAllUsers = sql"SELECT id, name FROM public.users".as[User]
+    Slick.source(selectAllUsers).runWith(Sink.seq).map(_.toSet)
+  }
 
   def readUsersSync() = {
     logger.info("About to read...")
-    val result = Await.result(getAllUsersFromDb, 10.seconds)
+    val result = Await.result(readUsersAsync(), 10.seconds)
     logger.info(s"Successfully read: ${result.size} users")
     result
   }
 
   def processUsersPaged() = {
+    val typedSelectAllUsers = TableQuery[Users]
+      .result
+      .withStatementParameters(
+        rsType = ResultSetType.ForwardOnly,
+        rsConcurrency = ResultSetConcurrency.ReadOnly,
+        fetchSize = 10
+      )
+      .transactionally
+
     val result = Slick.source(typedSelectAllUsers)
       .grouped(1000)
       .wireTap((group: Seq[(Int, String)]) => {
@@ -90,7 +85,7 @@ class SlickRunner(urlWithMappedPort: String) {
       .map(each => counter.getAndAdd(each.size))
       .runWith(Sink.seq)
 
-    result.onComplete(res => logger.info(s"Done reading paged yielding: ${counter.get()} elements"))
+    result.onComplete(res => logger.info(s"Done reading paged, yielding: ${counter.get()} elements"))
     result
   }
 
@@ -102,10 +97,12 @@ class SlickRunner(urlWithMappedPort: String) {
   }
 
   def createTableOnSession() = {
+    val createTable = sqlu"""CREATE TABLE public.users(id INTEGER, name VARCHAR(50))"""
     Await.result(session.db.run(createTable), 2.seconds)
   }
 
   def dropTableOnSession() = {
+    val dropTable = sqlu"""DROP TABLE public.users"""
     Await.result(session.db.run(dropTable), 2.seconds)
   }
 
@@ -121,6 +118,8 @@ class SlickRunner(urlWithMappedPort: String) {
 
   def terminate() = {
     system.terminate()
+    logger.info("About to close session...")
+    session.close()
   }
 }
 

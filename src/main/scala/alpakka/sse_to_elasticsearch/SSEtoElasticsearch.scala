@@ -18,7 +18,7 @@ import org.apache.commons.text.StringEscapeUtils
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.elasticsearch.ElasticsearchContainer
 import org.testcontainers.utility.DockerImageName
-import play.api.libs.json._
+import play.api.libs.json.{JsArray, JsString, Json}
 import spray.json.DefaultJsonProtocol._
 import spray.json.JsonFormat
 
@@ -28,10 +28,9 @@ import java.nio.file.Paths
 import java.time.{Instant, ZoneId}
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.Try
 import scala.util.control.NonFatal
-
 
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
@@ -41,6 +40,7 @@ import scala.util.control.NonFatal
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/elasticsearch.html
+  * https://www.testcontainers.org/modules/elasticsearch
   */
 object SSEtoElasticsearch extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -48,14 +48,16 @@ object SSEtoElasticsearch extends App {
 
   import system.dispatcher
 
-  val decider: Supervision.Decider = {
+  private val decider: Supervision.Decider = {
     case NonFatal(e) =>
       logger.warn(s"Stream failed with: $e, going to restart")
       Supervision.Restart
   }
 
-  val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/en-token.bin").toFile))
-  val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
+  // 2.x model from https://opennlp.apache.org/models.html
+  private val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.0-1.9.3.bin").toFile))
+  // 1.5 model from https://opennlp.sourceforge.net/models-1.5
+  private val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
 
   case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
 
@@ -65,41 +67,43 @@ object SSEtoElasticsearch extends App {
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
   implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
 
-  val dockerImageName = DockerImageName
+  private val dockerImageName = DockerImageName
     .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
     .withTag("7.10.2")
-  val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
+  private val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
   elasticsearchContainer.start()
 
   val address = elasticsearchContainer.getHttpHostAddress
   val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
 
   // This index will be created in Elasticsearch on the fly
-  val indexName = "wikipediaedits"
-  val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
-  val matchAllQuery = """{"match_all": {}}"""
+  private val indexName = "wikipediaedits"
+  private val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
+  private val matchAllQuery = """{"match_all": {}}"""
 
-  val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
-  val elasticsearchSourceTyped = ElasticsearchSource
+  private val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
+
+  // Note that ElasticsearchSource reads are scroll requests, where you are able to fetch even the entire collection of documents
+  private val elasticsearchSourceTyped = ElasticsearchSource
     .typed[Ctx](
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
     )
-  val elasticsearchSourceRaw = ElasticsearchSource
+  private val elasticsearchSourceRaw = ElasticsearchSource
     .create(
       elasticsearchParamsV7,
       query = matchAllQuery,
       settings = sourceSettings
     )
 
-  val sinkSettings =
+  private val sinkSettings =
     ElasticsearchWriteSettings(connectionSettings)
       .withBufferSize(10)
       .withVersionType("internal")
       .withRetryLogic(RetryAtFixedRate(maxRetries = 5, retryInterval = 1.second))
       .withApiVersion(ApiVersion.V7)
-  val elasticsearchSink =
+  private val elasticsearchSink =
     ElasticsearchSink.create[Ctx](
       elasticsearchParamsV7,
       settings = sinkSettings
@@ -165,12 +169,13 @@ object SSEtoElasticsearch extends App {
   }
 
 
-  def findPersons(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"About to find person names in: ${ctx.change.title}")
+  def findPersonsLocalNER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"LocalNER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
-    // We need a new instance because the access to TokenizerME is not thread safe
-    // Doc: https://opennlp.apache.org/docs/1.9.3/manual/opennlp.html
+    // We need a new instance, because TokenizerME is not thread safe
+    // Doc: https://opennlp.apache.org/docs/2.0.0/manual/opennlp.html
+    // Chapter: Name Finder API
     val tokenizer = new TokenizerME(tokenModel)
     val tokens = tokenizer.tokenize(content)
 
@@ -188,11 +193,30 @@ object SSEtoElasticsearch extends App {
     }
   }
 
+  def findPersonsRemoteGpt3NER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"GPT-3 NER: About to find person names in: ${ctx.change.title}")
+    val content = ctx.content
+    val resultRaw = new NerRequestOpenAI().run(content)
+
+    val choices: JsArray = (Json.parse(resultRaw) \ "choices").as[JsArray]
+    val text = (Json.parse(choices.value(0).toString()) \ "text").as[String]
+    val personsFound = text.split("\n").filter(_.nonEmpty).toList
+    if (personsFound.isEmpty) {
+      Future(ctx)
+    } else {
+      val personsFoundCleaned = personsFound.map(each => StringEscapeUtils.unescapeJava(each))
+      logger.info(s"FOUND persons: $personsFoundCleaned from content: $content")
+      Future(ctx.copy(personsFound = personsFoundCleaned))
+    }
+  }
+
   val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
     .filter(change => !change.isBot)
     .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
-    .mapAsync(3)(ctx => findPersons(ctx))
+    .mapAsync(3)(ctx => findPersonsLocalNER(ctx))
+    //TODO Activate, when results are better
+    //.mapAsync(3)(ctx => findPersonsRemoteGpt3NER(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
 
   logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
@@ -217,21 +241,20 @@ object SSEtoElasticsearch extends App {
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    val searchURL = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
-    if (os == "mac os x") {
-      Process(s"open $searchURL").!
-    }
-    else {
-      logger.info(s"Please open a browser at: $searchURL")
-    }
+    val url = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
+    if (os == "mac os x") Process(s"open $url").!
+    else if (os == "windows 10") Seq("cmd", "/c", s"start $url").!
+    else logger.info(s"Please open a browser at: $url")
   }
 
   private def dateTimeFormatted(timestamp: Long) = {
     Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
   }
 
+  // Note that the size of the collection can also be fetched via a GET request, eg
+  // http://localhost:57321/wikipediaedits/_count
   private def query() = {
-    logger.info(s"About to execute read queries...")
+    logger.info(s"About to execute scrolled read queries...")
     for {
       result <- readFromElasticsearchTyped()
       resultRaw <- readFromElasticsearchRaw()

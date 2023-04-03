@@ -15,13 +15,15 @@ import scala.util.{Failure, Success}
 
 /**
   * HTTP FileServer to test: [[sample.stream_shared_state.LocalFileCacheCaffeine]]
+  * Simulates a quirky legacy file download server encountered in real life
   *
   * The client can request these types of response:
   *  - HTTP 200 response:        /download/[id]
   *  - Flaky response:           /downloadflaky/[id]
   *  - Non-idempotent response:  /downloadni/[id]
-  *    Allows only one download file per id, answer with HTTP 404 on subsequent requests
+  *    Allows only one download file request per id, answer with HTTP 404 on subsequent requests
   *
+  * Uses a cache to remember the "one download per id" behaviour
   * Note that akka-http also supports server-side caching (by wrapping caffeine in caching directives):
   * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/caching-directives/index.html
   */
@@ -79,11 +81,11 @@ object FileServer extends App {
           logger.info(s"TRACE_ID: $id Server received non-idempotent request")
 
           if (cache.getIfPresent(id).isDefined) {
-            logger.warn(s"TRACE_ID: $id Only one download file per TRACE_ID allowed. Reply with 404")
+            logger.warn(s"TRACE_ID: $id Only one download file request per TRACE_ID allowed. Reply with 404")
             complete(StatusCodes.NotFound)
 
           } else {
-            cache.put(id, "downloading") //to simulate blocking on concurrent requests
+            cache.put(id, "downloading") // to simulate blocking on concurrent requests
             get {
               randomSleeper()
               val response = getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
