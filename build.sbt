@@ -6,8 +6,8 @@ version := "1.0"
 
 scalaVersion := "2.13.10"
 
-val akkaVersion = "2.7.0"
-val akkaHTTPVersion = "10.5.0"
+val akkaVersion = "2.8.0"
+val akkaHTTPVersion = "10.4.0"
 val alpakkaVersion = "5.0.0"
 
 val alpakkaKafkaConnectorVersion = "4.0.0"
@@ -16,7 +16,7 @@ val kafkaVersion = "3.3.1"
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.27.1"
 val testContainersVersion = "1.17.6"
-val keycloakVersion = "20.0.2"
+val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.5"
 val influxdbVersion = "6.7.0"
 
@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-  "org.json" % "json" % "20220924",
+  "org.json" % "json" % "20230227",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
@@ -100,7 +100,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.4.5",
+  "ch.qos.logback" % "logback-classic" % "1.4.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -108,7 +108,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.4.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
