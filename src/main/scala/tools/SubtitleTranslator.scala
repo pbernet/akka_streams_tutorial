@@ -38,7 +38,7 @@ object SubtitleTranslator extends App {
   val targetFilePath = "DE_challenges.srt"
   val targetLanguage = "German"
 
-  val maxGapSeconds = 1 // time between scenes (session windows)
+  val maxGapSeconds = 1 // time between scenes (= session windows)
   val endBlockTag = "\n" // one block per line
   var totalTokensUsed = 0
 
@@ -115,7 +115,7 @@ object SubtitleTranslator extends App {
     var translated = new OpenAICompletions().runChatCompletions(toTranslate)
 
     if (!isTranslationPlausible(translated.getLeft, sceneOrig.size)) {
-      // Fallback to the more reliable model
+      logger.info(s"Translation from 'gpt-3.5-turbo' is not plausible, lines do not match. Fallback to 'text-davinci-003'")
       translated = new OpenAICompletions().runCompletions(toTranslate)
     }
 

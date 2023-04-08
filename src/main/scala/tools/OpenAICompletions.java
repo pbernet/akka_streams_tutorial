@@ -48,8 +48,8 @@ public class OpenAICompletions {
         requestParams.put("model", "text-davinci-003");
         requestParams.put("prompt", prompt);
 
-        // For testing use lower number
-        requestParams.put("max_tokens", 200);
+        // The token limit for "text-davinci-003" is 4000 tokens (=  sum of prompt and completion tokens)
+        requestParams.put("max_tokens", 1000);
 
         // Sampling temperature: Higher values means the model will take more risks (0-1)
         // In the context of translations: control the degree of deviation from the source text
@@ -71,8 +71,8 @@ public class OpenAICompletions {
         requestParams.put("model", "gpt-3.5-turbo");
         requestParams.put("messages", messages);
 
-        // For testing use lower number
-        requestParams.put("max_tokens", 200);
+        // The token limit for "gpt-35-turbo" is 4096 tokens (=  sum of prompt and completion tokens)
+        requestParams.put("max_tokens", 1000);
 
         // Sampling temperature: Higher values means the model will take more risks (0-1)
         // In the context of translations: control the degree of deviation from the source text
@@ -111,10 +111,10 @@ public class OpenAICompletions {
 
         JSONArray arr = obj.getJSONArray("choices");
         JSONObject msg = arr.getJSONObject(0);
+        checkLength(msg);
+
         String content = msg.getJSONObject("message").getString("content");
-
         int totalTokens = obj.getJSONObject("usage").getInt("total_tokens");
-
         return new ImmutablePair<>(content, totalTokens);
     }
 
@@ -124,10 +124,17 @@ public class OpenAICompletions {
 
         JSONArray arr = obj.getJSONArray("choices");
         JSONObject msg = arr.getJSONObject(0);
+        checkLength(msg);
+
         String content = msg.getString("text");
-
         int totalTokens = obj.getJSONObject("usage").getInt("total_tokens");
-
         return new ImmutablePair<>(content, totalTokens);
+    }
+
+    private static void checkLength(JSONObject obj) {
+        String finish_reason = obj.getString("finish_reason");
+        if (finish_reason.equals("length")) {
+            LOGGER.warn("finish_reason has value 'length'. Increase max_tokens to get full response.");
+        }
     }
 }
