@@ -17,7 +17,7 @@ val activemqVersion = "5.16.3"
 val artemisVersion = "2.27.1"
 val testContainersVersion = "1.17.6"
 val keycloakVersion = "21.0.1"
-val sttpVersion = "3.8.5"
+val sttpVersion = "3.8.15"
 val influxdbVersion = "6.7.0"
 
 libraryDependencies ++= Seq(
