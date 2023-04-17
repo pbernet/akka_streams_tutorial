@@ -28,6 +28,12 @@ import scala.util.{Failure, Success, Try}
   * Works with these OpenAI API endpoints:
   *  - Default:  /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
   *  - Fallback: /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
+  *
+  * Usage:
+  *  - Wire up source file
+  *  - Add API_KEY in [[OpenAICompletions]] and run this class
+  *  - Scan log for WARN log messages and edit corresponding blocks in target file manually
+  *  - Note that the numerical block headers in the .srt files are not interpreted, only timestamps matter
   */
 object SubtitleTranslator extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -35,12 +41,15 @@ object SubtitleTranslator extends App {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   val sourceFilePath = "src/main/resources/EN_challenges.srt"
-  val targetFilePath = "DE_challenges.srt"
-  val targetLanguage = "German"
+  private val targetFilePath = "DE_challenges.srt"
+  private val targetLanguage = "German"
 
-  val maxGapSeconds = 1 // time between scenes (= session windows)
-  val endBlockTag = "\n" // one block per line
-  var totalTokensUsed = 0
+  private val maxGapSeconds = 1 // idle time between scenes (= session windows)
+  private val endBlockTag = "\n" // one block per line
+  private val maxCharPerTranslatedLine = 40 // recommendation
+  private val conversationPrefix = "-"
+
+  private var totalTokensUsed = 0
 
   // Extension methods for SubtitleBlock
   implicit class SubtitleBlockExt(block: SubtitleBlock) {
@@ -50,7 +59,7 @@ object SubtitleTranslator extends App {
   }
 
   // Source file must be in utf-8
-  val srt: Try[Srt] = SrtDissector(new FileInputStream(sourceFilePath))
+  private val srt: Try[Srt] = SrtDissector(new FileInputStream(sourceFilePath))
   logger.info("Number of subtitleBlocks to translate: {}", srt.get.length)
 
   private val dummyLastElement = Source.single(SubtitleBlock(0, 0, List("")))
@@ -108,25 +117,26 @@ object SubtitleTranslator extends App {
     logger.info(s"About to translate scene with: ${sceneOrig.size} original blocks")
 
     val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEbNewLine)
-    val toTranslate = generatePrompt(allLines)
-    logger.info(s"Request prompt: $toTranslate")
+    val toTranslate = generateTranslationPrompt(allLines)
+    logger.info(s"Translation prompt: $toTranslate")
 
-    // First try with the cheaper model
-    var translated = new OpenAICompletions().runChatCompletions(toTranslate)
-
-    if (!isTranslationPlausible(translated.getLeft, sceneOrig.size)) {
-      logger.info(s"Translation from 'gpt-3.5-turbo' is not plausible, lines do not match. Fallback to 'text-davinci-003'")
-      translated = new OpenAICompletions().runCompletions(toTranslate)
+    // First try with the cheaper 'gpt-3.5-turbo' model
+    val translatedCheap = new OpenAICompletions().runChatCompletions(toTranslate)
+    val translated = translatedCheap match {
+      case translatedCheap if !isTranslationPlausible(translatedCheap.getLeft, sceneOrig.size) =>
+        logger.info(s"Translation from 'gpt-3.5-turbo' is not plausible, lines do not match. Fallback to 'text-davinci-003'")
+        new OpenAICompletions().runCompletions(toTranslate)
+      case _ => translatedCheap
     }
 
     val newTokens = translated.getRight
     totalTokensUsed = totalTokensUsed + newTokens
 
     val rawResponseText = translated.getLeft
-    logger.info("Response text: {}", rawResponseText)
+    logger.debug("Response text: {}", rawResponseText)
     val seed: Vector[SubtitleBlock] = Vector.empty
 
-    val sceneTranslatedManually: Vector[SubtitleBlock] =
+    val sceneTranslated: Vector[SubtitleBlock] =
       rawResponseText
         .split(endBlockTag)
         .filterNot(each => each.isEmpty)
@@ -137,16 +147,17 @@ object SubtitleTranslator extends App {
             if (sceneOrig.isDefinedAt(rawResponseTextSplit._2)) {
               sceneOrig(rawResponseTextSplit._2)
             } else {
-              // Root cause: No plausible translation provided by openAI, eg due to added lines at beginning or at end.
+              // Root cause: No plausible translation provided by openAI, eg due to added lines at beginning or at end of response
               logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: ${rawResponseTextSplit._2} requested. Fallback to last original block")
               sceneOrig.last
             }
           val translatedBlock = origBlock.copy(lines = massagedResult)
-          logger.info(s"Translation: ${translatedBlock.allLines} $totalTokensUsed(+$newTokens)")
+          logger.info(s"Translated block to: ${translatedBlock.allLines}")
           acc.appended(translatedBlock)
         }
-    logger.info(s"Finished line by line translation of scene with: ${sceneTranslatedManually.size} blocks")
-    sceneTranslatedManually
+    logger.info(s"Finished line by line translation of scene with: ${sceneTranslated.size} blocks")
+
+    sceneTranslated
   }
 
   private def isTranslationPlausible(rawResponseText: String, originalSize: Int) = {
@@ -158,7 +169,7 @@ object SubtitleTranslator extends App {
     resultSize == originalSize
   }
 
-  private def generatePrompt(text: String) = {
+  private def generateTranslationPrompt(text: String) = {
     s"""
        |Translate the text lines below from English to $targetLanguage.
        |
@@ -171,35 +182,45 @@ object SubtitleTranslator extends App {
        |""".stripMargin
   }
 
-  private def massageResultText(text: String): List[String] = {
-    val textCleaned = clean(text)
-    // Two people conversation in one block
-    if (textCleaned.startsWith("-")) {
-      textCleaned.split("-").map(x => "-" + x).toList.tail
-    }
-    else {
-      splitSentence(textCleaned)
-    }
+  private def generateShortenPrompt(text: String) = {
+    s"""
+       |Rewrite to ${maxCharPerTranslatedLine * 2} characters or less:
+       |$text
+       |
+       |""".stripMargin
   }
 
-  private def clean(text: String): String = {
+  private def massageResultText(text: String) = {
+    val textCleaned = clean(text)
+    // Two people conversation in one block
+    if (textCleaned.startsWith(conversationPrefix)) {
+      textCleaned.split(conversationPrefix).map(line => conversationPrefix + line).toList.tail
+    }
+    else if (textCleaned.length > maxCharPerTranslatedLine * 2) {
+      logger.warn(s"Translated block text is too long (${textCleaned.length} chars). Try to shorten via API call. Check result manually")
+      val toShorten = generateShortenPrompt(textCleaned)
+      logger.info(s"Shorten prompt: $toShorten")
+      val responseShort = new OpenAICompletions().runCompletions(toShorten)
+      splitSentence(clean(responseShort.getLeft))
+    }
+    else splitSentence(textCleaned)
+  }
+
+  private def clean(text: String) = {
     val filtered = text.filter(_ >= ' ')
     if (filtered.startsWith("\"")) filtered.substring(1, filtered.length() - 1)
     else filtered
   }
 
-  private def splitSentence(text: String): List[String] = {
-    val maxCharPerLine = 40
-
-    if (text.length > maxCharPerLine && text.contains(",")) {
+  private def splitSentence(text: String) = {
+    if (text.length > maxCharPerTranslatedLine && text.contains(",")) {
       val indexFirstComma = text.indexOf(",")
       val offset = 15
-      // Comma must not be at beginning or at end
       if (indexFirstComma > offset && indexFirstComma < text.length - offset)
         List(text.substring(0, indexFirstComma + 1), text.substring(indexFirstComma + 1, text.length))
       else splitSentenceHonorWords(text)
     }
-    else if (text.length > maxCharPerLine) {
+    else if (text.length > maxCharPerTranslatedLine) {
       splitSentenceHonorWords(text)
     } else {
       List(text)
@@ -214,7 +235,7 @@ object SubtitleTranslator extends App {
     List(firstHalf, secondHalf)
   }
 
-  private def toTime(ms: Int): String = {
+  private def toTime(ms: Int) = {
     val d = Duration.ofMillis(ms)
     val hours = StringUtils.leftPad(d.toHoursPart.toString, 2, "0")
     val minutes = StringUtils.leftPad(d.toMinutesPart.toString, 2, "0")
@@ -246,7 +267,7 @@ object SubtitleTranslator extends App {
   def terminateWhen(done: Future[IOResult]) = {
     done.onComplete {
       case Success(_) =>
-        println(s"Flow Success. Translated to target file: $targetFilePath About to terminate...")
+        println(s"Flow Success. Finished writing to target file: $targetFilePath. Around $totalTokensUsed tokens used. About to terminate...")
         system.terminate()
       case Failure(e) =>
         println(s"Flow Failure: $e. Partial results are in target file:$targetFilePath About to terminate...")
