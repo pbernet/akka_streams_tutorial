@@ -15,7 +15,7 @@ val kafkaVersion = "3.3.1"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.27.1"
-val testContainersVersion = "1.17.6"
+val testContainersVersion = "1.18.0"
 val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.5"
 val influxdbVersion = "6.7.0"
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.72",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.73",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -78,7 +78,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.1.0",
+  "org.apache.opennlp" % "opennlp-tools" % "2.1.1",
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
