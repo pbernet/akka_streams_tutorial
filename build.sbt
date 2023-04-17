@@ -6,7 +6,7 @@ version := "1.0"
 
 scalaVersion := "2.13.10"
 
-val akkaVersion = "2.7.0"
+val akkaVersion = "2.8.0"
 val akkaHTTPVersion = "10.4.0"
 val alpakkaVersion = "5.0.0"
 
@@ -15,8 +15,8 @@ val kafkaVersion = "3.3.1"
 
 val activemqVersion = "5.16.3"
 val artemisVersion = "2.27.1"
-val testContainersVersion = "1.17.6"
-val keycloakVersion = "20.0.2"
+val testContainersVersion = "1.18.0"
+val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.5"
 val influxdbVersion = "6.7.0"
 
@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-  "org.json" % "json" % "20220924",
+  "org.json" % "json" % "20230227",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.72",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.73",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.34.0",
+  "com.hierynomus" % "sshj" % "0.35.0",
   "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
@@ -78,7 +78,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.1.0",
+  "org.apache.opennlp" % "opennlp-tools" % "2.1.1",
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
@@ -100,7 +100,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.4.5",
+  "ch.qos.logback" % "logback-classic" % "1.4.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -108,7 +108,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
-  "com.github.dasniko" % "testcontainers-keycloak" % "2.4.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),

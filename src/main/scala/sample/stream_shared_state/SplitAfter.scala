@@ -11,7 +11,8 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Split time series data into sub-streams for each second
+  * Split time series data into sub-streams per second
+  * Thus we have a `session window` using processing time
   * Similar to: [[SplitWhen]]
   * Similar streams operator: groupedWithin
   *
