@@ -126,6 +126,7 @@ libraryDependencies ++= Seq(
   "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.1" % Test,
   "org.junit.jupiter" % "junit-jupiter-api" % "5.9.1" % Test,
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
+  "org.opensearch" % "opensearch-testcontainers" % "2.0.0"
 
 )
 
