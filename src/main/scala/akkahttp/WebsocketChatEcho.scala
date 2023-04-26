@@ -14,6 +14,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 /**
   * A simple WebSocket chat system using only akka streams with the help of MergeHub Source and BroadcastHub Sink
+  * See also: [[WebsocketEcho]]
   *
   * Initial version shamelessly stolen from:
   * https://github.com/calvinlfer/akka-http-streaming-response-examples/blob/master/src/main/scala/com/experiments/calvin/WebsocketStreamsMain.scala
@@ -23,6 +24,7 @@ import scala.concurrent.duration._
 object WebsocketChatEcho extends App with ClientCommon {
 
     val (address, port) = ("127.0.0.1", 6002)
+  // The heartbeat_echo endpoint is not implemented here
     chatServer(address, port)
     browserClient()
     val clients = List("Bob", "Alice")
