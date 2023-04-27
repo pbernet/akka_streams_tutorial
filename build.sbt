@@ -123,8 +123,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
   "org.assertj" % "assertj-core" % "3.23.1" % Test,
 
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.1" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.1" % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.3" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.3" % Test,
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
   "org.opensearch" % "opensearch-testcontainers" % "2.0.0"
 
