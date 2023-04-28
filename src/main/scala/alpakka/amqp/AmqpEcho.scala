@@ -1,12 +1,12 @@
 package alpakka.amqp
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl.{AmqpFlow, AmqpSource, CommittableReadResult}
+import akka.stream.alpakka.amqp.scaladsl._
 import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
 import akka.stream.{KillSwitches, RestartSettings, ThrottleMode}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.containers.RabbitMQContainer
 
@@ -36,6 +36,7 @@ object AmqpEcho extends App {
 
   (1 to 2).par.foreach(each => sendReceiveClient(each, rabbitMQContainer))
   (1 to 2).par.foreach(each => pubSubClient(each, rabbitMQContainer))
+  (1 to 2).par.foreach(each => rpcScenario(each, rabbitMQContainer))
 
   def sendReceiveClient(id: Int, rabbitMQContainer: RabbitMQContainer): Unit = {
     val mappedPort = rabbitMQContainer.getAmqpPort
@@ -81,6 +82,88 @@ object AmqpEcho extends App {
 
     receiveFromExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
     sendToExchange(id, connectionProvider, exchangeName, exchangeDeclaration)
+  }
+
+  /**
+    * Show the AMQP 'RPC scenario', see diagram:
+    * https://www.rabbitmq.com/tutorials/tutorial-six-java.html
+    * Inspired by:
+    * https://stackoverflow.com/questions/76089253/amqprpc-alpakka-producer-not-receiving-a-response-back
+    *
+    * @param id
+    * @param rabbitMQContainer
+    */
+  def rpcScenario(id: Int, rabbitMQContainer: RabbitMQContainer) = {
+    val mappedPort = rabbitMQContainer.getAmqpPort
+    val amqpUri = s"amqp://$host:$mappedPort"
+    val connectionProvider = AmqpCachedConnectionProvider(AmqpUriConnectionProvider(amqpUri))
+
+    val queueNameRPC = "rpc"
+    val queueNameFullRPC = s"$queueNameRPC-$id"
+    val queueDeclarationRPC = QueueDeclaration(queueNameFullRPC)
+
+    // RPC server flow
+    val rpcFlow: Flow[ReadResult, WriteMessage, NotUsed] = Flow[ReadResult]
+      .map { readResult: ReadResult =>
+        logger.info(s"RECEIVED on server envelope: ${readResult.envelope}")
+        val output = s"Processed: ${readResult.bytes.utf8String}"
+        // The on-the-fly created replyTo queue name is in the properties
+        WriteMessage(ByteString(output)).withProperties(readResult.properties)
+      }
+
+    val amqpSink: Sink[WriteMessage, Future[Done]] = AmqpSink.replyTo(
+      AmqpReplyToSinkSettings(connectionProvider)
+    )
+
+    val amqpSource: Source[ReadResult, NotUsed] = AmqpSource.atMostOnceSource(
+      NamedQueueSourceSettings(connectionProvider, queueNameFullRPC)
+        .withDeclaration(queueDeclarationRPC),
+      bufferSize = 1
+    )
+
+    val doneServer: Future[Done] = amqpSource
+      .via(rpcFlow)
+      .runWith(amqpSink)
+
+    doneServer.onComplete {
+      case Success(_) => logger.info("Done RPC server flow")
+      case Failure(exception) => logger.info(s"Exception during RPC server flow: ", exception)
+    }
+
+    // RPC client flow
+    val inputMessages: Source[WriteMessage, NotUsed] = Source(List(
+      WriteMessage(ByteString("one")),
+      WriteMessage(ByteString("two")),
+      WriteMessage(ByteString("three")),
+      WriteMessage(ByteString("four")),
+      WriteMessage(ByteString("five")),
+    ))
+
+    val amqpRpcFlow: Flow[WriteMessage, ReadResult, Future[String]] = AmqpRpcFlow.atMostOnceFlow(
+      AmqpWriteSettings(connectionProvider)
+        .withRoutingKey(queueNameFullRPC)
+        .withDeclaration(queueDeclarationRPC)
+        .withBufferSize(10)
+        .withConfirmationTimeout(200.millis),
+      10
+    )
+
+    val printSink = Sink.foreach[ReadResult](each => logger.info(s"Reached sink: ${each.bytes.utf8String}"))
+    val done: (Future[String], Future[Done]) = inputMessages
+      .wireTap(each => logger.info("Sending: " + each))
+      .viaMat(amqpRpcFlow)(Keep.right)
+      .toMat(printSink)(Keep.both)
+      .run()
+
+    done._2.onComplete {
+      case Success(_) => logger.info("Done RPC client flow")
+      case Failure(exception) => logger.info(s"Exception during RPC client flow:", exception)
+    }
+
+    done._1.onComplete {
+      case Success(queue) => logger.info(s"Internally created REPLY-TO queue was: $queue")
+      case Failure(exception) => logger.info(s"Exception during RPC client flow:", exception)
+    }
   }
 
   private def sendToQueue(id: Int, connectionProvider: AmqpCachedConnectionProvider, queueDeclaration: QueueDeclaration, queueNameFull: String) = {
