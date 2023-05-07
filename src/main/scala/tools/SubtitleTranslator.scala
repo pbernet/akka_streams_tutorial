@@ -184,7 +184,7 @@ object SubtitleTranslator extends App {
 
   private def generateShortenPrompt(text: String) = {
     s"""
-       |Rewrite to ${maxCharPerTranslatedLine * 2} characters or less:
+       |Rewrite to ${maxCharPerTranslatedLine * 2} characters at most:
        |$text
        |
        |""".stripMargin
