@@ -13,8 +13,8 @@ val alpakkaVersion = "5.0.0"
 val alpakkaKafkaConnectorVersion = "4.0.0"
 val kafkaVersion = "3.3.1"
 
-val activemqVersion = "5.16.3"
-val artemisVersion = "2.27.1"
+val activemqVersion = "5.17.4"
+val artemisVersion = "2.28.0"
 val testContainersVersion = "1.18.0"
 val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.5"
@@ -78,7 +78,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.1.1",
+  "org.apache.opennlp" % "opennlp-tools" % "2.2.0",
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
@@ -100,7 +100,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
 
   "com.github.blemale" %% "scaffeine" % "5.1.2",
-  "ch.qos.logback" % "logback-classic" % "1.4.6",
+  "ch.qos.logback" % "logback-classic" % "1.4.7",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -115,16 +115,16 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.5.1",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.1.0" % Test pomOnly(),
-  "io.zonky.test" % "embedded-postgres" % "2.0.2" % Test,
+  "org.postgresql" % "postgresql" % "42.5.4",
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.2.0" % Test pomOnly(),
+  "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test,
 
-  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "org.scalatest" %% "scalatest" % "3.2.15" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "org.assertj" % "assertj-core" % "3.23.1" % Test,
+  "org.assertj" % "assertj-core" % "3.24.2" % Test,
 
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.1" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.1" % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
   "org.opensearch" % "opensearch-testcontainers" % "2.0.0"
 
