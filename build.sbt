@@ -7,17 +7,17 @@ version := "1.0"
 scalaVersion := "2.13.10"
 
 val akkaVersion = "2.8.0"
-val akkaHTTPVersion = "10.4.0"
+val akkaHTTPVersion = "10.5.0"
 val alpakkaVersion = "5.0.0"
 
 val alpakkaKafkaConnectorVersion = "4.0.0"
-val kafkaVersion = "3.3.1"
+val kafkaVersion = "3.4.0"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
 val testContainersVersion = "1.18.0"
 val keycloakVersion = "21.0.1"
-val sttpVersion = "3.8.5"
+val sttpVersion = "3.8.13"
 val influxdbVersion = "6.7.0"
 
 libraryDependencies ++= Seq(
@@ -94,12 +94,12 @@ libraryDependencies ++= Seq(
   //"io.apicurio" % "apicurio-registry-utils-serde" % "1.3.2.Final",
 
 
-  "org.apache.camel" % "camel-core" % "3.20.1",
-  "org.apache.camel" % "camel-reactive-streams" % "3.20.1",
-  "io.projectreactor" % "reactor-core" % "3.4.26",
-  "io.reactivex.rxjava3" % "rxjava" % "3.1.5",
+  "org.apache.camel" % "camel-core" % "3.20.2",
+  "org.apache.camel" % "camel-reactive-streams" % "3.20.2",
+  "io.projectreactor" % "reactor-core" % "3.5.4",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.6",
 
-  "com.github.blemale" %% "scaffeine" % "5.1.2",
+  "com.github.blemale" %% "scaffeine" % "5.2.1",
   "ch.qos.logback" % "logback-classic" % "1.4.7",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
