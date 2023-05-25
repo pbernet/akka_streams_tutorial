@@ -115,7 +115,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
 
-  "org.postgresql" % "postgresql" % "42.5.4",
+  "org.postgresql" % "postgresql" % "42.6.0",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.2.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test,
 
