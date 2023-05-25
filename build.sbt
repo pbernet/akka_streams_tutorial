@@ -15,7 +15,7 @@ val kafkaVersion = "3.4.0"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
-val testContainersVersion = "1.18.0"
+val testContainersVersion = "1.18.1"
 val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.13"
 val influxdbVersion = "6.7.0"
