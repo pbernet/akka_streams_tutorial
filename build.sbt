@@ -15,7 +15,7 @@ val kafkaVersion = "3.4.0"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
-val testContainersVersion = "1.18.0"
+val testContainersVersion = "1.18.3"
 val keycloakVersion = "21.0.1"
 val sttpVersion = "3.8.13"
 val influxdbVersion = "6.7.0"
@@ -108,7 +108,13 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "kafka" % testContainersVersion,
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
+  "org.testcontainers" % "toxiproxy" % testContainersVersion,
+  "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
+  "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
+  "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
@@ -121,13 +127,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.2.15" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "org.assertj" % "assertj-core" % "3.24.2" % Test,
-
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
-  "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
-  "org.opensearch" % "opensearch-testcontainers" % "2.0.0"
-
+  "org.assertj" % "assertj-core" % "3.24.2" % Test
 )
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
