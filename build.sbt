@@ -4,7 +4,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.10"
+scalaVersion := "2.13.11"
 
 val akkaVersion = "2.8.0"
 val akkaHTTPVersion = "10.5.0"
