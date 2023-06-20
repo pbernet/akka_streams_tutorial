@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
 
   "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-  "org.json" % "json" % "20230227",
+  "org.json" % "json" % "20230618",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
