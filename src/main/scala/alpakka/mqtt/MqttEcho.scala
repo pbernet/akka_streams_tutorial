@@ -65,7 +65,7 @@ object MqttEcho extends App {
           //TODO What is the benefit of this meccano? Does the Promise carry a ACK Result?
           val promise = Promise[None.type]()
           //On the server each new retained message overwrites the previous one
-          val publish = Publish(ControlPacketFlags.RETAIN | ControlPacketFlags.QoSAtLeastOnceDelivery, topic, ByteString(msg.toString))
+          val publish = Publish(ControlPacketFlags.RETAIN | PublishQoSFlags.QoSAtLeastOnceDelivery, topic, ByteString(msg.toString))
           pub.session ! Command(publish, () => promise.complete(Try(None)))
           promise.future
       }
@@ -84,7 +84,7 @@ object MqttEcho extends App {
 
     //Wait with the Subscribe to get a "last known good value" eg 6
     Thread.sleep(5000)
-    val topicFilters: Seq[(String, ControlPacketFlags)] = List((topic, ControlPacketFlags.QoSAtMostOnceDelivery))
+    val topicFilters: Seq[(String, ControlPacketFlags)] = List((topic, PublishQoSFlags.QoSAtMostOnceDelivery))
     logger.info(s"Client: $clientId send Subscribe for topic: $topic")
     sub.commands.offer(Command(Subscribe(topicFilters)))
   }
