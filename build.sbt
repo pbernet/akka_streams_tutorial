@@ -4,14 +4,14 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.10"
+scalaVersion := "2.13.11"
 
-val akkaVersion = "2.8.0"
-val akkaHTTPVersion = "10.5.0"
-val alpakkaVersion = "5.0.0"
+val akkaVersion = "2.8.1"
+val akkaHTTPVersion = "10.5.1"
+val alpakkaVersion = "6.0.1"
 
-val alpakkaKafkaConnectorVersion = "4.0.0"
-val kafkaVersion = "3.4.0"
+val alpakkaKafkaConnectorVersion = "4.0.2"
+val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.73",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.75",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -65,6 +65,7 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
+  "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
 
   "org.squbs" %% "squbs-ext" % "0.15.0",
 
@@ -82,7 +83,7 @@ libraryDependencies ++= Seq(
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
-  "com.typesafe.play" %% "play" % "2.8.18",
+  "com.typesafe.play" %% "play-json" % "2.9.4",
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
