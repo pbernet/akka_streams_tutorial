@@ -5,6 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import scala.jdk.javaapi.FutureConverters;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
 public class S3EchoMinioIT {
@@ -24,11 +31,12 @@ public class S3EchoMinioIT {
     }
 
     @Test
-    public void testLocal() throws InterruptedException {
+    public void testLocal() throws InterruptedException, IOException {
         S3Echo echo = new S3Echo(minioContainer.getHostAddress(), ACCESS_KEY, SECRET_KEY);
-        echo.run();
 
-        // TODO Add assertion, eg count files locally
-        Thread.sleep(5000);
+        assertThat(FutureConverters.asJava(echo.run())).succeedsWithin(15, TimeUnit.SECONDS);
+        LOGGER.info("Finished processing. Waiting with counting because of glitch...");
+        Thread.sleep(1000);
+        assertThat(Files.list(echo.localTmpDir()).count()).isEqualTo(10);
     }
 }

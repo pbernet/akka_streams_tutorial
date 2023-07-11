@@ -1,16 +1,18 @@
 package alpakka.s3
 
+import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.IOResult
+import akka.stream.Attributes
 import akka.stream.alpakka.s3.AccessStyle.PathAccessStyle
 import akka.stream.alpakka.s3._
 import akka.stream.alpakka.s3.scaladsl.S3
 import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
 import akka.util.ByteString
+import org.apache.commons.io.FileUtils
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -20,7 +22,7 @@ import scala.util.{Failure, Success}
   *
   * Run this class against your AWS account using the settings in application.conf
   * or
-  * Run via [[S3EchoMinioIT]] against local minio docker container
+  * Run via [[alpakka.s3.S3EchoMinioIT]] against local minio docker container
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/s3.html
@@ -47,47 +49,48 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
       )
   }
 
-  implicit val s3attributes = S3Attributes.settings(s3Settings)
+  implicit val s3attributes: Attributes = S3Attributes.settings(s3Settings)
 
-  def run() = {
-    makeBucket()
-      .onComplete {
-        case Success(done) =>
-          logger.info(s"Successfully created bucket: $done")
-          roundtripClient()
-        case Failure(s3ex: S3Exception) =>
-          if (s3ex.code.equals("BucketAlreadyOwnedByYou")) {
-            logger.warn(s"Bucket already exists, proceed...")
-            roundtripClient()
-          } else {
-            logger.warn(s"Bucket failure: $s3ex")
-          }
-        case Failure(e) =>
-          logger.info(s"Bucket failure: $e")
-      }
-  }
+  val localTmpDir: Path = Paths.get(System.getProperty("java.io.tmpdir")).resolve(s"s3echo_${UUID.randomUUID().toString.take(4)}")
+  logger.info(s"Using localTmpDir dir: $localTmpDir")
+  FileUtils.forceMkdir(localTmpDir.toFile)
 
-  private def roundtripClient(): Unit = {
-    uploadClient(resourceFileName).onComplete {
-      case Success(key) =>
-        logger.info(s"About to download with bucketKey: $key")
-        Thread.sleep(1000)
-        downloadClient(key)
-      case Failure(e) =>
-        logger.info(s"Failure: $e")
-    }
+  def run(): Future[Done] = {
+    val done = for {
+      _ <- makeBucket()
+      allDone <- roundtripClient()
+    } yield allDone
+    terminateWhen(done)
+    done
   }
 
   private def makeBucket() = {
     logger.info(s"Check connection and credentials. Create unique bucket, if it does not already exist: $bucketName")
 
-    // Hangs, when "endpoint-url" is not correct
-    S3.makeBucket(bucketName)
+    S3.checkIfBucketExists(bucketName)
+      .flatMap {
+        case BucketAccess.NotExists =>
+          logger.info(s"Bucket: $bucketName does not exist. Creating bucket")
+          // Hangs, when "endpoint-url" is not correct
+          S3.makeBucket(bucketName)
+        case BucketAccess.AccessGranted =>
+          logger.info(s"Bucket: $bucketName already exists. Proceed...")
+          Future.successful(Done)
+        case BucketAccess.AccessDenied =>
+          Future.failed(new RuntimeException(s"Access denied to create bucket: $bucketName"))
+        case resp =>
+          Future.failed(new RuntimeException(s"Error during initialization of: $bucketName. Details: ${resp.toString}"))
+      }
   }
 
-  private def uploadClient(resourceFileName: String) = {
-    val prefix = UUID.randomUUID().toString.take(4) + "_"
-    val bucketKey = s"$prefix$resourceFileName"
+  private def roundtripClient() = {
+    Source(1 to 10)
+      .mapAsync(5)(each => uploadClient(each))
+      .runForeach(key => downloadClient(key))
+  }
+
+  private def uploadClient(id: Int) = {
+    val bucketKey = s"${id}_${UUID.randomUUID().toString.take(4)}_$resourceFileName"
     logger.info(s"About to upload file with bucketKey: $bucketKey")
 
     val fileSource =
@@ -104,6 +107,9 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
   }
 
   private def downloadClient(bucketKey: String) = {
+    logger.info(s"About to download with bucketKey: $bucketKey")
+    // We give AWS time to fully process the upload
+    Thread.sleep(1000)
     val s3Source: Source[ByteString, Future[ObjectMetadata]] =
       S3.getObject(bucketName, bucketKey).withAttributes(s3attributes)
 
@@ -112,20 +118,16 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
       s3Source.toMat(Sink.seq)(Keep.both).run()
     }
 
-    dataFuture.onComplete {
-      case Success(data) =>
-        val source = Source(data)
-        val tmpPath = Paths.get(System.getProperty("java.io.tmpdir")).resolve(bucketKey)
-        val sink = FileIO.toPath(tmpPath)
-        logger.info(s"About to write to tmp file: $tmpPath")
-        val done = source.runWith(sink)
-        terminateWhen(done)
-      case Failure(e) =>
-        logger.info(s"Download failure: $e")
+    dataFuture.collect { data =>
+      val source = Source(data)
+      val tmpPath = localTmpDir.resolve(bucketKey)
+      val sink = FileIO.toPath(tmpPath)
+      logger.info(s"About to write to tmp file: $tmpPath")
+      source.runWith(sink)
     }
   }
 
-  private def terminateWhen(done: Future[IOResult]) = {
+  private def terminateWhen(done: Future[Done]): Unit = {
     done.onComplete {
       case Success(_) =>
         logger.info(s"Flow Success. About to terminate...")
