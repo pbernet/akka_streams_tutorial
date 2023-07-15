@@ -48,7 +48,7 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
   } else {
     S3Settings()
       .withAccessStyle(PathAccessStyle)
-      .withEndpointUrl(s"https://$urlWithMappedPort")
+      .withEndpointUrl(s"http://$urlWithMappedPort")
       .withCredentialsProvider(
         StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
       )
@@ -118,15 +118,10 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
 
   private def downloadClient(bucketKey: String) = {
     logger.info(s"About to download file with bucketKey: $bucketKey")
-    // We give AWS time to fully process the upload
+    // Give AWS time to fully process the previous upload
     Thread.sleep(1000)
-    val s3Source: Source[ByteString, Future[ObjectMetadata]] =
-      S3.getObject(bucketName, bucketKey).withAttributes(s3attributes)
 
-    val (metadataFuture, dataFuture) = {
-      // We want the content of the whole file, hence Sink.seq
-      s3Source.toMat(Sink.seq)(Keep.both).run()
-    }
+    val (metadataFuture, dataFuture) = getObject(bucketKey)
 
     dataFuture.collect { data =>
       val source = Source(data)
@@ -156,15 +151,19 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
       .listBucket(bucketName, None)
       .withAttributes(s3attributes)
       .mapAsync(4) { resContents =>
-        val (metadataFuture, dataFuture) =
-          S3
-            .getObject(bucketName, resContents.key)
-            .withAttributes(s3attributes)
-            .toMat(Sink.seq)(Keep.both).run()
+        val (metadataFuture, dataFuture) = getObject(resContents.key)
         dataFuture.map { seqbs => (ArchiveMetadata(resContents.key), Source(seqbs)) }
       }
       .via(Archive.zip())
       .runWith(s3Sink)
+  }
+
+  private def getObject(bucketKey: String) = {
+    S3
+      .getObject(bucketName, bucketKey)
+      .withAttributes(s3attributes)
+      // We want the content of the whole file, hence Sink.seq
+      .toMat(Sink.seq)(Keep.both).run()
   }
 
   private def terminateWhen(done: Future[Done]): Unit = {
