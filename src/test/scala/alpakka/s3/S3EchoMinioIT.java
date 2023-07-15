@@ -27,16 +27,14 @@ public class S3EchoMinioIT {
 
     @BeforeAll
     public static void beforeAll() {
-        LOGGER.info("Started on host address: {}", minioContainer.getHostAddress());
+        LOGGER.info("Minio container started on host address: {}", minioContainer.getHostAddress());
     }
 
     @Test
-    public void testLocal() throws InterruptedException, IOException {
+    public void testLocal() throws IOException {
         S3Echo echo = new S3Echo(minioContainer.getHostAddress(), ACCESS_KEY, SECRET_KEY);
 
         assertThat(FutureConverters.asJava(echo.run())).succeedsWithin(15, TimeUnit.SECONDS);
-        LOGGER.info("Finished processing. Waiting with counting because of glitch...");
-        Thread.sleep(1000);
         assertThat(Files.list(echo.localTmpDir()).count()).isEqualTo(10);
     }
 }
