@@ -31,7 +31,7 @@ import scala.util.{Failure, Success}
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/s3.html
   */
-class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
+class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("S3Echo")
   implicit val executionContext = system.dispatcher
@@ -179,5 +179,5 @@ class S3Echo(urlWithMappedPort: String, accessKey: String, secretKey: String) {
 }
 
 object S3Echo extends App {
-  new S3Echo("", "", "").run()
+  new S3Echo().run()
 }
