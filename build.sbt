@@ -67,6 +67,11 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
   "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
 
+  "com.lightbend.akka" %% "akka-stream-alpakka-kinesis" % alpakkaVersion,
+  "software.amazon.awssdk" % "kinesis" % "2.20.103", // classic
+  "software.amazon.awssdk" % "netty-nio-client" % "2.20.103", // non blocking
+
+
   "org.squbs" %% "squbs-ext" % "0.15.0",
 
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
@@ -110,6 +115,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
   "org.testcontainers" % "toxiproxy" % testContainersVersion,
+  "org.testcontainers" % "localstack" % testContainersVersion,
   "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
