@@ -68,9 +68,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
 
   "com.lightbend.akka" %% "akka-stream-alpakka-kinesis" % alpakkaVersion,
-  "software.amazon.awssdk" % "kinesis" % "2.20.103", // classic
-  "software.amazon.awssdk" % "netty-nio-client" % "2.20.103", // non blocking
-
+  // Use latest. Ref in alpakka: 2.17.113
+  "software.amazon.awssdk" % "kinesis" % "2.20.103",
 
   "org.squbs" %% "squbs-ext" % "0.15.0",
 

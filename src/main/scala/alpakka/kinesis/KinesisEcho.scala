@@ -27,15 +27,18 @@ import scala.util.{Failure, Success}
   *  - download n binary elements
   *
   * Run this class against your AWS account using hardcoded accessKey/secretKey
-  * Prerequisite: Create a Provisioned Data stream with 1 shard on AWS
+  * Prerequisite: Create a "provisioned data stream" with 1 shard on AWS
   * or
-  * Run via [[alpakka.kinesis.KinesisEchoIT]] against local localstack docker container
+  * Run via [[alpakka.kinesis.KinesisEchoIT]] against localstack docker container
   *
   * Remarks:
-  *  - We don't do computation on Kinesis
-  *  - Default data retention time is 24h, hence with the setting TrimHorizon we receive old records...
-  *  - A Kinesis data stream with 1 shard should preserve order,
-  *    however duplicates may occur due to retries
+  *  - No computation on the server side, just echo routing
+  *  - Default data retention time is 24h, hence with the setting TrimHorizon we may receive old records...
+  *  - A Kinesis data stream with 1 shard should preserve order, however duplicates may occur due to retries
+  *
+  * Doc:
+  * https://doc.akka.io/docs/alpakka/current/kinesis.html
+  *
   */
 class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secretKey: String = "", region: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -47,11 +50,11 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
 
   val batchSize = 10
 
-  // TODO Why do we need full path here?
-  implicit val amazonKinesisAsync: software.amazon.awssdk.services.kinesis.KinesisAsyncClient = {
+  implicit val amazonKinesisAsync: KinesisAsyncClient = {
     if (new UrlValidator().isValid(urlWithMappedPort.toString)) {
-      logger.info("Running against localstack on local container...")
+      logger.info("Running against localStack on local container...")
       val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
+
       KinesisAsyncClient
         .builder()
         .endpointOverride(urlWithMappedPort)
@@ -80,7 +83,7 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
   }
   system.registerOnTermination(amazonKinesisAsync.close())
 
-  def run() = {
+  def run(): Int = {
     uploadClient()
     val done = downloadClient()
 
