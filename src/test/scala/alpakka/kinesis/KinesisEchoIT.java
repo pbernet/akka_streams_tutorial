@@ -9,7 +9,10 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.http.SdkHttpClient;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.*;
@@ -20,9 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.KINESIS;
 
 /**
- * This test needs some processing time
- * for the stream setup to complete in the localStack container
- * Reading the stream info via SDK does not work as expected
+ * This test needs some processing time for the stream setup to complete in the localStack container
  * <p>
  * Doc:
  * https://testcontainers.com/modules/localstack
@@ -54,35 +55,43 @@ public class KinesisEchoIT {
         LOGGER.debug("Result exit code: {}", result.getExitCode());
         LOGGER.info("Check streams on container: {}", result.getStdout());
 
+        SdkHttpClient httpClient = ApacheHttpClient.builder().maxConnections(10).build();
+        //SdkHttpClient httpClientLightweight = UrlConnectionHttpClient.builder().build();
+
         KinesisClient kinesisClient = KinesisClient
                 .builder()
-                // 1) Asks for an additional security token included in the request to createStream
-                //.credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())))
-                // 2) Sets up the stream resource, with cred profile read from local config
-                //.credentialsProvider(ProfileCredentialsProvider.create())
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(localStack.getAccessKey(), localStack.getSecretKey())))
                 .region(Region.of(localStack.getRegion()))
-                .httpClient(UrlConnectionHttpClient.builder().build())
+                .httpClient(httpClient)
+                .endpointOverride(localStack.getEndpoint())
                 .build();
 
-        // Does not work with 1) NOR 2)
-        //createStream(kinesisClient);
+        createStream(kinesisClient);
 
-        // Seems to work without credentials, but...
+
         if (kinesisClient.listStreams().streamNames().isEmpty()) {
             LOGGER.info("Check streams via SDK. No Kinesis data streams setup for region: {}", localStack.getRegion());
         } else {
             kinesisClient.listStreams().streamNames().forEach(each -> {
                 DescribeStreamSummaryRequest describeStreamSummaryRequest = DescribeStreamSummaryRequest.builder().streamName(STREAM_NAME).build();
                 DescribeStreamSummaryResponse describeStreamSummaryResponse = kinesisClient.describeStreamSummary(describeStreamSummaryRequest);
-                // Why do we see three stream instances with the same ARN?
-                // Why is the accountId NOT 000000000000 (= the default localstack accountId)?
                 LOGGER.info("Check streams via SDK. StreamSummaryResponse: " + describeStreamSummaryResponse.streamDescriptionSummary().streamARN());
             });
         }
     }
 
     private static void createStream(KinesisClient kinesisClient) {
-        CreateStreamRequest createStreamRequest = CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(1).streamModeDetails(StreamModeDetails.builder().streamMode(StreamMode.PROVISIONED).build()).build();
+        CreateStreamRequest createStreamRequest = CreateStreamRequest
+                .builder()
+                // TODO Correctly detects an existing stream, but we can't yet create a new stream with unique name
+                .streamName(STREAM_NAME)
+                //.streamName("clientCreatedUniqueNameDoesNotWork")
+                .shardCount(1)
+                .streamModeDetails(StreamModeDetails
+                        .builder()
+                        .streamMode(StreamMode.PROVISIONED)
+                        .build())
+                .build();
 
         try {
             // The ARN stream name is scoped by the AWS account and the Region.
@@ -91,7 +100,7 @@ public class KinesisEchoIT {
             CreateStreamResponse createStreamResponse = kinesisClient.createStream(createStreamRequest);
             LOGGER.info("createStreamResponse: " + createStreamResponse.responseMetadata().toString());
         } catch (ResourceInUseException ex) {
-            LOGGER.info("testDataStreamProvisioned already exists. Proceed...");
+            LOGGER.info("Stream: {} already exists. Proceed...", STREAM_NAME);
         }
     }
 
