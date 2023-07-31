@@ -45,7 +45,7 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
   implicit val system = ActorSystem("KinesisEcho")
   implicit val executionContext = system.dispatcher
 
-  val dataStreamName = "testDataStreamProvisioned"
+  val kinesisDataStreamName = "kinesisDataStreamProvisioned"
   val shardIdName = "shardId-000000000000"
 
   val batchSize = 10
@@ -84,8 +84,8 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
   system.registerOnTermination(amazonKinesisAsync.close())
 
   def run(): Int = {
-    uploadClient()
-    val done = downloadClient()
+    producerClient()
+    val done = consumerClient()
 
     val result: Seq[String] = Await.result(done, 60.seconds)
 
@@ -94,11 +94,11 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
     result.size
   }
 
-  private def uploadClient() = {
+  private def producerClient() = {
     logger.info(s"About to start upload...")
 
     val defaultFlowSettings = KinesisFlowSettings.Defaults
-    val kinesisFlow: Flow[PutRecordsRequestEntry, PutRecordsResultEntry, NotUsed] = KinesisFlow(dataStreamName, defaultFlowSettings)
+    val kinesisFlow: Flow[PutRecordsRequestEntry, PutRecordsResultEntry, NotUsed] = KinesisFlow(kinesisDataStreamName, defaultFlowSettings)
 
     val done: Future[Seq[PutRecordsResultEntry]] = Source(1 to batchSize)
       .map(each => convertToRecord(each))
@@ -109,11 +109,11 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
     done
   }
 
-  private def downloadClient(): Future[Seq[String]] = {
+  private def consumerClient(): Future[Seq[String]] = {
     logger.info(s"About to start download...")
 
     val settings = {
-      ShardSettings(streamName = dataStreamName, shardId = shardIdName)
+      ShardSettings(streamName = kinesisDataStreamName, shardId = shardIdName)
         .withRefreshInterval(1.second)
         .withLimit(500)
         // TrimHorizon: same as "earliest" in Kafka

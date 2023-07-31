@@ -34,7 +34,7 @@ import static org.testcontainers.containers.localstack.LocalStackContainer.Servi
 public class KinesisEchoIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(KinesisEchoIT.class);
 
-    private static final String STREAM_NAME = "testDataStreamProvisioned";
+    private static final String STREAM_NAME = "kinesisDataStreamProvisioned";
 
     @Container
     public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack"))
@@ -42,8 +42,8 @@ public class KinesisEchoIT {
             // Works but is deprecated; The suffix :1 is the shard count
             // see: https://docs.localstack.cloud/user-guide/aws/kinesis
             .withEnv("KINESIS_INITIALIZE_STREAMS", STREAM_NAME + ":1");
-    // Also works. Make sure that init.sh is executable
-    //.withClasspathResourceMapping("/localstack", "/etc/localstack/init/ready.d/", BindMode.READ_ONLY);
+    // Also works. Make sure that init_kinesis is executable
+    //.withClasspathResourceMapping("/localstack", "/etc/localstack/init/ready.d/init_kinesis.sh", BindMode.READ_ONLY);
 
     @BeforeAll
     public static void beforeAll() throws InterruptedException, IOException {
