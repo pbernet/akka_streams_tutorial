@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -39,11 +40,11 @@ public class KinesisEchoIT {
     @Container
     public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack"))
             .withServices(KINESIS)
-            // Works but is deprecated; The suffix :1 is the shard count
-            // see: https://docs.localstack.cloud/user-guide/aws/kinesis
-            .withEnv("KINESIS_INITIALIZE_STREAMS", STREAM_NAME + ":1");
-    // Also works. Make sure that init_kinesis is executable
-    //.withClasspathResourceMapping("/localstack", "/etc/localstack/init/ready.d/init_kinesis.sh", BindMode.READ_ONLY);
+            // Make sure that init_kinesis.sh is executable and has linux line separator (LF)
+            .withClasspathResourceMapping("/localstack/init_kinesis.sh", "/etc/localstack/init/ready.d/init_kinesis.sh", BindMode.READ_ONLY);
+    // Also works but is deprecated; The suffix :1 is the shard count
+    // see: https://docs.localstack.cloud/user-guide/aws/kinesis
+    //.withEnv("KINESIS_INITIALIZE_STREAMS", STREAM_NAME + ":1");
 
     @BeforeAll
     public static void beforeAll() throws InterruptedException, IOException {
@@ -67,23 +68,13 @@ public class KinesisEchoIT {
                 .build();
 
         createStream(kinesisClient);
-
-
-        if (kinesisClient.listStreams().streamNames().isEmpty()) {
-            LOGGER.info("Check streams via SDK. No Kinesis data streams setup for region: {}", localStack.getRegion());
-        } else {
-            kinesisClient.listStreams().streamNames().forEach(each -> {
-                DescribeStreamSummaryRequest describeStreamSummaryRequest = DescribeStreamSummaryRequest.builder().streamName(STREAM_NAME).build();
-                DescribeStreamSummaryResponse describeStreamSummaryResponse = kinesisClient.describeStreamSummary(describeStreamSummaryRequest);
-                LOGGER.info("Check streams via SDK. StreamSummaryResponse: " + describeStreamSummaryResponse.streamDescriptionSummary().streamARN());
-            });
-        }
+        checkStreams(kinesisClient);
     }
 
     private static void createStream(KinesisClient kinesisClient) {
         CreateStreamRequest createStreamRequest = CreateStreamRequest
                 .builder()
-                // TODO Correctly detects an existing stream, but we can't yet create a new stream with unique name
+                // TODO Correctly detects existing stream, but we can't yet create a new stream with unique name
                 .streamName(STREAM_NAME)
                 //.streamName("clientCreatedUniqueNameDoesNotWork")
                 .shardCount(1)
@@ -101,6 +92,19 @@ public class KinesisEchoIT {
             LOGGER.info("createStreamResponse: " + createStreamResponse.responseMetadata().toString());
         } catch (ResourceInUseException ex) {
             LOGGER.info("Stream: {} already exists. Proceed...", STREAM_NAME);
+        }
+    }
+
+    private static void checkStreams(KinesisClient kinesisClient) {
+        LOGGER.info("Check streams via SDK");
+        if (kinesisClient.listStreams().streamNames().isEmpty()) {
+            LOGGER.info("No Kinesis data stream(s) setup for region: {}", localStack.getRegion());
+        } else {
+            kinesisClient.listStreams().streamNames().forEach(each -> {
+                DescribeStreamSummaryRequest describeStreamSummaryRequest = DescribeStreamSummaryRequest.builder().streamName(STREAM_NAME).build();
+                DescribeStreamSummaryResponse describeStreamSummaryResponse = kinesisClient.describeStreamSummary(describeStreamSummaryRequest);
+                LOGGER.info("StreamSummaryResponse: {}", describeStreamSummaryResponse.streamDescriptionSummary().streamARN());
+            });
         }
     }
 
