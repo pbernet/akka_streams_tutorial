@@ -1,5 +1,6 @@
 package alpakka.kinesis;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -71,12 +72,19 @@ public class KinesisEchoIT {
         checkStreams(kinesisClient);
     }
 
+    @AfterAll
+    public static void afterAll() throws InterruptedException, IOException {
+        ExecResult result = localStack.execInContainer("awslocal", "kinesis", "list-streams");
+        LOGGER.debug("Result exit code: {}", result.getExitCode());
+        LOGGER.info("Check streams on container: {}", result.getStdout());
+    }
+
+    // This creates the additional stream, it is visible on the localstack container (see afterAll)
+    // However, the subsequent checkStreams() call does not show this, maybe due to caching in SDK?
     private static void createStream(KinesisClient kinesisClient) {
         CreateStreamRequest createStreamRequest = CreateStreamRequest
                 .builder()
-                // TODO Correctly detects existing stream, but we can't yet create a new stream with unique name
-                .streamName(STREAM_NAME)
-                //.streamName("clientCreatedUniqueNameDoesNotWork")
+                .streamName("kinesisDataStreamProvisioned_CreatedByClientSDK")
                 .shardCount(1)
                 .streamModeDetails(StreamModeDetails
                         .builder()
