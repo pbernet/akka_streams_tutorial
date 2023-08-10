@@ -5,13 +5,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -20,9 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.*;
 
 /**
- * Setup/run this pipeline on localStack:
- * producerClientFirehose() --> Elasticsearch -> Check manually via browserClient()
- * +-> S3            -> Check via countFilesBucket()
+ * Setup/run {@link alpakka.kinesis.FirehoseEcho} on localStack container
  * <p>
  * Doc:
  * https://docs.localstack.cloud/user-guide/aws/kinesis-firehose
@@ -34,11 +32,11 @@ public class FirehoseEchoIT {
     private static final int LOCALSTACK_PORT = 4566;
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack"))
+    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
             .withServices(FIREHOSE, S3, KINESIS)
             // Make sure that init_firehose.sh is executable and has linux line separator (LF)
-            .withClasspathResourceMapping("/localstack/init_firehose.sh", "/etc/localstack/init/ready.d/init_firehose.sh", BindMode.READ_ONLY)
-            // When Elasticsearch is ready it spits out this line in the log. This takes up to 240 seconds on a 2012 vintage MacBook Pro...
+            .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_firehose.sh", 700), "/etc/localstack/init/ready.d/init_firehose.sh")
+            // When Elasticsearch is ready it spits out this line in the log. Takes up to 240 seconds on a 2012 vintage MacBook Pro...
             .waitingFor(Wait.forLogMessage(".*Active license is now \\[BASIC\\]; Security is disabled.*", 1).withStartupTimeout(Duration.ofSeconds(240)));
 
     @BeforeAll

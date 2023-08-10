@@ -24,11 +24,17 @@ import scala.util.{Failure, Success}
 
 
 /**
-  * Run via [[alpakka.firehose.FirehoseEchoIT]] against localstack docker container
+  * Show the possibilities of a "Firehose pipeline"; eg
+  * producerClientFirehose()
+  * --> Elasticsearch -> Check entries manually via browserClient()
+  * +-> S3            -> Check via countFilesBucket()
+  *
+  * Run via [[alpakka.firehose.FirehoseEchoIT]] against localStack docker container
+  * Possible to run against AWS, after a all the resources are setup via console
   *
   * Doc:
+  * https://docs.localstack.cloud/user-guide/aws/kinesis-firehose
   * https://doc.akka.io/docs/alpakka/current/kinesis.html
-  *
   */
 class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), accessKey: String = "accessKey", secretKey: String = "secretKey", region: String = "us-east-1") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -50,7 +56,7 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
 
   implicit private val s3attributes: Attributes = S3Attributes.settings(s3Settings)
 
-  implicit val firehoseAsyncClient: FirehoseAsyncClient = {
+  implicit val awsFirehoseClient: FirehoseAsyncClient = {
     FirehoseAsyncClient
       .builder()
       .endpointOverride(urlWithMappedPort)
@@ -59,7 +65,7 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
       .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
       .build()
   }
-  system.registerOnTermination(firehoseAsyncClient.close())
+  system.registerOnTermination(awsFirehoseClient.close())
 
   def run() = {
     val done = for {
@@ -67,7 +73,7 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
       filesFut <- countFilesBucket()
     } yield filesFut
 
-    val result = Await.result(done, 60.seconds)
+    val result = Await.result(done, 80.seconds)
     result.size
   }
 

@@ -5,12 +5,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.localstack.LocalStackContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.SdkHttpClient;
@@ -20,12 +21,14 @@ import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.*;
 
 import java.io.IOException;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.KINESIS;
 
 /**
- * This test needs some processing time for the stream setup to complete in the localStack container
+ * Setup/run {@link alpakka.kinesis.KinesisEcho} on localStack container
+ * Additionally use the classic sync AWS KinesisClient to create/delete streams
  * <p>
  * Doc:
  * https://testcontainers.com/modules/localstack
@@ -38,20 +41,21 @@ public class KinesisEchoIT {
 
     private static final String STREAM_NAME = "kinesisDataStreamProvisioned";
 
+    private static KinesisClient kinesisClient;
+
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack"))
+    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
             .withServices(KINESIS)
             // Make sure that init_kinesis.sh is executable and has linux line separator (LF)
-            .withClasspathResourceMapping("/localstack/init_kinesis.sh", "/etc/localstack/init/ready.d/init_kinesis.sh", BindMode.READ_ONLY);
+            .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_kinesis.sh", 700), "/etc/localstack/init/ready.d/init_kinesis.sh")
     // Also works but is deprecated; The suffix :1 is the shard count
     // see: https://docs.localstack.cloud/user-guide/aws/kinesis
     //.withEnv("KINESIS_INITIALIZE_STREAMS", STREAM_NAME + ":1");
+            .waitingFor(Wait.forLogMessage(".*Starting persist data loop.*", 1).withStartupTimeout(Duration.ofSeconds(30)));
 
     @BeforeAll
     public static void beforeAll() throws InterruptedException, IOException {
         LOGGER.info("LocalStack container started on host address: {}", localStack.getEndpoint());
-        LOGGER.info("Waiting 10 seconds for stream setup to complete...");
-        Thread.sleep(10000);
 
         ExecResult result = localStack.execInContainer("awslocal", "kinesis", "list-streams");
         LOGGER.debug("Result exit code: {}", result.getExitCode());
@@ -60,7 +64,7 @@ public class KinesisEchoIT {
         SdkHttpClient httpClient = ApacheHttpClient.builder().maxConnections(10).build();
         //SdkHttpClient httpClientLightweight = UrlConnectionHttpClient.builder().build();
 
-        KinesisClient kinesisClient = KinesisClient
+        kinesisClient = KinesisClient
                 .builder()
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(localStack.getAccessKey(), localStack.getSecretKey())))
                 .region(Region.of(localStack.getRegion()))
@@ -74,6 +78,8 @@ public class KinesisEchoIT {
 
     @AfterAll
     public static void afterAll() throws InterruptedException, IOException {
+        deleteStream(kinesisClient);
+
         ExecResult result = localStack.execInContainer("awslocal", "kinesis", "list-streams");
         LOGGER.debug("Result exit code: {}", result.getExitCode());
         LOGGER.info("Check streams on container: {}", result.getStdout());
@@ -115,6 +121,18 @@ public class KinesisEchoIT {
             });
         }
     }
+
+    private static void deleteStream(KinesisClient kinesisClient) throws InterruptedException {
+        DeleteStreamRequest deleteStreamRequest = DeleteStreamRequest
+                .builder()
+                .streamName(STREAM_NAME)
+                .build();
+
+        kinesisClient.deleteStream(deleteStreamRequest);
+        Thread.sleep(1000);
+        LOGGER.info("Successfully deleted stream: {} via SDK", STREAM_NAME);
+    }
+
 
     @Test
     public void testLocal() {
