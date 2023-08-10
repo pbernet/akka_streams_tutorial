@@ -72,6 +72,10 @@ libraryDependencies ++= Seq(
   "software.amazon.awssdk" % "kinesis" % "2.20.118",
   "software.amazon.awssdk" % "apache-client" % "2.20.118",
 
+  "com.lightbend.akka" %% "akka-stream-alpakka-sqs" % alpakkaVersion,
+  // For now use referenced, because of Future trouble
+  "software.amazon.awssdk" % "sqs" % "2.20.116",
+
   "org.squbs" %% "squbs-ext" % "0.15.0",
 
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
