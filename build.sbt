@@ -74,7 +74,7 @@ libraryDependencies ++= Seq(
 
   "com.lightbend.akka" %% "akka-stream-alpakka-sqs" % alpakkaVersion,
   // For now use referenced, because of Future trouble
-  "software.amazon.awssdk" % "sqs" % "2.20.116",
+  "software.amazon.awssdk" % "sqs" % "2.20.126",
 
   "org.squbs" %% "squbs-ext" % "0.15.0",
 
