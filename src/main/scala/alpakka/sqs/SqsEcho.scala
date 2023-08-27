@@ -1,8 +1,8 @@
 package alpakka.sqs
 
 import akka.actor.ActorSystem
-import akka.stream.alpakka.sqs.scaladsl.{SqsPublishSink, SqsSource}
-import akka.stream.alpakka.sqs.{SqsPublishGroupedSettings, SqsSourceSettings}
+import akka.stream.alpakka.sqs.scaladsl.{SqsAckFlow, SqsPublishSink, SqsSource}
+import akka.stream.alpakka.sqs.{MessageAction, SqsPublishGroupedSettings, SqsSourceSettings}
 import akka.stream.scaladsl.{Sink, Source}
 import com.github.matsluni.akkahttpspi.AkkaHttpClient
 import org.apache.commons.validator.routines.UrlValidator
@@ -31,7 +31,7 @@ import scala.concurrent.duration.{DurationInt, SECONDS}
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/sqs.html
-  * https://docs.localstack.cloud/user-guide/aws/sqs/
+  * https://docs.localstack.cloud/user-guide/aws/sqs
   */
 class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secretKey: String = "", region: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -77,7 +77,7 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
     } yield consumed
 
     val result = Await.result(done, 10.seconds)
-    logger.info(s"Successfully downloaded: ${result.size} records")
+    logger.info(s"Successfully consumed: ${result.size} msgs")
     result.size
   }
 
@@ -99,13 +99,15 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
     val messages =
       SqsSource(
         queueUrl,
-        SqsSourceSettings().withCloseOnEmptyReceive(true).withWaitTime(10.millis)
-      ).runWith(Sink.seq)
+        SqsSourceSettings().withCloseOnEmptyReceive(true).withWaitTime(10.millis))
+        .map(MessageAction.delete)
+        .via(SqsAckFlow(queueUrl)) // Handle ack/deletion (via internal receipt handle)
+        .runWith(Sink.seq)
     messages
   }
 
   // When the queue already exists, return it's queueUrl
-  private def createQueue() = {
+  private def createQueue(): String = {
     val response: CreateQueueResponse = awsSqsClient
       .createQueue(
         CreateQueueRequest.builder()
@@ -115,8 +117,8 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
     response.queueUrl()
   }
 
-  private def deleteQueue() = {
-    val response: DeleteQueueResponse = awsSqsClient
+  private def deleteQueue(): DeleteQueueResponse = {
+    val response = awsSqsClient
       .deleteQueue(DeleteQueueRequest.builder()
         .queueUrl(queueUrl)
         .build())
@@ -129,6 +131,6 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
 object SqsEcho extends App {
   val echo = new SqsEcho()
   echo.run()
-  // Avoid dangling resources on AWS
+  // Avoid dangling resources on AWS, comment out for testing
   echo.deleteQueue()
 }
