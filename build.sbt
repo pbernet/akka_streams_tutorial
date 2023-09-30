@@ -161,3 +161,17 @@ run / fork := true
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
+
+// For Scalafix basic stuff to work
+ThisBuild / scalafixScalaBinaryVersion :=
+  CrossVersion.binaryScalaVersion(scalaVersion.value)
+
+libraryDependencies +=
+  "ch.epfl.scala" %% "scalafix-core" % _root_.scalafix.sbt.BuildInfo.scalafixVersion % ScalafixConfig
+
+inThisBuild(
+  List(
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision
+  )
+)
