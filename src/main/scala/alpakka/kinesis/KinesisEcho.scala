@@ -1,13 +1,13 @@
 package alpakka.kinesis
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.alpakka.kinesis.scaladsl.{KinesisFlow, KinesisSource}
-import akka.stream.alpakka.kinesis.{KinesisFlowSettings, ShardIterator, ShardSettings}
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.ByteString
-import com.github.matsluni.akkahttpspi.AkkaHttpClient
+import com.github.pjfanning.pekkohttpspi.PekkoHttpClient
 import org.apache.commons.validator.routines.UrlValidator
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.kinesis.scaladsl.{KinesisFlow, KinesisSource}
+import org.apache.pekko.stream.connectors.kinesis.{KinesisFlowSettings, ShardIterator, ShardSettings}
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.SdkBytes
@@ -60,7 +60,7 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
         .endpointOverride(urlWithMappedPort)
         .credentialsProvider(credentialsProvider)
         .region(Region.of(region))
-        .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
+        .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
         // Possible to configure retry policy
         // see https://doc.akka.io/docs/alpakka/current/aws-shared-configuration.html
         // .overrideConfiguration(...)
@@ -74,7 +74,7 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
         .builder()
         .credentialsProvider(credentialsProvider)
         .region(Region.EU_WEST_1)
-        .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
+        .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
         // Possible to configure retry policy
         // see https://doc.akka.io/docs/alpakka/current/aws-shared-configuration.html
         // .overrideConfiguration(...)

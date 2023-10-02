@@ -1,7 +1,7 @@
 package sample.stream
 
-import akka.actor.ActorSystem
 import org.apache.commons.io.FileUtils
+import org.apache.pekko.actor.ActorSystem
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File

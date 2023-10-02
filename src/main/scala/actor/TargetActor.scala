@@ -1,7 +1,7 @@
 package actor
 
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 object TargetActor {
   def apply(): Behavior[Buncher.Batch] =

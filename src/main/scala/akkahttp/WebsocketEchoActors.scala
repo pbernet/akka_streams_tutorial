@@ -1,15 +1,14 @@
 package akkahttp
 
-import akka.Done
-import akka.actor.{Actor, ActorRef, Props}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{CompletionStrategy, OverflowStrategy}
-import akkahttp.WebsocketEcho.handleWebSocketMessages
 import akkahttp.WebsocketEchoActors.Protocol.{CloseConnection, OpenConnection, SignedMessage}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{Actor, ActorRef, Props}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.stream.{CompletionStrategy, OverflowStrategy}
 
 import java.util.UUID
 import scala.concurrent.Future

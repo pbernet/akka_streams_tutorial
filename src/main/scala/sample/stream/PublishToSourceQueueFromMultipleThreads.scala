@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
-import akka.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete}
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters._

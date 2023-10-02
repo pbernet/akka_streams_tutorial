@@ -1,47 +1,46 @@
 import sbt.Keys.libraryDependencies
 
-name := "akka-streams-tutorial"
+name := "pekko-tutorial"
 
 version := "1.0"
 
 scalaVersion := "2.13.12"
 
-val akkaVersion = "2.8.1"
-val akkaHTTPVersion = "10.5.1"
-val alpakkaVersion = "6.0.1"
+val pekkoVersion = "1.0.1"
+val pekkoHTTPVersion = "1.0.0"
 
-val alpakkaKafkaConnectorVersion = "4.0.2"
+val pekkoConnectorVersion = "1.0.0"
 val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
 val testContainersVersion = "1.19.0"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11
-val sttpVersion = "3.8.13"
-val influxdbVersion = "6.7.0"
+val sttpVersion = "3.9.0"
+val influxdbVersion = "6.10.0"
 val awsClientVersion = "2.20.155"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
 
-  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-  "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+  "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-actor" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-actor-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-slf4j" % pekkoVersion,
 
-  "com.typesafe.akka" %% "akka-http" % akkaHTTPVersion,
-  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
+  "org.apache.pekko" %% "pekko-http" % pekkoHTTPVersion,
+  "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
   "org.json" % "json" % "20230227",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
-  "com.softwaremill.sttp.client3" %% "akka-http-backend" % sttpVersion,
+  "com.softwaremill.sttp.client3" %% "pekko-http-backend" % sttpVersion,
 
   "org.apache.activemq" % "activemq-client" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.activemq" % "activemq-broker" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
+  "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
   "javax.jms" % "jms" % "1.1",
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
@@ -50,37 +49,36 @@ libraryDependencies ++= Seq(
 
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.76",
 
-  "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
   "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
 
-  "com.lightbend.akka" %% "akka-stream-alpakka-sse" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
+  "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
   "com.hierynomus" % "sshj" % "0.35.0",
-  "com.lightbend.akka" %% "akka-stream-alpakka-xml" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-ftp" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-elasticsearch" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-mqtt-streaming" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-amqp" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion,
-  "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
+  "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-elasticsearch" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-mqtt-streaming" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-mqtt" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-amqp" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-slick" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-csv" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-s3" % pekkoConnectorVersion,
 
-  "com.lightbend.akka" %% "akka-stream-alpakka-kinesis" % alpakkaVersion,
+  "org.apache.pekko" %% "pekko-connectors-kinesis" % pekkoConnectorVersion,
   // Use latest. Ref in alpakka: 2.17.113
   "software.amazon.awssdk" % "kinesis" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "software.amazon.awssdk" % "apache-client" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
 
-  "com.lightbend.akka" %% "akka-stream-alpakka-sqs" % alpakkaVersion,
-  // For now use referenced, because of Future trouble
+  "org.apache.pekko" %% "pekko-connectors-sqs" % pekkoConnectorVersion,
   "software.amazon.awssdk" % "sqs" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
 
-  "org.squbs" %% "squbs-ext" % "0.15.0",
+  "org.squbs" %% "squbs-ext" % "0.15.0", // not (yet) migrated to pekko
 
-  "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
+  "com.influxdb" %% "influxdb-client-scala" % influxdbVersion, // not (yet) migrated to pekko
   "com.influxdb" % "flux-dsl" % influxdbVersion,
   "org.influxdb" % "influxdb-java" % "2.23",
 
@@ -95,7 +93,7 @@ libraryDependencies ++= Seq(
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
   "com.typesafe.play" %% "play-json" % "2.9.4",
-  "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+  "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.2",
@@ -140,7 +138,7 @@ libraryDependencies ++= Seq(
   "io.zonky.test" % "embedded-postgres" % "2.0.4" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.15" % Test,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
+  "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
   "org.assertj" % "assertj-core" % "3.24.2" % Test
 )
 

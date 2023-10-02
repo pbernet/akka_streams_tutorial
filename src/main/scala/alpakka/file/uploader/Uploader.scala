@@ -1,15 +1,15 @@
 package alpakka.file.uploader
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpEntity, HttpRequest, MediaTypes, Multipart, RequestEntity, _}
-import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.directives.FileInfo
-import akka.http.scaladsl.settings.ConnectionPoolSettings
-import akka.stream.scaladsl.FileIO
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshalling.Marshal
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.directives.FileInfo
+import org.apache.pekko.http.scaladsl.settings.ConnectionPoolSettings
+import org.apache.pekko.stream.scaladsl.FileIO
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
@@ -72,7 +72,7 @@ class Uploader(system: ActorSystem) {
 
   def upload(file: File): Future[HttpResponse] = {
     val target = Uri(s"$protocol://$address:$port")
-      .withPath(akka.http.scaladsl.model.Uri.Path("/api/upload"))
+      .withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/api/upload"))
 
     val headers: Seq[HttpHeader] = Seq(RawHeader("accept", "*/*"))
 

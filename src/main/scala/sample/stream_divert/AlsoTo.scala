@@ -1,9 +1,9 @@
 package sample.stream_divert
 
-import akka.actor.ActorSystem
-import akka.event.Logging
-import akka.stream.Attributes
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.event.Logging
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
 /**
   * Shows the async nature of the alsoTo operator.

@@ -1,9 +1,9 @@
 package alpakka.slick
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.slick.scaladsl._
-import akka.stream.scaladsl._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.slick.scaladsl._
+import org.apache.pekko.stream.scaladsl._
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.{GetResult, ResultSetConcurrency, ResultSetType}
 

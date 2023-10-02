@@ -1,16 +1,16 @@
 package akkahttp
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.directives.FileInfo
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.RestartSettings
-import akka.stream.scaladsl.{Compression, FileIO, RestartSource, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import org.apache.pekko.http.scaladsl.marshalling.Marshal
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.directives.FileInfo
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.RestartSettings
+import org.apache.pekko.stream.scaladsl.{Compression, FileIO, RestartSource, Sink, Source}
 import spray.json.DefaultJsonProtocol
 
 import java.io.File
@@ -188,7 +188,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
       delayRequestSoTheServerIsNotHammered()
 
-      val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
+      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/upload"))
 
       val result: Future[FileHandle] =
         for {
@@ -205,7 +205,7 @@ object HttpFileEcho extends App with JsonProtocol {
   }
 
   def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
-    val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
+    val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
 
     def getResponseDownload(request: HttpRequest): Future[HttpResponse] = {
       val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)

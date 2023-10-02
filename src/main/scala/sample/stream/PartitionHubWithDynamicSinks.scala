@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.{Keep, PartitionHub, RunnableGraph, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.{Keep, PartitionHub, RunnableGraph, Source}
 
 import scala.concurrent.duration._
 

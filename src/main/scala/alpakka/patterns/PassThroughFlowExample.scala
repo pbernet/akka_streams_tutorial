@@ -1,9 +1,9 @@
 package alpakka.patterns
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, Source, _}
-import akka.stream.{FlowShape, Graph, OverflowStrategy}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Flow, Source, _}
+import org.apache.pekko.stream.{FlowShape, Graph, OverflowStrategy}
 
 import java.time.LocalDateTime
 

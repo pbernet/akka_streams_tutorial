@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl._
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Paths

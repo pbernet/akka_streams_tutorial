@@ -1,7 +1,7 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success}

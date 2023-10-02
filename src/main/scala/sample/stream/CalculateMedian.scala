@@ -1,8 +1,8 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.Source
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.Source
 
 import java.util.concurrent.ThreadLocalRandom
 import scala.annotation.tailrec

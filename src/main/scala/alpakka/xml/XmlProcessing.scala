@@ -1,10 +1,10 @@
 package alpakka.xml
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.alpakka.xml.{EndElement, ParseEvent, StartElement, TextEvent}
-import akka.stream.scaladsl.{FileIO, Sink, Source}
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.connectors.xml.{EndElement, ParseEvent, StartElement, TextEvent}
+import org.apache.pekko.stream.scaladsl.{FileIO, Sink, Source}
+import org.apache.pekko.util.ByteString
 
 import java.nio.file.Paths
 import java.util.Base64

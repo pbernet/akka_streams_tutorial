@@ -1,11 +1,11 @@
 package util
 
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.alpakka.file.scaladsl.FileTailSource
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.KillSwitches
+import org.apache.pekko.stream.connectors.file.scaladsl.FileTailSource
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 
 import java.nio.file.{FileSystem, FileSystems, Path, Paths}
 import java.util.Scanner

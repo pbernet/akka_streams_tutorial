@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl._
-import akka.util.ByteString
-import akka.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.{Done, NotUsed}
 import sample.graphstage.ThroughputMonitor
 import sample.graphstage.ThroughputMonitor.Stats
 

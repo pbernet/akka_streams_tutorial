@@ -1,8 +1,8 @@
 package sample.stream_shared_state
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete}
+import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.{Instant, OffsetDateTime, ZoneId}

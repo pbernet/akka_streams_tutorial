@@ -1,11 +1,11 @@
 package sample.stream_actor
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws._
-import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source}
-import akka.stream.{FlowShape, SourceShape}
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.ws._
+import org.apache.pekko.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source}
+import org.apache.pekko.stream.{FlowShape, SourceShape}
 import sample.stream_actor.WindTurbineSimulator._
 
 import scala.concurrent.duration._

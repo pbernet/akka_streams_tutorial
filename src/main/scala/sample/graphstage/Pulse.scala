@@ -1,7 +1,7 @@
 package sample.graphstage
 
-import akka.stream.stage._
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import org.apache.pekko.stream.stage._
+import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 

@@ -1,12 +1,12 @@
 package alpakka.env
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes, Uri}
-import akka.http.scaladsl.server.Directives.{logRequestResult, path, _}
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.server.Directives.{logRequestResult, path, _}
+import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File

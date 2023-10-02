@@ -1,9 +1,9 @@
 package sample.graphdsl
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
-import akka.stream.{FlowShape, UniformFanInShape, UniformFanOutShape}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
+import org.apache.pekko.stream.{FlowShape, UniformFanInShape, UniformFanOutShape}
 
 /**
   * A GraphDSL example, to assemble and start a compound of
@@ -33,7 +33,7 @@ object CompoundFlowFromGraph extends App {
     require(indexFlows.nonEmpty, "Cannot create compound flow without any flows to combine")
 
     Flow.fromGraph(GraphDSL.create() { implicit b =>
-      import akka.stream.scaladsl.GraphDSL.Implicits._
+      import org.apache.pekko.stream.scaladsl.GraphDSL.Implicits._
 
       val broadcast: UniformFanOutShape[T, T] = b.add(Broadcast(indexFlows.size))
       val merge: UniformFanInShape[T, T] = b.add(Merge(indexFlows.size))

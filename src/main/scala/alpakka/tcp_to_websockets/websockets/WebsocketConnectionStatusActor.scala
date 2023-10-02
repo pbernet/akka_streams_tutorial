@@ -1,7 +1,7 @@
 package alpakka.tcp_to_websockets.websockets
 
-import akka.actor.{Actor, ActorLogging, Props}
 import alpakka.tcp_to_websockets.websockets.WebsocketConnectionStatusActor.{Connected, ConnectionStatus, Terminated}
+import org.apache.pekko.actor.{Actor, ActorLogging, Props}
 
 
 object WebsocketConnectionStatusActor {

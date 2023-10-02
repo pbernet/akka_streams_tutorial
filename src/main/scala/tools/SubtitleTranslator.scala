@@ -1,12 +1,12 @@
 package tools
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{FileIO, Flow, Source}
-import akka.stream.{IOResult, ThrottleMode}
-import akka.util.ByteString
 import com.crowdscriber.caption.common.Vocabulary.{Srt, SubtitleBlock}
 import com.crowdscriber.caption.srtdissector.SrtDissector
 import org.apache.commons.lang3.StringUtils
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{FileIO, Flow, Source}
+import org.apache.pekko.stream.{IOResult, ThrottleMode}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.FileInputStream

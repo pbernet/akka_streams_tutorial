@@ -1,13 +1,13 @@
 package alpakka.jms
 
-import akka.Done
-import akka.actor.ActorSystem
-import akka.stream.ThrottleMode
-import akka.stream.alpakka.jms._
-import akka.stream.alpakka.jms.scaladsl.JmsProducer
-import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.Config
 import org.apache.activemq.ActiveMQConnectionFactory
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.connectors.jms._
+import org.apache.pekko.stream.connectors.jms.scaladsl.JmsProducer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import javax.jms.ConnectionFactory

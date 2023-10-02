@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.Done
-import akka.actor.ActorSystem
-import akka.stream.ActorAttributes
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ActorAttributes
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future

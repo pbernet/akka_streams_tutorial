@@ -1,13 +1,13 @@
 package alpakka.mqtt
 
-import akka.Done
-import akka.actor.ActorSystem
-import akka.event.Logging
-import akka.stream._
-import akka.stream.alpakka.mqtt._
-import akka.stream.alpakka.mqtt.scaladsl.{MqttSink, MqttSource}
-import akka.stream.scaladsl._
-import akka.util.ByteString
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.event.Logging
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.connectors.mqtt._
+import org.apache.pekko.stream.connectors.mqtt.scaladsl.{MqttSink, MqttSource}
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.slf4j.{Logger, LoggerFactory}
 

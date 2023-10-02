@@ -1,7 +1,7 @@
 package sample.stream_shared_state
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future

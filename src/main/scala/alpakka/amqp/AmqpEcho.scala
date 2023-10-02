@@ -1,12 +1,12 @@
 package alpakka.amqp
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.amqp._
-import akka.stream.alpakka.amqp.scaladsl._
-import akka.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
-import akka.stream.{KillSwitches, RestartSettings, ThrottleMode}
-import akka.util.ByteString
-import akka.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.amqp._
+import org.apache.pekko.stream.connectors.amqp.scaladsl._
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, RestartFlow, Sink, Source}
+import org.apache.pekko.stream.{KillSwitches, RestartSettings, ThrottleMode}
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.containers.RabbitMQContainer
 

@@ -1,9 +1,9 @@
 package sample.stream_shared_state
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.stage._
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.stage._
 
 import scala.concurrent.duration._
 import scala.language.reflectiveCalls

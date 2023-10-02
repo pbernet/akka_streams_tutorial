@@ -1,9 +1,9 @@
 package sample.stream_actor
 
-import akka.actor.ActorSystem
-import akka.pattern.{BackoffOpts, BackoffSupervisor}
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.pattern.{BackoffOpts, BackoffSupervisor}
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.duration._
 

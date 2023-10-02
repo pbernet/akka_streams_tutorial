@@ -1,20 +1,20 @@
 package alpakka.sse_to_elasticsearch
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.alpakka.elasticsearch.WriteMessage.createIndexMessage
-import akka.stream.alpakka.elasticsearch._
-import akka.stream.alpakka.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
-import akka.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import akka.stream.{ActorAttributes, RestartSettings, Supervision}
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
 import org.apache.commons.text.StringEscapeUtils
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpRequest
+import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.connectors.elasticsearch.WriteMessage.createIndexMessage
+import org.apache.pekko.stream.connectors.elasticsearch._
+import org.apache.pekko.stream.connectors.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
+import org.apache.pekko.stream.scaladsl.{Flow, RestartSource, Sink, Source}
+import org.apache.pekko.stream.{ActorAttributes, RestartSettings, Supervision}
 import org.opensearch.testcontainers.OpensearchContainer
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.utility.DockerImageName
@@ -122,7 +122,7 @@ object SSEtoElasticsearch extends App {
     )
 
 
-  import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+  import org.apache.pekko.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
   val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
   val restartSource = RestartSource.withBackoff(restartSettings) { () =>

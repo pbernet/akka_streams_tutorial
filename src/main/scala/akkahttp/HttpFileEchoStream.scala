@@ -1,17 +1,17 @@
 package akkahttp
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.directives.FileInfo
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
-import akka.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import org.apache.pekko.http.scaladsl.marshalling.Marshal
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, logRequestResult, path, _}
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.directives.FileInfo
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.scaladsl.{FileIO, Keep, Sink, Source}
+import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
 import spray.json.DefaultJsonProtocol
 
 import java.io.File
@@ -130,7 +130,7 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
     }
 
     def createUploadRequest(fileToUpload: FileHandle): Future[(HttpRequest, FileHandle)] = {
-      val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/upload"))
+      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/upload"))
 
       createEntityFrom(new File(fileToUpload.absolutePath))
         .map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
@@ -140,13 +140,13 @@ object HttpFileEchoStream extends App with DefaultJsonProtocol with SprayJsonSup
 
     def createDownloadRequest(fileToDownload: FileHandle): Future[HttpRequest] = {
       Marshal(fileToDownload).to[RequestEntity].map { entity: MessageEntity =>
-        val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
+        val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
         HttpRequest(HttpMethods.GET, uri = target, entity = entity)
       }
     }
 
     def createDownloadRequestBlocking(fileToDownload: FileHandle) = {
-      val target = Uri(s"http://$address:$port").withPath(akka.http.scaladsl.model.Uri.Path("/download"))
+      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
       val entityFuture = Marshal(fileToDownload).to[MessageEntity]
       val entity = Await.result(entityFuture, 1.second)
       HttpRequest(HttpMethods.GET, target, entity = entity)

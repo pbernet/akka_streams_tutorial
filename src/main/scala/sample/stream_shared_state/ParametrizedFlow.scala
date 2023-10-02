@@ -1,9 +1,9 @@
 package sample.stream_shared_state
 
-import akka.Done
-import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source, SourceQueueWithComplete, Zip}
-import akka.stream.{FlowShape, OverflowStrategy}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorSystem, Cancellable}
+import org.apache.pekko.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source, SourceQueueWithComplete, Zip}
+import org.apache.pekko.stream.{FlowShape, OverflowStrategy}
 
 import scala.collection.immutable
 import scala.concurrent.Future

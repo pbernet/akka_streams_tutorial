@@ -1,8 +1,8 @@
 package sample.stream_actor_simple
 
-import akka.actor.Actor
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{KillSwitches, UniqueKillSwitch}
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
 
 import scala.concurrent.duration._
 

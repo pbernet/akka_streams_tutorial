@@ -1,15 +1,15 @@
 package alpakka.kinesis
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.Attributes
-import akka.stream.alpakka.kinesisfirehose.scaladsl.KinesisFirehoseFlow
-import akka.stream.alpakka.s3.AccessStyle.PathAccessStyle
-import akka.stream.alpakka.s3.scaladsl.S3
-import akka.stream.alpakka.s3.{ListBucketResultContents, S3Attributes, S3Settings}
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.util.ByteString
-import com.github.matsluni.akkahttpspi.AkkaHttpClient
+import com.github.pjfanning.pekkohttpspi.PekkoHttpClient
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.connectors.kinesisfirehose.scaladsl.KinesisFirehoseFlow
+import org.apache.pekko.stream.connectors.s3.AccessStyle.PathAccessStyle
+import org.apache.pekko.stream.connectors.s3.scaladsl.S3
+import org.apache.pekko.stream.connectors.s3.{ListBucketResultContents, S3Attributes, S3Settings}
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.SdkBytes
@@ -62,7 +62,7 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
       .endpointOverride(urlWithMappedPort)
       .credentialsProvider(credentialsProvider)
       .region(Region.of(region))
-      .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
+      .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
       .build()
   }
   system.registerOnTermination(awsFirehoseClient.close())

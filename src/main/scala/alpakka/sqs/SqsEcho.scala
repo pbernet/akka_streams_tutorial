@@ -1,11 +1,11 @@
 package alpakka.sqs
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.sqs.scaladsl.{SqsAckSink, SqsPublishSink, SqsSource}
-import akka.stream.alpakka.sqs._
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import com.github.matsluni.akkahttpspi.AkkaHttpClient
+import com.github.pjfanning.pekkohttpspi.PekkoHttpClient
 import org.apache.commons.validator.routines.UrlValidator
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.sqs._
+import org.apache.pekko.stream.connectors.sqs.scaladsl.{SqsAckSink, SqsPublishSink, SqsSource}
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.regions.Region
@@ -52,7 +52,7 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
         .endpointOverride(urlWithMappedPort)
         .credentialsProvider(credentialsProvider)
         .region(Region.of(region))
-        .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
+        .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
         .build()
     }
     else {
@@ -63,7 +63,7 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
         .builder()
         .credentialsProvider(credentialsProvider)
         .region(Region.EU_WEST_1)
-        .httpClient(AkkaHttpClient.builder().withActorSystem(system).build())
+        .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
         .build()
     }
   system.registerOnTermination(awsSqsClient.close())

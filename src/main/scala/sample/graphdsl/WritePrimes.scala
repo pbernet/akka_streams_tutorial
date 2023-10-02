@@ -1,9 +1,10 @@
 package sample.graphdsl
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl._
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
 
 import java.nio.file.Paths
 import java.util.concurrent.ThreadLocalRandom
@@ -20,7 +21,7 @@ object WritePrimes extends App {
     implicit val ec = system.dispatcher
 
     val maxRandomNumberSize = 100
-    val primeSource: Source[Int, akka.NotUsed] =
+  val primeSource: Source[Int, NotUsed] =
       Source.fromIterator(() => Iterator.continually(ThreadLocalRandom.current().nextInt(maxRandomNumberSize)))
       .take(100)
       .filter(rnd => isPrime(rnd))

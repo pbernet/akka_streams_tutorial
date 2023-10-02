@@ -1,11 +1,5 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.kafka.ProducerSettings
-import akka.stream.scaladsl.{Flow, Framing, Keep, Sink, Tcp}
-import akka.stream.{ActorAttributes, Supervision}
-import akka.util.ByteString
 import ca.uhn.hl7v2.validation.impl.ValidationContextFactory
 import ca.uhn.hl7v2.{AcknowledgmentCode, DefaultHapiContext, HL7Exception}
 import org.apache.commons.lang3.StringUtils
@@ -13,6 +7,12 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.producer.{Producer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.kafka.ProducerSettings
+import org.apache.pekko.stream.scaladsl.{Flow, Framing, Keep, Sink, Tcp}
+import org.apache.pekko.stream.{ActorAttributes, Supervision}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.Properties

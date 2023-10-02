@@ -1,12 +1,12 @@
 package alpakka.file
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.alpakka.file.ArchiveMetadata
-import akka.stream.alpakka.file.scaladsl.Archive
-import akka.stream.scaladsl._
-import akka.stream.stage._
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.connectors.file.ArchiveMetadata
+import org.apache.pekko.stream.connectors.file.scaladsl.Archive
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.stream.stage._
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.FileInputStream

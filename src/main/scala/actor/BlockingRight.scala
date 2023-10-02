@@ -1,7 +1,7 @@
 package actor
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorSystem, DispatcherSelector}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ActorSystem, DispatcherSelector}
 
 /**
   * If blocking (eg by an external resource) is required,

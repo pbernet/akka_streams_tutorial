@@ -1,13 +1,13 @@
 package alpakka.tcp_to_websockets.websockets
 
-import akka.Done
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws._
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.{Connected, ConnectionFailure}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.ws._
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
+import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}

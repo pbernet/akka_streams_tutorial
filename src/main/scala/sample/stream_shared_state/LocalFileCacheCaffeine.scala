@@ -1,14 +1,14 @@
 package sample.stream_shared_state
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
-import akka.stream.{ActorAttributes, Supervision, ThrottleMode}
 import com.github.benmanes.caffeine
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.hc.client5.http.HttpResponseException
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
+import org.apache.pekko.stream.{ActorAttributes, Supervision, ThrottleMode}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.net.URI

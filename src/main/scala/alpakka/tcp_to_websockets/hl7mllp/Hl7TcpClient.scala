@@ -1,10 +1,10 @@
 package alpakka.tcp_to_websockets.hl7mllp
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source, Tcp}
-import akka.util.ByteString
 import ca.uhn.hl7v2.AcknowledgmentCode
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Sink, Source, Tcp}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters._

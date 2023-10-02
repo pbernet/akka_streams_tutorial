@@ -1,19 +1,19 @@
 package alpakka.tcp_to_websockets.websockets
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, Subscriptions}
-import akka.stream._
-import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.IsolationLevel
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.http.scaladsl.model.HttpRequest
+import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.kafka.scaladsl.Consumer
+import org.apache.pekko.kafka.{ConsumerSettings, Subscriptions}
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.Locale
@@ -65,8 +65,8 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
   private def server(address: String, port: Int) = {
 
     val route = {
-      import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-      import akka.http.scaladsl.server.Directives._
+      import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+      import org.apache.pekko.http.scaladsl.server.Directives._
 
       def events =
         path("events" / Segment) { clientName =>
@@ -100,7 +100,7 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
 
   private def backoffClient(address: String, port: Int) = {
 
-    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+    import org.apache.pekko.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartSource = RestartSource.withBackoff(restartSettings) { () =>

@@ -1,13 +1,13 @@
 package alpakka.sse
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream._
-import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpRequest
+import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -20,9 +20,6 @@ import scala.util.{Failure, Success}
   * after RuntimeException on server, see Doc RestartSource:
   * https://doc.akka.io/docs/akka/current/stream/stream-error.html?language=scala#delayed-restarts-with-a-backoff-operator
   *
-  * An even more resilient sse server->client implementation is here:
-  * http://developer.lightbend.com/docs/alpakka/current/sse.html
-  * see EventSourceSpec in this repo for a working example
   */
 object SSEHeartbeat extends App {
   implicit val system: ActorSystem = ActorSystem()
@@ -37,8 +34,8 @@ object SSEHeartbeat extends App {
   private def server(address: String, port: Int) = {
 
     val route = {
-      import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-      import akka.http.scaladsl.server.Directives._
+      import org.apache.pekko.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+      import org.apache.pekko.http.scaladsl.server.Directives._
 
       def timeToServerSentEvent(time: LocalTime) = ServerSentEvent(DateTimeFormatter.ISO_LOCAL_TIME.format(time))
 
@@ -79,7 +76,7 @@ object SSEHeartbeat extends App {
 
   private def simpleClient(address: String, port: Int) = {
 
-    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+    import org.apache.pekko.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
     Http()
       .singleRequest(HttpRequest(
@@ -91,7 +88,7 @@ object SSEHeartbeat extends App {
 
   private def backoffClient(address: String, port: Int) = {
 
-    import akka.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
+    import org.apache.pekko.http.scaladsl.unmarshalling.sse.EventStreamUnmarshalling._
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
     val restartSource = RestartSource.withBackoff(restartSettings) { () =>

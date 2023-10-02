@@ -1,9 +1,9 @@
 package sample.graphstage
 
-import akka.NotUsed
-import akka.stream._
-import akka.stream.scaladsl._
-import akka.stream.stage._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.stream.stage._
 import sample.graphstage.ThroughputMonitor.Stats
 
 import scala.concurrent.duration.FiniteDuration

@@ -1,10 +1,10 @@
 package alpakka.file.uploader
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.file.scaladsl.Directory
-import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{OverflowStrategy, QueueOfferResult}
 import org.apache.commons.io.monitor.{FileAlterationListenerAdaptor, FileAlterationMonitor, FileAlterationObserver}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.file.scaladsl.Directory
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File

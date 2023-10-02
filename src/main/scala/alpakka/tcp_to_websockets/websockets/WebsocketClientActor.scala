@@ -1,9 +1,9 @@
 package alpakka.tcp_to_websockets.websockets
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.http.scaladsl.model.StatusCode
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor._
 import org.apache.commons.lang3.exception.ExceptionUtils
+import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props}
+import org.apache.pekko.http.scaladsl.model.StatusCode
 
 import scala.concurrent.duration._
 

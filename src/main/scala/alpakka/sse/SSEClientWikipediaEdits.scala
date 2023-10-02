@@ -1,13 +1,13 @@
 package alpakka.sse
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
-import akka.stream.alpakka.sse.scaladsl.EventSource
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{Supervision, ThrottleMode}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
+import org.apache.pekko.stream.connectors.sse.scaladsl.EventSource
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.stream.{Supervision, ThrottleMode}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 

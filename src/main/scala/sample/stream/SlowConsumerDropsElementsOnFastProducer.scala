@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.scaladsl._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.scaladsl._
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.{Instant, ZoneId, ZonedDateTime}

@@ -1,15 +1,15 @@
 package alpakka.kafka
 
-import akka.actor.ActorSystem
-import akka.kafka.ProducerMessage.Message
-import akka.kafka.ProducerSettings
-import akka.kafka.scaladsl.Producer
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.{Done, NotUsed}
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.errors.{NetworkException, UnknownTopicOrPartitionException}
 import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.kafka.ProducerMessage.Message
+import org.apache.pekko.kafka.ProducerSettings
+import org.apache.pekko.kafka.scaladsl.Producer
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

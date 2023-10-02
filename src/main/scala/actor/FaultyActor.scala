@@ -1,8 +1,8 @@
 package actor
 
 import actor.FaultyActor.DoIt
-import akka.actor.{Actor, Status}
 import akkahttp.SampleRoutes.FaultyActorResponse
+import org.apache.pekko.actor.{Actor, Status}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.concurrent.ThreadLocalRandom

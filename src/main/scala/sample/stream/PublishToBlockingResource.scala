@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.DelayOverflowStrategy
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.DelayOverflowStrategy
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 import scala.collection.parallel.CollectionConverters._

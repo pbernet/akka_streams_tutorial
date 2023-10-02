@@ -1,8 +1,8 @@
 package alpakka.file
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{FileIO, Sink, Source, StreamConverters}
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{FileIO, Sink, Source, StreamConverters}
+import org.apache.pekko.util.ByteString
 
 import java.io.FileInputStream
 import java.nio.file.Paths

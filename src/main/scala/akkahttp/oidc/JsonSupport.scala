@@ -1,6 +1,6 @@
 package akkahttp.oidc
 
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import spray.json.DefaultJsonProtocol._
 
 trait JsonSupport extends SprayJsonSupport {

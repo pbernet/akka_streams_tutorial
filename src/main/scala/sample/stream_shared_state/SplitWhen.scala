@@ -1,10 +1,10 @@
 package sample.stream_shared_state
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.IOResult
-import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.IOResult
+import org.apache.pekko.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Paths

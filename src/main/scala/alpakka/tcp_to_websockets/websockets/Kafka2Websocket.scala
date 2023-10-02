@@ -1,18 +1,18 @@
 package alpakka.tcp_to_websockets.websockets
 
-import akka.actor.ActorSystem
-import akka.kafka._
-import akka.kafka.scaladsl.Consumer.Control
-import akka.kafka.scaladsl.{Consumer, Transactional}
-import akka.pattern.{BackoffOpts, BackoffSupervisor}
-import akka.stream.RestartSettings
-import akka.stream.scaladsl.{RestartSource, Sink}
-import akka.util.Timeout
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.SendMessage
 import alpakka.tcp_to_websockets.websockets.WebsocketConnectionStatusActor.ConnectionStatus
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.kafka._
+import org.apache.pekko.kafka.scaladsl.Consumer.Control
+import org.apache.pekko.kafka.scaladsl.{Consumer, Transactional}
+import org.apache.pekko.pattern.{BackoffOpts, BackoffSupervisor}
+import org.apache.pekko.stream.RestartSettings
+import org.apache.pekko.stream.scaladsl.{RestartSource, Sink}
+import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -118,7 +118,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   private def safeSendToWebsocket(transactionalId: String, msg: ConsumerMessage.TransactionalMessage[String, String]) = {
     logger.info(s"TransactionalID: $transactionalId - Offset: ${msg.record.offset()} - Partition: ${msg.record.partition()} Consume msg with key: ${msg.record.key()} and value: ${printableShort(msg.record.value())}")
 
-    import akka.pattern.ask
+    import org.apache.pekko.pattern.ask
     implicit val askTimeout: Timeout = Timeout(10.seconds)
 
     val isConnectedFuture = (websocketConnectionStatus ? ConnectionStatus).mapTo[Boolean]

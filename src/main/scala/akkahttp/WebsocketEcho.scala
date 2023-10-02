@@ -1,19 +1,19 @@
 package akkahttp
 
-import akka.Done
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.directives.WebSocketDirectives
-import akka.pattern.ask
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
-import akka.stream.{CompletionStrategy, OverflowStrategy, QueueOfferResult}
-import akka.util.Timeout
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.ws._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.server.directives.WebSocketDirectives
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
+import org.apache.pekko.stream.{CompletionStrategy, OverflowStrategy, QueueOfferResult}
+import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
-import sttp.client3.akkahttp.AkkaHttpBackend
+import sttp.client3.pekkohttp.PekkoHttpBackend
 import sttp.client3.{UriContext, asWebSocket, basicRequest}
 import sttp.ws.WebSocket
 
@@ -294,7 +294,7 @@ object WebsocketEcho extends App with WebSocketDirectives with ClientCommon {
       } yield ()
     }
 
-    val backend = AkkaHttpBackend()
+    val backend = PekkoHttpBackend()
 
     basicRequest
       .response(asWebSocket(useWebSocket))

@@ -1,11 +1,11 @@
 package sample.stream_actor
 
+import org.apache.pekko.Done
+import org.apache.pekko.actor.Actor
+import sample.stream_actor.Total.Increment
+
 import java.text.SimpleDateFormat
 import java.util.{Date, TimeZone}
-
-import akka.Done
-import akka.actor.Actor
-import sample.stream_actor.Total.Increment
 
 object Total {
   case class Increment(value: Long, avg: Double, id: String)

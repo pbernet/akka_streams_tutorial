@@ -1,12 +1,12 @@
 package interop
 
-import akka.actor.ActorSystem
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl.{Sink, Source}
 import io.reactivex.rxjava3.core.Flowable
 import org.apache.camel.FluentProducerTemplate
 import org.apache.camel.component.reactive.streams.api.{CamelReactiveStreams, CamelReactiveStreamsService}
 import org.apache.camel.impl.DefaultCamelContext
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.reactivestreams.Publisher
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.Flux

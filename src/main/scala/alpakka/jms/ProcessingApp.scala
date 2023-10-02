@@ -1,13 +1,13 @@
 package alpakka.jms
 
-import akka.actor.ActorSystem
-import akka.stream._
-import akka.stream.alpakka.jms._
-import akka.stream.alpakka.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsProducer}
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.{Done, NotUsed}
 import com.typesafe.config.Config
 import org.apache.activemq.ActiveMQConnectionFactory
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream._
+import org.apache.pekko.stream.connectors.jms._
+import org.apache.pekko.stream.connectors.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsProducer}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.concurrent.ThreadLocalRandom

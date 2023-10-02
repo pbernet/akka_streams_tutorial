@@ -1,7 +1,7 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl._
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl._
 import sample.stream_shared_state.SplitWhen
 
 import scala.collection.immutable.Iterable

@@ -1,14 +1,14 @@
 package akkahttp.oidc
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.{HttpChallenge, OAuth2BearerToken}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, StatusCodes}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{AuthenticationFailedRejection, Directive1, RejectionHandler, Route}
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.util.Timeout
 import dasniko.testcontainers.keycloak.KeycloakContainer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.headers.{HttpChallenge, OAuth2BearerToken}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.{AuthenticationFailedRejection, Directive1, RejectionHandler, Route}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.util.Timeout
 import org.keycloak.TokenVerifier
 import org.keycloak.adapters.KeycloakDeploymentBuilder
 import org.keycloak.admin.client.{CreatedResponseUtil, Keycloak, KeycloakBuilder}

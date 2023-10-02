@@ -1,10 +1,10 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.ClosedShape
-import akka.stream.scaladsl.GraphDSL.Implicits._
-import akka.stream.scaladsl._
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.ClosedShape
+import org.apache.pekko.stream.scaladsl.GraphDSL.Implicits._
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.util.ByteString
 
 import java.io.{BufferedInputStream, BufferedOutputStream}
 import java.nio.file.Paths

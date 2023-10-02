@@ -1,9 +1,9 @@
 package alpakka.file
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.file.scaladsl.LogRotatorSink
-import akka.stream.scaladsl.{FileIO, Flow, Keep, Source}
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.file.scaladsl.LogRotatorSink
+import org.apache.pekko.stream.scaladsl.{FileIO, Flow, Keep, Source}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File

@@ -1,9 +1,9 @@
 package sample.stream
 
-import akka.actor.ActorSystem
-import akka.stream.RestartSettings
-import akka.stream.scaladsl.{Flow, Framing, Keep, RestartSource, Sink, Source, Tcp}
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.RestartSettings
+import org.apache.pekko.stream.scaladsl.{Flow, Framing, Keep, RestartSource, Sink, Source, Tcp}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.net.InetSocketAddress

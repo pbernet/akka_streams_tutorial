@@ -1,7 +1,7 @@
 package sample.stream_actor
 
-import akka.actor.{Actor, ActorLogging, Props}
-import akka.http.scaladsl.model.StatusCode
+import org.apache.pekko.actor.{Actor, ActorLogging, Props}
+import org.apache.pekko.http.scaladsl.model.StatusCode
 import sample.stream_actor.WindTurbineSimulator._
 
 case class WindTurbineSimulatorException(id: String) extends RuntimeException

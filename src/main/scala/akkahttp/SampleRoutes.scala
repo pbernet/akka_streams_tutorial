@@ -2,14 +2,14 @@ package akkahttp
 
 import actor.FaultyActor
 import actor.FaultyActor.DoIt
-import akka.actor.{ActorSystem, Props}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.StatusCodes.InternalServerError
-import akka.http.scaladsl.model.{ContentTypes, HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import org.apache.pekko.http.scaladsl.model.StatusCodes.InternalServerError
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import spray.json.DefaultJsonProtocol
 
@@ -100,7 +100,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   val getFromFaultyActor =
     pathPrefix("faultyActor") {
       get {
-        import akka.pattern.ask
+        import org.apache.pekko.pattern.ask
         implicit val askTimeout: Timeout = Timeout(30.seconds)
         complete((faultyActor ? DoIt()).mapTo[FaultyActorResponse])
       }

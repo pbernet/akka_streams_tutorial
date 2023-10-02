@@ -1,16 +1,16 @@
 package alpakka.s3
 
-import akka.Done
-import akka.actor.ActorSystem
-import akka.stream.Attributes
-import akka.stream.alpakka.file.ArchiveMetadata
-import akka.stream.alpakka.file.scaladsl.Archive
-import akka.stream.alpakka.s3.AccessStyle.PathAccessStyle
-import akka.stream.alpakka.s3._
-import akka.stream.alpakka.s3.scaladsl.S3
-import akka.stream.scaladsl.{FileIO, Keep, Sink, Source}
-import akka.util.ByteString
 import org.apache.commons.io.FileUtils
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.connectors.file.ArchiveMetadata
+import org.apache.pekko.stream.connectors.file.scaladsl.Archive
+import org.apache.pekko.stream.connectors.s3.AccessStyle.PathAccessStyle
+import org.apache.pekko.stream.connectors.s3._
+import org.apache.pekko.stream.connectors.s3.scaladsl.S3
+import org.apache.pekko.stream.scaladsl.{FileIO, Keep, Sink, Source}
+import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 

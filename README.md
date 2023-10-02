@@ -1,6 +1,15 @@
 [![Build Status](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml/badge.svg)](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml)
 [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
-# Akka streams tutorial #
+
+# Pekko tutorial #
+
+> **_NOTE:_**  As
+> of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
+> Lightbend has changed the licensing model. [Apache Pekko](https://github.com/apache/incubator-pekko) is the open source
+> alternative.
+> For now the branch `migrate_pekko` contains a 1st basic migration (with a few losses). See also `migrate_pekko_grpc`.
+> The plan is to move the content of those branches to a new `pekko_tutorial` repo.
+> A BIG thank you to the committed Pekko committers.
 
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
 hundred
@@ -32,9 +41,6 @@ Other noteworthy examples:
 
 Remarks:
 
-* As
-  of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
-  Lightbend has changed the licensing model 
 * Requires a late JDK 11 because [caffeine 3.x](https://github.com/ben-manes/caffeine/releases) requires it as well
   as [ZipCryptoEcho](src/main/scala/alpakka/file/ZipCryptoEcho.scala)
 * Most examples are throttled, so you can see from the console output what is happening

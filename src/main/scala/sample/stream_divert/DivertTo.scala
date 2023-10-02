@@ -1,8 +1,8 @@
 package sample.stream_divert
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}

@@ -1,17 +1,17 @@
 package alpakka.sftp
 
-import akka.actor.ActorSystem
-import akka.stream.alpakka.ftp.scaladsl.Sftp
-import akka.stream.alpakka.ftp.{FtpCredentials, FtpFile, SftpSettings}
-import akka.stream.scaladsl.{FileIO, RunnableGraph, Sink, Source}
-import akka.stream.{IOResult, ThrottleMode}
-import akka.util.ByteString
-import akka.{Done, NotUsed}
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.FileSystemFile
 import net.schmizz.sshj.{DefaultConfig, SSHClient}
 import org.apache.commons.lang3.exception.ExceptionUtils
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.connectors.ftp.scaladsl.Sftp
+import org.apache.pekko.stream.connectors.ftp.{FtpCredentials, FtpFile, SftpSettings}
+import org.apache.pekko.stream.scaladsl.{FileIO, RunnableGraph, Sink, Source}
+import org.apache.pekko.stream.{IOResult, ThrottleMode}
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File

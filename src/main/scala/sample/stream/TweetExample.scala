@@ -1,10 +1,10 @@
 package sample.stream
 
-import akka.NotUsed
-import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.DelayOverflowStrategy
-import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
 import org.apache.commons.lang3.exception.ExceptionUtils
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.{ActorSystem, Cancellable}
+import org.apache.pekko.stream.DelayOverflowStrategy
+import org.apache.pekko.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.{Instant, ZoneId}

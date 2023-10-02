@@ -1,13 +1,13 @@
 package sample.stream_actor
 
-import akka.Done
-import akka.actor.{ActorSystem, Props}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.http.scaladsl.server.Directives._
-import akka.stream.scaladsl.{Flow, Source}
-import akka.util.Timeout
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.stream.scaladsl.{Flow, Source}
+import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json._
 import sample.stream_actor.Total.Increment
@@ -70,7 +70,7 @@ object WindTurbineServer {
       .map { elem => println(s"After parsing size: ${elem._2.size}"); elem }
       .mapAsync(1) {
         case (lastMessage: String, measurements: Seq[MeasurementsContainer]) =>
-          import akka.pattern.ask
+          import org.apache.pekko.pattern.ask
           implicit val askTimeout = Timeout(30.seconds)
 
           //generateRandomServerError()
@@ -120,7 +120,7 @@ object WindTurbineServer {
   /**
     * Generate server errors at 1/6 of the time
     * Clients will receive:
-    * akka.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
+    * org.apache.pekko.http.scaladsl.model.ws.PeerClosedConnectionException: Peer closed connection with code 1011 'internal error'
     * and are able to recover due to the RestartSource used
     */
   private def generateRandomServerError() = {

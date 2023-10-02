@@ -1,7 +1,7 @@
 package sample.stream_shared_state
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.Source
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable

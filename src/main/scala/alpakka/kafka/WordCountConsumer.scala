@@ -1,16 +1,16 @@
 package alpakka.kafka
 
-import akka.actor.{ActorSystem, Props}
-import akka.kafka.scaladsl.Consumer.DrainingControl
-import akka.kafka.scaladsl.{Committer, Consumer}
-import akka.kafka.{CommitterSettings, ConsumerMessage, ConsumerSettings, Subscriptions}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, ZipWith}
-import akka.stream.{FlowShape, Graph}
-import akka.util.Timeout
-import akka.{Done, NotUsed}
 import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{LongDeserializer, StringDeserializer}
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.kafka.scaladsl.Consumer.DrainingControl
+import org.apache.pekko.kafka.scaladsl.{Committer, Consumer}
+import org.apache.pekko.kafka.{CommitterSettings, ConsumerMessage, ConsumerSettings, Subscriptions}
+import org.apache.pekko.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, ZipWith}
+import org.apache.pekko.stream.{FlowShape, Graph}
+import org.apache.pekko.util.Timeout
+import org.apache.pekko.{Done, NotUsed}
 
 import scala.concurrent.duration._
 

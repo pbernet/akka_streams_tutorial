@@ -1,6 +1,6 @@
 package sample.stream_actor_simple
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import scala.concurrent.duration._
 

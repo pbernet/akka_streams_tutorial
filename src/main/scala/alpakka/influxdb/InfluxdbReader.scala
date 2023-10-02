@@ -1,21 +1,20 @@
 package alpakka.influxdb
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.Sink
-import akka.stream.{ActorAttributes, Supervision}
 import com.influxdb.LogLevel
 import com.influxdb.client.InfluxDBClientFactory
 import com.influxdb.client.scala.InfluxDBClientScalaFactory
 import com.influxdb.query.FluxTable
 import com.influxdb.query.dsl.Flux
 import com.influxdb.query.dsl.functions.restriction.Restrictions
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Supervision
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.temporal.ChronoUnit
 import java.util
-import scala.concurrent.Await
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
-import scala.util.control.NonFatal
+import scala.util.control.NonFatal;
 
 /**
   *
@@ -32,8 +31,10 @@ import scala.util.control.NonFatal
 class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bucket: String = "testbucket", actorSystem: ActorSystem) {
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  implicit val system = actorSystem
-  implicit val ec = actorSystem.dispatcher
+  implicit val system: ActorSystem = actorSystem
+  implicit val ec: ExecutionContextExecutor = actorSystem.dispatcher
+
+  //import system.dispatcher
 
   val deciderFlow: Supervision.Decider = {
     case NonFatal(e) =>
@@ -47,32 +48,34 @@ class InfluxdbReader(baseURL: String, token: String, org: String = "testorg", bu
 
   private val query =
     """
-    interval = 1m
+      interval = 1m
 
-    from(bucket: "testbucket")
-       |> range(start: -interval)
-    """
+      from(bucket: "testbucket")
+         |> range(start: -interval)
+      """
 
-  def source() = influxdbClientScala
-    .getQueryScalaApi()
-    .query(query)
+  // TODO Activate, when "com.influxdb" %% "influxdb-client-scala" is available for pekko
+  //    def source() = influxdbClientScala
+  //      .getQueryScalaApi()
+  //      .query(query)
 
+  // TODO Activate, when "com.influxdb" %% "influxdb-client-scala" is available for pekko
   def getQuerySync(mem: String) = {
-    logger.info(s"Query raw for measurements of type: $mem")
-    val result = source()
-      .filter(fluxRecord => fluxRecord.getMeasurement().equals(mem) )
-      .wireTap(fluxRecord => {
-        val measurement = fluxRecord.getMeasurement()
-        val value = fluxRecord.getValue()
-        logger.debug(s"About to process measurement: $measurement with value: $value")
-      })
-      .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
-      .runWith(Sink.seq)
-
-    Await.result(result, 10.seconds)
+    //      logger.info(s"Query raw for measurements of type: $mem")
+    //      val result = source()
+    //        .filter(fluxRecord => fluxRecord.getMeasurement().equals(mem) )
+    //        .wireTap(fluxRecord => {
+    //          val measurement = fluxRecord.getMeasurement()
+    //          val value = fluxRecord.getValue()
+    //          logger.debug(s"About to process measurement: $measurement with value: $value")
+    //        })
+    //        .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
+    //        .runWith(Sink.seq)
+    //
+    //      Await.result(result, 10.seconds)
   }
 
-  def fluxQueryCount(mem: String) : Long = {
+  def fluxQueryCount(mem: String): Long = {
     logger.info(s"Query with flux DSL for measurements of type: $mem")
     val flux = Flux
       .from(bucket)

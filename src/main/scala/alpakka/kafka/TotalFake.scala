@@ -1,9 +1,9 @@
 package alpakka.kafka
 
-import akka.Done
-import akka.actor.Actor
-import akka.kafka.ConsumerMessage.CommittableMessage
 import alpakka.kafka.TotalFake.{IncrementMessage, IncrementWord}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.kafka.ConsumerMessage.CommittableMessage
 
 /**
   * Keep the state of:
