@@ -27,6 +27,7 @@ public class SqsEchoIT {
             .withServices(SQS)
             // https://docs.localstack.cloud/user-guide/aws/sqs/#queue-urls
             .withEnv("SQS_ENDPOINT_STRATEGY", "domain")
+            // Redundant to createQueue(), left to show that this is a way to init a queue
             .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_sqs.sh", 700), "/etc/localstack/init/ready.d/init_sqs.sh");
 
     @BeforeAll
