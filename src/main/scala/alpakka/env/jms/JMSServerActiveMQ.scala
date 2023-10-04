@@ -6,17 +6,17 @@ import org.slf4j.{Logger, LoggerFactory}
 /**
   * Embedded old school ActiveMQ JMSServer to experiment with:
   *  - KahaDB persistence (in java.io.tmpdir)
-  *  - AES encryption for the payload
+  *  - AES encryption for the payload via AESBrokerPlugin
   *
-  * Alternative: Embedded Artemis JMSServer
+  * Alternative: Embedded Artemis JMSServer [[JMSServerArtemis]]
   * https://activemq.apache.org/components/artemis/documentation
   * Search for: Embedding Apache ActiveMQ Artemis
   *
   * Issues:
-  *  - NPE in org.apache.activemq.openwire.v12.BaseDataStreamMarshaller
+  * Messages are processed but produces random NPE while decrypting messages in AESBroker
   *
   */
-object JMSServer extends App {
+object JMSServerActiveMQ extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val broker = new BrokerService()
   val host: String = "localhost"

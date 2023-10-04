@@ -45,7 +45,7 @@ object JMSServerArtemis extends App {
   runTestClient()
   runTestClientJNDI()
 
-  private def runTestClient() = {
+  private def runTestClient(): Unit = {
     val cf = new ActiveMQConnectionFactory(serverUrl)
     val connection = cf.createConnection()
     connection.start()
@@ -67,7 +67,7 @@ object JMSServerArtemis extends App {
     }
   }
 
-  private def runTestClientJNDI() = {
+  private def runTestClientJNDI(): Unit = {
     // Picks up jndi.properties from resources
     val props = new Properties()
     props.setProperty(Context.INITIAL_CONTEXT_FACTORY, "org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory")

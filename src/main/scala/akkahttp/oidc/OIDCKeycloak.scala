@@ -25,8 +25,8 @@ import java.security.{KeyFactory, PublicKey}
 import java.time.Duration
 import java.util
 import java.util.{Base64, Collections}
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
@@ -54,16 +54,15 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   implicit val system: ActorSystem = ActorSystem()
-  implicit val executionContext = system.dispatcher
-
+  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   def runKeycloak() = {
     // Pin to same version as "keycloakVersion" in build.sbt
-    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:20.0.1")
+    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:21.1.2")
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
       .withRealmImportFile("keycloak_realm_config.json")
-      .withStartupTimeout(Duration.ofSeconds(120))
+      .withStartupTimeout(Duration.ofSeconds(180))
 
     keycloak.start()
     logger.info("Running Keycloak on URL: {}", keycloak.getAuthServerUrl)

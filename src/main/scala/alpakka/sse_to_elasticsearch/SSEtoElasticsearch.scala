@@ -15,8 +15,8 @@ import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
 import org.apache.commons.text.StringEscapeUtils
+import org.opensearch.testcontainers.OpensearchContainer
 import org.slf4j.{Logger, LoggerFactory}
-import org.testcontainers.elasticsearch.ElasticsearchContainer
 import org.testcontainers.utility.DockerImageName
 import play.api.libs.json.{JsArray, JsString, Json}
 import spray.json.DefaultJsonProtocol._
@@ -36,11 +36,15 @@ import scala.util.control.NonFatal
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
   * fetch the abstract from Wikipedia API,
   * do NER processing for persons in EN
-  * and write the results to Elasticsearch version 7.x server
+  * and write the results to either:
+  *  - Elasticsearch version 7.x server
+  *  - Opensearch version 1.x server
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/elasticsearch.html
   * https://www.testcontainers.org/modules/elasticsearch
+  * https://doc.akka.io/docs/alpakka/current/opensearch.html
+  * https://github.com/opensearch-project/opensearch-testcontainers
   */
 object SSEtoElasticsearch extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -67,18 +71,26 @@ object SSEtoElasticsearch extends App {
   implicit val formatChange: JsonFormat[Change] = jsonFormat9(Change)
   implicit val formatCtx: JsonFormat[Ctx] = jsonFormat3(Ctx)
 
-  private val dockerImageName = DockerImageName
-    .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
-    .withTag("7.10.2")
-  private val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
-  elasticsearchContainer.start()
+  //  private val dockerImageName = DockerImageName
+  //    .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
+  //    .withTag("7.10.2")
+  //  private val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
+  //  elasticsearchContainer.start()
+  private val dockerImageNameOS = DockerImageName
+    .parse("opensearchproject/opensearch")
+    .withTag("1.3.9")
+  private val searchContainer = new OpensearchContainer(dockerImageNameOS);
+  searchContainer.start()
 
-  val address = elasticsearchContainer.getHttpHostAddress
-  val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
+  val address = searchContainer.getHttpHostAddress
+  //val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
+  val connectionSettings = OpensearchConnectionSettings(s"$address")
+    .withCredentials("user", "password")
 
   // This index will be created in Elasticsearch on the fly
   private val indexName = "wikipediaedits"
-  private val elasticsearchParamsV7 = ElasticsearchParams.V7(indexName)
+  //private val searchParams = ElasticsearchParams.V7(indexName)
+  private val searchParams = OpensearchParams.V1(indexName)
   private val matchAllQuery = """{"match_all": {}}"""
 
   private val sourceSettings = ElasticsearchSourceSettings(connectionSettings).withApiVersion(ApiVersion.V7)
@@ -86,13 +98,13 @@ object SSEtoElasticsearch extends App {
   // Note that ElasticsearchSource reads are scroll requests, where you are able to fetch even the entire collection of documents
   private val elasticsearchSourceTyped = ElasticsearchSource
     .typed[Ctx](
-      elasticsearchParamsV7,
+      searchParams,
       query = matchAllQuery,
       settings = sourceSettings
     )
   private val elasticsearchSourceRaw = ElasticsearchSource
     .create(
-      elasticsearchParamsV7,
+      searchParams,
       query = matchAllQuery,
       settings = sourceSettings
     )
@@ -105,7 +117,7 @@ object SSEtoElasticsearch extends App {
       .withApiVersion(ApiVersion.V7)
   private val elasticsearchSink =
     ElasticsearchSink.create[Ctx](
-      elasticsearchParamsV7,
+      searchParams,
       settings = sinkSettings
     )
 
@@ -219,7 +231,7 @@ object SSEtoElasticsearch extends App {
     //.mapAsync(3)(ctx => findPersonsRemoteGpt3NER(ctx))
     .filter(ctx => ctx.personsFound.nonEmpty)
 
-  logger.info(s"Elasticsearch container listening on: ${elasticsearchContainer.getHttpHostAddress}")
+  logger.info(s"Elasticsearch container listening on: ${searchContainer.getHttpHostAddress}")
   logger.info("About to start processing flow...")
 
   restartSource
@@ -241,7 +253,7 @@ object SSEtoElasticsearch extends App {
 
   private def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    val url = s"http://localhost:${elasticsearchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
+    val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
     if (os == "mac os x") Process(s"open $url").!
     else if (os == "windows 10") Seq("cmd", "/c", s"start $url").!
     else logger.info(s"Please open a browser at: $url")
