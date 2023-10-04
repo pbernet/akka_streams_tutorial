@@ -4,7 +4,7 @@
 
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
 hundred
-meters along the happy path, well aware that the real work started right there.
+meters along the happy path, aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from
 various [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html)
 and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.html) tutorials, blogs and postings to provide you with
@@ -66,8 +66,8 @@ Other resources:
 
 Dropping identical (consecutive or non-consecutive) elements in an unbounded stream:
 
-* [DeduplicateConsecutiveElements](src/main/scala/sample/stream_shared_state/DeduplicateConsecutiveElements.scala) shows
-  the usage of the `sliding` operator
+* [DeduplicateConsecutiveElements](src/main/scala/sample/stream_shared_state/DeduplicateConsecutiveElements.scala) using
+  the `sliding` operator
 * [Dedupe](src/main/scala/sample/stream_shared_state/Dedupe.scala) shows
   the [squbs Deduplicate GraphStage](https://squbs.readthedocs.io/en/latest/deduplicate) which allows
   to dedupe both types
@@ -100,7 +100,7 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 | [WindTurbineServer](src/main/scala/sample/stream_actor/WindTurbineServer.scala)| Start server which a accumulates measurements|
 
  The clients communicate via websockets with the `WindTurbineServer`. After a restart of `SimulateWindTurbines` the clients are able to resume. 
- Shutting down the `WindTurbineServer` results in reporting the clients that the server is not reachable.
+ Shutting down the `WindTurbineServer` results in reporting to the clients that the server is not reachable.
  After restarting `WindTurbineServer` the clients are able to resume. Since there is no persistence, the processing just continuous.
 
 
@@ -117,13 +117,13 @@ Start the classes in the order below and watch the console output.
 | [DeleteTopicUtil](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset                                                                                                                                                                                                                                                            |
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-This PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
+The PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
 
 [Hl7TcpClient](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7TcpClient.scala) &rarr; [Hl7Tcp2Kafka](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7Tcp2Kafka.scala) &rarr; [KafkaServer](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala) &rarr; [Kafka2Websocket](src/main/scala/alpakka/tcp_to_websockets/websockets/Kafka2Websocket.scala) &rarr; [WebsocketServer](src/main/scala/alpakka/env/WebsocketServer.scala)
 
 The focus is on resilience (= try not to lose messages during the restart of the stages). However, currently messages may reach the `WebsocketServer` unordered (due to retry in  `Hl7TcpClient`) and in-flight messages may get lost (upon re-start of `WebsocketServer`).
 
-Start each stage separate in the IDE, or together via the integration
+Start each stage separately in the IDE, or together via the integration
 test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophySpec.scala)
 
 ## Analyse Wikipedia edits live stream ##
@@ -142,7 +142,7 @@ The index is queried periodically and the content may also be viewed with a Brow
 
 ## Movie subtitle translation via OpenAI API ##
 
-The class [SubtitleTranslator](src/main/scala/tools/SubtitleTranslator.scala) translates all blocks of an English
+[SubtitleTranslator](src/main/scala/tools/SubtitleTranslator.scala) translates all blocks of an English
 source `.srt` file to a target language using the OpenAI API endpoints:
 
 * `/chat/completions` (gpt-3.5-turbo) used by default,
@@ -152,8 +152,8 @@ source `.srt` file to a target language using the OpenAI API endpoints:
 
 Akka streams helps in these areas:
 
-* Easy workflow modeling
+* Easy workflow modelling
 * Scene splitting with `session windows`. All blocks of a scene are grouped in one session and thus translated in one
   API call
 * Throttling to not exceed the API rate-limits
-* Continuous writing of translated blocks to target file
+* Continuous writing of translated blocks to the target file

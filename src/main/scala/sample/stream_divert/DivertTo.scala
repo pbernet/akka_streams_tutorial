@@ -9,12 +9,17 @@ import scala.util.{Failure, Success}
 
 /**
   * Inspired by:
-  * Colin Breck talk scala days NY 2018
+  * Colin Breck talk Scala Days NY 2018
   *
   * Concepts:
-  *  - treat errors as data by using Either
+  *  - treat errors as data by using the Either type
   *  - divert invalid elements at the end (instead of filtering/dropping earlier)
   *  - keep order of elements downstream
+  *
+  * Trade-off of this approach: Needs pattern matching on all downstream operations
+  *
+  * See also:
+  * https://bszwej.medium.com/akka-streams-error-handling-7ff9cc01bc12
   */
 object DivertTo extends App {
   implicit val system: ActorSystem = ActorSystem()
@@ -25,7 +30,7 @@ object DivertTo extends App {
 
   val sink = Sink.foreach[Either[Valid[Int], Invalid[Int]]](each => println(s"Reached sink: ${each.swap.getOrElse(0)}"))
 
-  val errorSink = Flow[Invalid[Int]]
+  private val errorSink = Flow[Invalid[Int]]
     .map(each => println(s"Reached errorSink: $each"))
     .to(Sink.ignore)
 
@@ -35,7 +40,6 @@ object DivertTo extends App {
       else Right(Invalid(x, Some(new Exception("Is odd"))))
     }
     .map {
-      //Drawback of this approach: Pattern matching on all downstream operations
       case left@Left(_) => businessLogicOn(left)
       case right@Right(_) => right
     }
@@ -43,8 +47,8 @@ object DivertTo extends App {
       case left@Left(_) => left
       case right@Right(_) => right
     }
-    //Divert invalid elements
-    //contramap: apply "getOrElse" to each incoming upstream element *before* it is passed to the errorSink
+    // Divert invalid elements
+    // contramap: apply "getOrElse" to each incoming upstream element *before* it is passed to the errorSink
     .divertTo(errorSink.contramap(_.getOrElse(Invalid(0, Some(new Exception("N/A"))))), _.isRight)
 
   private def businessLogicOn(left: Left[Valid[Int], Invalid[Int]]) = {

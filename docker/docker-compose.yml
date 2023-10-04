@@ -107,5 +107,23 @@ services:
     networks:
       - runtime-net
 
+  # Doc:
+  # https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/docker-compose/docker-compose.yaml
+  # https://docs.min.io/docs/deploy-minio-on-docker-compose.html
+  # Also possible to start from cmd line:
+  # docker run -p 9005:9005 -p 9006:9006 -e "MINIO_ROOT_USER=minio" -e "MINIO_ROOT_PASSWORD=minio123" quay.io/minio/minio server /data --console-address ":9006"
+  # Connect to dashboard: http://127.0.0.1:9006/dashboard
+  minio:
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9006"
+    ports:
+      - "9005:9005"
+      - "9006:9006"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    networks:
+      - runtime-net
+
 networks:
   runtime-net:
