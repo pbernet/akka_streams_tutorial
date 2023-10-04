@@ -27,30 +27,30 @@ import scala.util.{Failure, Success}
   *  - download n binary elements
   *
   * Run this class against your AWS account using hardcoded accessKey/secretKey
-  * Prerequisite: Create a "provisioned data stream" with 1 shard on AWS
+  * Prerequisite: Create a "provisioned data stream" with 1 shard on AWS console
   * or
-  * Run via [[alpakka.kinesis.KinesisEchoIT]] against localstack docker container
+  * Run via [[alpakka.kinesis.KinesisEchoIT]] against localStack docker container
   *
   * Remarks:
   *  - No computation on the server side, just echo routing
-  *  - Default data retention time is 24h, hence with the setting TrimHorizon we may receive old records...
+  *  - Default data retention time is 24h, hence with the setting `TrimHorizon` we may receive old records...
   *  - A Kinesis data stream with 1 shard should preserve order, however duplicates may occur due to retries
+  *  - Be warned that running against AWS (and thus setting up resources) can cost you money
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/kinesis.html
-  *
   */
 class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secretKey: String = "", region: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system = ActorSystem("KinesisEcho")
   implicit val executionContext = system.dispatcher
 
-  val dataStreamName = "testDataStreamProvisioned"
+  val kinesisDataStreamName = "kinesisDataStreamProvisioned"
   val shardIdName = "shardId-000000000000"
 
   val batchSize = 10
 
-  implicit val amazonKinesisAsync: KinesisAsyncClient = {
+  implicit val awsKinesisClient: KinesisAsyncClient = {
     if (new UrlValidator().isValid(urlWithMappedPort.toString)) {
       logger.info("Running against localStack on local container...")
       val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
@@ -81,24 +81,26 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
         .build()
     }
   }
-  system.registerOnTermination(amazonKinesisAsync.close())
+  system.registerOnTermination(awsKinesisClient.close())
 
   def run(): Int = {
-    uploadClient()
-    val done = downloadClient()
+
+    val done = for {
+      _ <- producerClient()
+      consumed <- consumerClient()
+    } yield consumed
 
     val result: Seq[String] = Await.result(done, 60.seconds)
-
     logger.info(s"Successfully downloaded: ${result.size} records")
     terminateWhen(done)
     result.size
   }
 
-  private def uploadClient() = {
+  private def producerClient() = {
     logger.info(s"About to start upload...")
 
     val defaultFlowSettings = KinesisFlowSettings.Defaults
-    val kinesisFlow: Flow[PutRecordsRequestEntry, PutRecordsResultEntry, NotUsed] = KinesisFlow(dataStreamName, defaultFlowSettings)
+    val kinesisFlow: Flow[PutRecordsRequestEntry, PutRecordsResultEntry, NotUsed] = KinesisFlow(kinesisDataStreamName, defaultFlowSettings)
 
     val done: Future[Seq[PutRecordsResultEntry]] = Source(1 to batchSize)
       .map(each => convertToRecord(each))
@@ -109,11 +111,11 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
     done
   }
 
-  private def downloadClient(): Future[Seq[String]] = {
+  private def consumerClient(): Future[Seq[String]] = {
     logger.info(s"About to start download...")
 
     val settings = {
-      ShardSettings(streamName = dataStreamName, shardId = shardIdName)
+      ShardSettings(streamName = kinesisDataStreamName, shardId = shardIdName)
         .withRefreshInterval(1.second)
         .withLimit(500)
         // TrimHorizon: same as "earliest" in Kafka
@@ -121,7 +123,7 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
     }
 
     val source: Source[software.amazon.awssdk.services.kinesis.model.Record, NotUsed] =
-      KinesisSource.basic(settings, amazonKinesisAsync)
+      KinesisSource.basic(settings, awsKinesisClient)
 
     source
       .map(each => convertToString(each))
@@ -160,4 +162,5 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
 object KinesisEcho extends App {
   val echo = new KinesisEcho()
   echo.run()
+  // TODO Add stream removal
 }

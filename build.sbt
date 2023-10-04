@@ -4,7 +4,7 @@ name := "akka-streams-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.11"
+scalaVersion := "2.13.12"
 
 val akkaVersion = "2.8.1"
 val akkaHTTPVersion = "10.5.1"
@@ -15,10 +15,11 @@ val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
-val testContainersVersion = "1.18.3"
-val keycloakVersion = "21.0.1"
+val testContainersVersion = "1.19.0"
+val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11
 val sttpVersion = "3.8.13"
 val influxdbVersion = "6.7.0"
+val awsClientVersion = "2.20.155"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -42,11 +43,12 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "com.lightbend.akka" %% "akka-stream-alpakka-jms" % alpakkaVersion,
   "javax.jms" % "jms" % "1.1",
+  "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.75",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.76",
 
   "com.typesafe.akka" %% "akka-stream-kafka" % alpakkaKafkaConnectorVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -69,7 +71,12 @@ libraryDependencies ++= Seq(
 
   "com.lightbend.akka" %% "akka-stream-alpakka-kinesis" % alpakkaVersion,
   // Use latest. Ref in alpakka: 2.17.113
-  "software.amazon.awssdk" % "kinesis" % "2.20.103",
+  "software.amazon.awssdk" % "kinesis" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "software.amazon.awssdk" % "apache-client" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+
+  "com.lightbend.akka" %% "akka-stream-alpakka-sqs" % alpakkaVersion,
+  // For now use referenced, because of Future trouble
+  "software.amazon.awssdk" % "sqs" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
 
   "org.squbs" %% "squbs-ext" % "0.15.0",
 
@@ -125,11 +132,12 @@ libraryDependencies ++= Seq(
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
+  "org.keycloak" % "keycloak-admin-client" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
-  "org.postgresql" % "postgresql" % "42.5.4",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.2.0" % Test pomOnly(),
-  "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test,
+  "org.postgresql" % "postgresql" % "42.6.0",
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.4.0" % Test pomOnly(),
+  "io.zonky.test" % "embedded-postgres" % "2.0.4" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.15" % Test,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
