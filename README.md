@@ -3,13 +3,15 @@
 
 # Pekko tutorial #
 
-> **_NOTE:_**  As
+> **Akka vs Pekko**  
+> As
 > of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
 > Lightbend has changed the licensing model. [Apache Pekko](https://github.com/apache/incubator-pekko) is the open source
 > alternative.
-> For now the branch `migrate_pekko` contains a 1st basic migration (with a few losses). See also `migrate_pekko_grpc`.
-> The plan is to move the content of those branches to a new `pekko_tutorial` repo.
-> A BIG thank you to the committed Pekko committers.
+>
+> For now the branch `migrate_pekko` contains a 1st basic migration (with a few losses).
+> The plan is to move the content of this branch to a new `pekko_tutorial` repo.
+> A BIG Thank you to the committed Pekko committers.
 
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
 hundred
