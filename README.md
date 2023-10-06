@@ -2,6 +2,18 @@
 [![Scala Steward badge](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 # Akka streams tutorial #
 
+> **Akka vs Pekko**  
+> As
+>
+of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
+> Lightbend has changed the licensing model. [Apache Pekko](https://github.com/apache/incubator-pekko) is the open
+> source
+> alternative. A BIG Thank you to the committed Pekko committers.
+>
+> For now the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
+> contains a 1st basic migration (with a few losses).
+> The plan is to move the content of this branch to a new `pekko_tutorial` repo.
+
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
 hundred
 meters along the happy path, aware that the real work started right there.
