@@ -3,9 +3,7 @@
 # Akka streams tutorial #
 
 > **Akka vs Pekko**  
-> As
->
-of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
+> As of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
 > Lightbend has changed the licensing model. [Apache Pekko](https://github.com/apache/incubator-pekko) is the open
 > source
 > alternative. A BIG Thank you to the committed Pekko committers.
