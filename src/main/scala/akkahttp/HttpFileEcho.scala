@@ -58,7 +58,7 @@ object HttpFileEcho extends App with JsonProtocol {
   val chuckSizeBytes = 100 * 1024 // to handle large files
 
   server(address, port)
-  (1 to 10).par.foreach(each => roundtripClient(each, address, port))
+  (1 to 5).par.foreach(each => roundtripClient(each, address, port))
   browserClient()
 
   def server(address: String, port: Int): Unit = {
@@ -74,19 +74,21 @@ object HttpFileEcho extends App with JsonProtocol {
 
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
+        withRequestTimeout(60.seconds) {
 
-        formFields(Symbol("payload")) { payload =>
-          println(s"Server received request with additional form data: $payload")
+          formFields(Symbol("payload")) { payload =>
+            println(s"Server received request with additional form data: $payload")
 
-          def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
+            def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
 
-          // Activate to simulate rnd server ex during upload and thus provoke retry on client
-          throwRndRuntimeException("upload")
+            // Activate to simulate rnd server ex during upload and thus provoke retry on client
+            //throwRndRuntimeException("upload")
 
-          storeUploadedFile("binary", tempDestination) {
-            case (metadataFromClient: FileInfo, uploadedFile: File) =>
-              println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
-              complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+            storeUploadedFile("binary", tempDestination) {
+              case (metadataFromClient: FileInfo, uploadedFile: File) =>
+                println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+                complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
+            }
           }
         }
       } ~
@@ -161,7 +163,7 @@ object HttpFileEcho extends App with JsonProtocol {
     }
 
     def getResponse(request: HttpRequest): Future[FileHandle] = {
-      val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+      val restartSettings = RestartSettings(1.second, 60.seconds, 0.2).withMaxRestarts(10, 1.minute)
       RestartSource.withBackoff(restartSettings) { () =>
         val responseFuture = Http().singleRequest(request)
 
@@ -208,7 +210,7 @@ object HttpFileEcho extends App with JsonProtocol {
     val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
 
     def getResponseDownload(request: HttpRequest): Future[HttpResponse] = {
-      val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
+      val restartSettings = RestartSettings(1.second, 60.seconds, 0.2).withMaxRestarts(10, 1.minute)
       RestartSource.withBackoff(restartSettings) { () =>
         val responseFuture = Http().singleRequest(request)
 
