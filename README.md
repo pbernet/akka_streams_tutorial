@@ -18,8 +18,9 @@
 hundred
 meters along the happy path, aware that the real work started right there.
 This repo contains a collection of runnable and self-contained examples from
-various [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html)
-and [Alpakka](https://doc.akka.io/docs/alpakka/current/index.html) tutorials, blogs and postings to provide you with
+various [Pekko Streams](https://pekko.apache.org/docs/pekko/current/stream)
+and [Pekko Connectors](https://pekko.apache.org/docs/pekko-connectors/current/) tutorials, blogs and postings to provide
+you with
 exactly this feeling.
 See the class comment on how to run each example. These more complex examples are described below:
 * [Element deduplication](#element-deduplication)
@@ -29,18 +30,19 @@ See the class comment on how to run each example. These more complex examples ar
 * [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
 * [Movie subtitle translation via OpenAI API](#movie-subtitle-translation-via-openai-api)
 
-Many of the examples deal with some kind of (shared) state. While most Akka
-Streams [operators](https://doc.akka.io/docs/akka/current/stream/operators/index.html) are stateless, the samples in
+Many of the examples deal with some kind of (shared) state. While most Pekko
+Streams [operators](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs//stream/operators/index.html) are
+stateless, the samples in
 package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) also show some trickier stateful
 operators in action.
 
 Other noteworthy examples:
 * The `*Echo` examples series implement round trips eg [HttpFileEcho](src/main/scala/akkahttp/HttpFileEcho.scala)
-  and [WebsocketEcho](src/main/scala/akkahttp/WebsocketEcho)
+  and [WebsocketEcho](src/main/scala/akkahttp/WebsocketEcho.scala)
 * The branch `grpc` contains the
   basic [gRPC examples](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/echo) and
   a [chunked file upload](https://github.com/pbernet/akka_streams_tutorial/tree/grpc/src/main/scala/akka/grpc/fileupload/FileServiceImpl.scala)
-  . Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources via the `sbt-akka-grpc` plugin.
+  . Use `sbt compile` or `Rebuild Project` in IDEA to re-generate the sources via the `sbt-Pekko-grpc` plugin.
 
 Remarks:
 
@@ -56,17 +58,19 @@ Remarks:
 Other resources:
 
 * Maintained examples are
-  in [akka-stream-tests](https://github.com/akka/akka/tree/main/akka-stream-tests/src/test/scala/akka/stream/scaladsl)
-  , the [Streams Cookbook](https://doc.akka.io/docs/akka/current/stream/stream-cookbook.html?language=scala) and in
-  the [Alpakka Samples](https://github.com/akka/alpakka-samples) repo
-* Getting started guides: [stream-quickstart](https://doc.akka.io/docs/akka/current/stream/stream-quickstart.html) and
+  in [pekko-stream-tests](https://github.com/apache/incubator-pekko/tree/main/stream-tests/src/test/scala/org/apache/pekko/stream/scaladsl)
+  , the [Streams Cookbook](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs//stream/stream-cookbook.html)
+* Getting started
+  guides: [Streams Quickstart Guide](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs////stream/stream-quickstart.html)
+  and
   this
   popular [stackoverflow article](https://stackoverflow.com/questions/35120082/how-to-get-started-with-akka-streams)
-* The doc chapters [Stream composition](https://doc.akka.io/docs/akka/current/stream/stream-composition.html)
-  and [Design Principles behind Akka Streams](https://doc.akka.io/docs/akka/current/general/stream/stream-design.html)
+* The doc
+  chapters [Modularity, Composition and Hierarchy](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs////////stream/stream-composition.html)
+  and [Design Principles behind Apache Pekko Streams](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs///////general/stream/stream-design.html)
   provide useful background
 * The concept
-  of [running streams using materialized values](https://doc.akka.io/docs/akka/current/stream/stream-flows-and-basics.html#defining-and-running-streams)
+  of [running streams using materialized values](https://nightlies.apache.org/pekko/docs/pekko/1.0.1/docs/////////stream/stream-flows-and-basics.html#defining-and-running-streams)
   is also explained in this [blog](http://nivox.github.io/posts/akka-stream-materialized-values),
   this [video](https://www.youtube.com/watch?v=2-CK76cPB9s) and in
   this [stackoverflow article](https://stackoverflow.com/questions/37911174/via-viamat-to-tomat-in-akka-stream)
@@ -79,7 +83,7 @@ Dropping identical (consecutive or non-consecutive) elements in an unbounded str
   the `sliding` operator
 * [Dedupe](src/main/scala/sample/stream_shared_state/Dedupe.scala) shows
   the [squbs Deduplicate GraphStage](https://squbs.readthedocs.io/en/latest/deduplicate) which allows
-  to dedupe both types
+  to dedupe both types (N/A for Pekko)
 
 The following use case uses a local caffeine cache to avoid duplicate HTTP file downloads:
 
@@ -88,17 +92,17 @@ The following use case uses a local caffeine cache to avoid duplicate HTTP file 
 * For subsequent messages with the same TRACE_ID: fetch file from cache to avoid duplicate downloads per TRACE_ID
 * Use time based cache eviction to get rid of old downloads
 
-| Class                     | Description     |
-| -------------------       |-----------------|
-| [FileServer](src/main/scala/alpakka/env/FileServer.scala)|Local HTTP `FileServer` for non-idempotent file download simulation|
-| [LocalFileCacheCaffeine](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala)|Akka streams client flow, with cache implemented with [caffeine](https://github.com/ben-manes/caffeine "")|
+| Class                                                                                            | Description                                                                                                 |
+|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| [FileServer](src/main/scala/alpakka/env/FileServer.scala)                                        | Local HTTP `FileServer` for non-idempotent file download simulation                                         |
+| [LocalFileCacheCaffeine](src/main/scala/sample/stream_shared_state/LocalFileCacheCaffeine.scala) | Pekko streams client flow, with cache implemented with [caffeine](https://github.com/ben-manes/caffeine "") |
 
 ## Windturbine example ##
 
 Working sample from
 the [blog series 1-4](http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-iv/ "Blog 4")
 from Colin Breck where classic Actors are used to model shared state, life-cycle management and fault-tolerance in
-combination with Akka Streams.
+combination with Pekko Streams.
 Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
 Islands in the Stream: Integrating Akka Streams and Akka Actors
 ](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
@@ -117,16 +121,19 @@ Islands in the Stream: Integrating Akka Streams and Akka Actors
 The ubiquitous word count with an additional message count. A message is a sequence of words.
 Start the classes in the order below and watch the console output.
 
-| Class               | Description                                                                                                                                                                                                                                                                            |
-| ------------------- |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [KafkaServerEmbedded](src/main/scala/alpakka/env/KafkaServerEmbedded.scala)| Uses [Embedded Kafka](https://github.com/embeddedkafka/embedded-kafka) (= an in-memory Kafka instance). No persistence on restart                                                                                                                                                      | 
-| [WordCountProducer](src/main/scala/alpakka/kafka/WordCountProducer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which feeds random words to topic `wordcount-input`                                                                                                                                    |
-| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java)| [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc") client to count words and messages and feed the results to `wordcount-output` and `messagecount-output` topics. Contains additional interactive queries which should yield the same results `WordCountConsumer` |
-| [WordCountConsumer](src/main/scala/alpakka/kafka/WordCountConsumer.scala)| [akka-streams-kafka](https://doc.akka.io/docs/akka-stream-kafka/current/home.html "Doc") client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`                                                                                              |
-| [DeleteTopicUtil](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)| Utility to reset the offset                                                                                                                                                                                                                                                            |
+| Class                                                                         | Description                                                                                                                                                                                                                                                                               |
+|-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [KafkaServerEmbedded](src/main/scala/alpakka/env/KafkaServerEmbedded.scala)   | Uses [Embedded Kafka](https://github.com/embeddedkafka/embedded-kafka) (= an in-memory Kafka instance). No persistence on restart                                                                                                                                                         | 
+| [WordCountProducer](src/main/scala/alpakka/kafka/WordCountProducer.scala)     | [pekko-streams-kafka](https://pekko.apache.org/docs/pekko-connectors-kafka/current/ "Doc") client which feeds random words to topic `wordcount-input`                                                                                                                                     |
+| [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java) | [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc") client to count words and messages and feed the results to `wordcount-output` and `messagecount-output` topics. Contains additional interactive queries which should yield the same results `WordCountConsumer` |
+| [WordCountConsumer](src/main/scala/alpakka/kafka/WordCountConsumer.scala)     | [pekko-streams-kafka](https://pekko.apache.org/docs/pekko-connectors-kafka/current/ "Doc") client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`                                                                                               |
+| [DeleteTopicUtil](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)         | Utility to reset the offset                                                                                                                                                                                                                                                               |
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
-The PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain, relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some kind of "Alpakka-Trophy" across these stages:
+
+The PoC in package [alpakka.tcp_to_websockets](src/main/scala/alpakka/tcp_to_websockets) is from the E-Health domain,
+relaying [HL7 V2](https://www.hl7.org/implement/standards/product_brief.cfm?product_id=185 "Doc") text messages in some
+kind of "Trophy" across these stages:
 
 [Hl7TcpClient](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7TcpClient.scala) &rarr; [Hl7Tcp2Kafka](src/main/scala/alpakka/tcp_to_websockets/hl7mllp/Hl7Tcp2Kafka.scala) &rarr; [KafkaServer](src/main/scala/alpakka/env/KafkaServerTestcontainers.scala) &rarr; [Kafka2Websocket](src/main/scala/alpakka/tcp_to_websockets/websockets/Kafka2Websocket.scala) &rarr; [WebsocketServer](src/main/scala/alpakka/env/WebsocketServer.scala)
 
@@ -159,7 +166,7 @@ source `.srt` file to a target language using the OpenAI API endpoints:
 * `/completions`      (text-davinci-003) used as fallback,
   see [Doc](https://beta.openai.com/docs/api-reference/completions/create)
 
-Akka streams helps in these areas:
+Pekko streams helps in these areas:
 
 * Easy workflow modelling
 * Scene splitting with `session windows`. All blocks of a scene are grouped in one session and thus translated in one
