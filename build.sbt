@@ -106,8 +106,8 @@ libraryDependencies ++= Seq(
   //"io.apicurio" % "apicurio-registry-utils-serde" % "1.3.2.Final",
 
 
-  "org.apache.camel" % "camel-core" % "3.20.2",
-  "org.apache.camel" % "camel-reactive-streams" % "3.20.2",
+  "org.apache.camel" % "camel-core" % "3.20.8",
+  "org.apache.camel" % "camel-reactive-streams" % "3.20.8",
   "io.projectreactor" % "reactor-core" % "3.5.4",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.6",
 
