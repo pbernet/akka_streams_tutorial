@@ -122,7 +122,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "influxdb" % testContainersVersion,
   "org.testcontainers" % "toxiproxy" % testContainersVersion,
   "org.testcontainers" % "localstack" % testContainersVersion,
-  "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
+  "org.opensearch" % "opensearch-testcontainers" % "2.0.1",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
