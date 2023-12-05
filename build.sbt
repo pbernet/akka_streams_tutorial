@@ -136,7 +136,7 @@ libraryDependencies ++= Seq(
   "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
   "org.postgresql" % "postgresql" % "42.6.0",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.4.0" % Test pomOnly(),
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "15.5.1" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.0.4" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.15" % Test,
