@@ -11,7 +11,7 @@ val akkaHTTPVersion = "10.5.1"
 val alpakkaVersion = "6.0.1"
 
 val alpakkaKafkaConnectorVersion = "4.0.2"
-val kafkaVersion = "3.4.1"
+val kafkaVersion = "3.6.1"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
