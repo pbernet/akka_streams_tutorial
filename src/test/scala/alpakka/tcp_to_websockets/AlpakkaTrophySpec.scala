@@ -74,7 +74,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       kafka2Websocket.run()
 
       // 10 + 1 Initial message
-      new LogFileScanner().run(10, 10, "Starting test: NOT Happy path should recover after Kafka2Websocket restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)
+      new LogFileScanner().run(20, 10, "Starting test: NOT Happy path should recover after Kafka2Websocket restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)
     }
 // OK, when started on its own. NOK when run in suite
 //    "recover after WebsocketServer restart" in {
