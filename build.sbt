@@ -6,7 +6,7 @@ version := "1.0"
 
 scalaVersion := "2.13.12"
 
-val pekkoVersion = "1.0.1"
+val pekkoVersion = "1.0.2"
 val pekkoHTTPVersion = "1.0.0"
 
 val pekkoConnectorVersion = "1.0.0"
@@ -14,8 +14,8 @@ val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.4"
 val artemisVersion = "2.28.0"
-val testContainersVersion = "1.19.0"
-val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11
+val testContainersVersion = "1.19.3"
+val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
 val influxdbVersion = "6.10.0"
 val awsClientVersion = "2.20.155"
