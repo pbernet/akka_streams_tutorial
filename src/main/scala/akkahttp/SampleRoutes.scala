@@ -112,17 +112,31 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   // curl -X GET localhost:6002/acceptAll -H "Accept: text/plain"
   // curl -X GET localhost:6002/acceptAll -H "Accept: text/xxx"
   val acceptAll: Route = get {
-      path("acceptAll") { ctx: RequestContext =>
-          // withAcceptAll: Remove/Ignore accept headers and always return application/json
-         ctx.withAcceptAll.complete("""{ "foo": "bar" }""".parseJson)
-      }
+    path("acceptAll") { ctx: RequestContext =>
+      // withAcceptAll: Remove/Ignore accept headers and always return application/json
+      ctx.withAcceptAll.complete("""{ "foo": "bar" }""".parseJson)
+    }
   }
+
+  // Extract raw JSON from POST request
+  // curl -X POST http://localhost:6002/jsonRaw -d '{"account":{"name":"TEST"}}'
+  // https://stackoverflow.com/questions/77490507/apache-pekko-akka-http-extracted-string-body-from-request-doesnt-have-quo
+  val jsonRaw: Route =
+  path("jsonRaw")(
+    post(
+      entity(as[String]) {
+        json =>
+          println("JSON raw: " + json)
+          complete(StatusCodes.OK)
+      }
+    )
+  )
 
   val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
 
   val routes = {
     handleErrors {
-      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor, acceptAll)
+      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor, acceptAll, jsonRaw)
     }
   }
 
