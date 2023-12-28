@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - migrate_pekko
 jobs:
   test:
     runs-on: ubuntu-latest
