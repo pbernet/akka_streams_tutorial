@@ -120,6 +120,11 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "influxdb" % testContainersVersion,
   "org.testcontainers" % "toxiproxy" % testContainersVersion,
   "org.testcontainers" % "localstack" % testContainersVersion,
+  "org.testcontainers" % "clickhouse" % testContainersVersion,
+
+  "com.clickhouse" % "clickhouse-jdbc" % "0.5.0",
+  "com.crobox.clickhouse" %% "client" % "1.1.4",
+
   "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
