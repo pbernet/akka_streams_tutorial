@@ -66,7 +66,7 @@ object ProcessingApp {
 
   // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
   // Seems to work together with the new connection and send retry settings on the connector
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "artemis", "failover:tcp://127.0.0.1:21616")
 
   val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
   val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(

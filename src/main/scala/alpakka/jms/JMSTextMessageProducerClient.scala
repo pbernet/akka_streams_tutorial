@@ -38,7 +38,7 @@ object JMSTextMessageProducerClient {
     .withMaxRetries(10)
 
   // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
-  val connectionFactory = new ActiveMQConnectionFactory("artemis", "simetraehcapa", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory = new ActiveMQConnectionFactory("artemis", "artemis", "failover:tcp://127.0.0.1:21616")
 
   def main(args: Array[String]): Unit = {
     jmsTextMessageProducerClient(connectionFactory)
