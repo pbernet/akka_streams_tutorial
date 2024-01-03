@@ -9,8 +9,8 @@
 > alternative. A BIG Thank you to the committed Pekko committers.
 >
 > For now the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
-> contains a 1st basic migration (with a few losses).
-> The plan is to move the content of this branch to a new `pekko_tutorial` repo.
+> contains a 1st basic migration (with a few losses). Currently this is the only maintained branch.
+> The plan is to move the content of the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a> to a new `pekko_tutorial` repo.
 
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running it's first few
 hundred
