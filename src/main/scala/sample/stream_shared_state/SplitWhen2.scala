@@ -12,37 +12,12 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Given a sorted stream of records e.g. from a file that has records sorted based on key
-  *
-  * key, value
-  * 1,2
-  * 1,3
-  * 1,4
-  * 1,5
-  * 2,3  <--
-  * 2,4
-  * 2,5
-  * 3,4  <--
-  * 3,5
-  * 4,5  <--
-  *
-  * Create a new group and collect records while the record key is the same as before.
-  * When we encounter a changed key, emit the aggregation for the previous group and create a new group.
-  *
-  * Inspired by:
-  * https://discuss.lightbend.com/t/groupwhile-on-akka-streams/5592/3
-  *
-  * and by doc:
-  * https://doc.akka.io/docs/akka/current/stream/operators/Source-or-Flow/splitWhen.html
-  *
-  * Note that this implementation can be materialized many times because the
-  * stateful decision is done in statefulMapConcat, see discussion:
-  * https://discuss.lightbend.com/t/state-inside-of-flow-operators/5717
-  *
-  * Similar to: [[SplitWhen2]]
+  * Same as: [[SplitWhen]] but with
+  * statefulMap instead of statefulMapConcat (= deprecated)
+  * and thus more concise
   *
   */
-object SplitWhen extends App {
+object SplitWhen2 extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
@@ -80,22 +55,26 @@ object SplitWhen extends App {
       }
     }
 
-  val printSink = Sink.foreach[List[Record]](each => println(s"Reached sink: $each"))
+  val groupByKeyChange: Flow[Record, List[Record], NotUsed] = {
+    Flow[Record].statefulMap(() => List.empty[Record])(
+      (stateList, nextElem) => {
+        val newStateList = stateList :+ nextElem
+        val lastElem = if (stateList.isEmpty) nextElem else stateList.reverse.head
 
-  private def hasKeyChanged = {
-    () => {
-      var lastRecordKey: Option[String] = None
-      currentRecord: Record =>
-        lastRecordKey match {
-          case Some(currentRecord.key) | None =>
-            lastRecordKey = Some(currentRecord.key)
-            List((currentRecord, false))
-          case _ =>
-            lastRecordKey = Some(currentRecord.key)
-            List((currentRecord, true))
+        if (lastElem.key.equals(nextElem.key)) { // stateful decision
+          // (list for next iteration, list of output elements)
+          (newStateList, Nil)
         }
-    }
+        else {
+          // (list for next iteration, list of output elements)
+          (List(nextElem), stateList)
+        }
+      },
+      // Cleanup function, we return the last stateList
+      stateList => Some(stateList))
   }
+
+  val printSink = Sink.foreach[List[Record]](each => println(s"Reached sink: $each"))
 
   genResourceFile().onComplete {
     case Success(_) =>
@@ -103,11 +82,8 @@ object SplitWhen extends App {
       sourceOfLines
         .via(csvToRecord)
         .via(terminationHook)
-        .statefulMapConcat(hasKeyChanged) // stateful decision
-        .splitWhen(_._2) // split when key has changed
-        .map(_._1) // proceed with payload
-        .fold(List.empty[Record])(_ :+ _) // sum payload
-        .mergeSubstreams // better performance, but why?
+        .via(groupByKeyChange)
+        .filterNot(each => each.isEmpty)
         .runWith(printSink)
     case Failure(exception) => logger.info(s"Exception: $exception")
   }
