@@ -161,9 +161,9 @@ The index is queried periodically and the content may also be viewed with a Brow
 [SubtitleTranslator](src/main/scala/tools/SubtitleTranslator.scala) translates all blocks of an English
 source `.srt` file to a target language using the OpenAI API endpoints:
 
-* `/chat/completions` (gpt-3.5-turbo) used by default,
+* `/chat/completions` (gpt-3.5-turbo/gpt-4) used by default,
   see [Doc](https://platform.openai.com/docs/guides/chat/chat-vs-completions)
-* `/completions`      (text-davinci-003) used as fallback,
+* `/completions`      (gpt-3.5-turbo-instruct) used as fallback,
   see [Doc](https://beta.openai.com/docs/api-reference/completions/create)
 
 Pekko streams helps in these areas:

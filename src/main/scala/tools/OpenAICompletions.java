@@ -25,30 +25,34 @@ import java.util.concurrent.TimeUnit;
  * <br>
  * Doc:
  * https://platform.openai.com/docs/guides/chat/chat-vs-completions
- * https://beta.openai.com/docs/api-reference/completions/create
+ * https://platform.openai.com/docs/guides/text-generation
  */
 public class OpenAICompletions {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenAICompletions.class);
 
-    // API key: https://beta.openai.com/account/api-keys
+    // Add your API key, see: https://platform.openai.com/api-keys
     public static final String API_KEY = "***";
 
     public static final int RESPONSE_TIMEOUT_SECONDS = 180;
 
     public static void main(String[] args) throws IOException {
         String toTranslate = String.format("Translate the following subtitle text from English to German: %s", "This is fun.");
-        ImmutablePair<String, Integer> resultRaw = new OpenAICompletions().runChatCompletions(toTranslate);
-        //ImmutablePair<String, Integer> resultRaw = new TranslatorOpenAI().runCompletions(toTranslate);
+
+        String modelCompletions = "gpt-3.5-turbo-instruct";
+        ImmutablePair<String, Integer> resultRaw = new OpenAICompletions().runCompletions(modelCompletions, toTranslate);
         LOGGER.info("Translation: {}", resultRaw.getLeft());
         LOGGER.info("Total tokens: {}", resultRaw.getRight());
+
+        String modelChatCompletions = "gpt-3.5-turbo"; //gpt-4
+        ImmutablePair<String, Integer> resultRawChat = new OpenAICompletions().runChatCompletions(modelChatCompletions, toTranslate);
+        LOGGER.info("Chat translation: {}", resultRawChat.getLeft());
+        LOGGER.info("Chat total tokens: {}", resultRawChat.getRight());
     }
 
-    public ImmutablePair<String, Integer> runCompletions(String prompt) {
+    public ImmutablePair<String, Integer> runCompletions(String model, String prompt) {
         JSONObject requestParams = new JSONObject();
-        requestParams.put("model", "text-davinci-003");
+        requestParams.put("model", model);
         requestParams.put("prompt", prompt);
-
-        // The token limit for "text-davinci-003" is 4000 tokens (=  sum of prompt and completion tokens)
         requestParams.put("max_tokens", 1000);
 
         // Sampling temperature: Higher values means the model will take more risks (0-1)
@@ -59,7 +63,7 @@ public class OpenAICompletions {
         return extractPayloadCompletions(postRequest(requestParams, "completions"));
     }
 
-    public ImmutablePair<String, Integer> runChatCompletions(String prompt) {
+    public ImmutablePair<String, Integer> runChatCompletions(String model, String prompt) {
 
         JSONArray messages = new JSONArray();
         JSONObject jo = new JSONObject();
@@ -68,10 +72,8 @@ public class OpenAICompletions {
         messages.put(jo);
 
         JSONObject requestParams = new JSONObject();
-        requestParams.put("model", "gpt-3.5-turbo");
+        requestParams.put("model", model);
         requestParams.put("messages", messages);
-
-        // The token limit for "gpt-35-turbo" is 4096 tokens (=  sum of prompt and completion tokens)
         requestParams.put("max_tokens", 1000);
 
         // Sampling temperature: Higher values means the model will take more risks (0-1)
@@ -100,15 +102,16 @@ public class OpenAICompletions {
                 .build()) {
             return IOUtils.toString(httpClient.execute(request).getEntity().getContent(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            LOGGER.warn("Unable to get result from openai completions endpoint. Cause: ", e);
+            LOGGER.warn("Connection issue while accessing openai endpoint. Cause: ", e);
         }
         return "N/A";
     }
 
     private static ImmutablePair<String, Integer> extractPayloadChatCompletions(String jsonResponseChatCompletions) {
-        LOGGER.debug("RAW Response JSON: " + jsonResponseChatCompletions);
+        LOGGER.info("Raw response JSON: " + jsonResponseChatCompletions);
         JSONObject obj = new JSONObject(jsonResponseChatCompletions);
 
+        // Check raw response to see cause of parsing ex
         JSONArray arr = obj.getJSONArray("choices");
         JSONObject msg = arr.getJSONObject(0);
         checkLength(msg);
@@ -119,9 +122,10 @@ public class OpenAICompletions {
     }
 
     private ImmutablePair<String, Integer> extractPayloadCompletions(String jsonResponseCompletions) {
-        LOGGER.debug("RAW Response JSON: " + jsonResponseCompletions);
+        LOGGER.info("Raw response JSON: " + jsonResponseCompletions);
         JSONObject obj = new JSONObject(jsonResponseCompletions);
 
+        // Check raw response to see cause of parsing ex
         JSONArray arr = obj.getJSONArray("choices");
         JSONObject msg = arr.getJSONObject(0);
         checkLength(msg);

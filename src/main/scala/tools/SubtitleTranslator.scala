@@ -21,19 +21,21 @@ import scala.util.{Failure, Success, Try}
   *
   * Workflow:
   *  - Load all blocks from the .srt source file
-  *  - Split blocks to scenes (= all blocks in a session window), depending on maxGapSeconds
+  *  - Group blocks to scenes (= all blocks within a session window), depending on maxGap
   *  - Translate all blocks of a scene in one prompt (one line per block) via the openAI API
   *  - Continuously write translated blocks to target file
   *
   * Works with these OpenAI API endpoints:
-  *  - Default:  /chat/completions (gpt-3.5-turbo)    https://platform.openai.com/docs/guides/chat/chat-vs-completions
-  *  - Fallback: /completions      (text-davinci-003) https://beta.openai.com/docs/api-reference/completions/create
+  *  - Default:  /chat/completions (gpt-3.5-turbo)          https://platform.openai.com/docs/guides/chat/chat-vs-completions
+  *  - Fallback: /completions      (gpt-3.5-turbo-instruct) https://platform.openai.com/docs/api-reference/completions/create
   *
   * Usage:
-  *  - Wire up source file
+  *  - Wire .srt source file
   *  - Add API_KEY in [[OpenAICompletions]] and run this class
-  *  - Scan log for WARN log messages and edit corresponding blocks in target file manually
+  *  - Scan log for WARN log messages and improve corresponding blocks in target file manually
   *  - Note that the numerical block headers in the .srt files are not interpreted, only timestamps matter
+  *
+  * Similar to: [[sample.stream.SessionWindow]]
   */
 object SubtitleTranslator extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -44,6 +46,9 @@ object SubtitleTranslator extends App {
   private val targetFilePath = "DE_challenges.srt"
   private val targetLanguage = "German"
 
+  private val defaultModel = "gpt-3.5-turbo"
+  private val fallbackModel = "gpt-3.5-turbo-instruct"
+
   private val maxGapSeconds = 1 // idle time between scenes (= session windows)
   private val endBlockTag = "\n" // one block per line
   private val maxCharPerTranslatedLine = 40 // recommendation
@@ -51,8 +56,7 @@ object SubtitleTranslator extends App {
 
   private var totalTokensUsed = 0
 
-  // Extension methods for SubtitleBlock
-  implicit class SubtitleBlockExt(block: SubtitleBlock) {
+  implicit class SubtitleBlockExtensions(block: SubtitleBlock) {
     def allLines: String = block.lines.mkString(" ")
 
     def allLinesEbNewLine: String = allLines + endBlockTag + endBlockTag
@@ -62,18 +66,19 @@ object SubtitleTranslator extends App {
   private val srt: Try[Srt] = SrtDissector(new FileInputStream(sourceFilePath))
   logger.info("Number of subtitleBlocks to translate: {}", srt.get.length)
 
-  private val dummyLastElement = Source.single(SubtitleBlock(0, 0, List("")))
-  val source = Source.fromIterator(() => srt.get.iterator) ++ dummyLastElement
+  val source = Source.fromIterator(() => srt.get.iterator)
 
   val workflow = Flow[SubtitleBlock]
-    .via(partitionToScenes(maxGapSeconds))
+    .via(groupByScene(maxGapSeconds))
+    .filterNot(scene => scene.isEmpty)
     .map(translateScene)
 
   val fileSink = FileIO.toPath(Paths.get(targetFilePath))
+
   val processingSink = Flow[SubtitleBlock]
-    .statefulMapConcat(addBlockCounter())
-    .map { case (block: SubtitleBlock, blockCounter: Int) =>
-      ByteString(formatOutBlock(block, blockCounter))
+    .zipWithIndex
+    .map { case (block: SubtitleBlock, blockCounter: Long) =>
+      ByteString(formatOutBlock(block, blockCounter + 1))
     }
     .toMat(fileSink)((_, bytesWritten) => bytesWritten)
 
@@ -87,33 +92,27 @@ object SubtitleTranslator extends App {
   terminateWhen(done)
 
 
-  private def partitionToScenes(maxGap: Int) = {
-    Flow[SubtitleBlock]
-      .sliding(2) // allows to compare this element with the next element
-      .statefulMapConcat(hasGap(maxGap)) // stateful decision
-      .splitAfter(_._2) // split when gap has been reached
-      .map(_._1) // proceed with payload
-      //.wireTap(each => println(s"Scene block:\n$each"))
-      .fold(Vector.empty[SubtitleBlock])(_ :+ _)
-      .mergeSubstreams
-  }
-
-  private def hasGap(maxGap: Int): () => Seq[SubtitleBlock] => Iterable[(SubtitleBlock, Boolean)] = {
-    () => {
-      slidingElements => {
-        if (slidingElements.size == 2) {
-          val current = slidingElements.head.end
-          val next = slidingElements.tail.head.start
-          val gap = next - current
-          List((slidingElements.head, gap >= maxGap * 1000))
-        } else {
-          List((slidingElements.head, false))
+  // Partition to session windows
+  private def groupByScene(maxGap: Int) = {
+    Flow[SubtitleBlock].statefulMap(() => List.empty[SubtitleBlock])(
+      (stateList, nextElem) => {
+        val newStateList = stateList :+ nextElem
+        val lastElem = if (stateList.isEmpty) nextElem else stateList.reverse.head
+        val calcGap = nextElem.start - lastElem.end
+        if (calcGap < maxGap * 1000) {
+          // (list for next iteration, list of output elements)
+          (newStateList, Nil)
         }
-      }
-    }
+        else {
+          // (list for next iteration, list of output elements)
+          (List(nextElem), stateList)
+        }
+      },
+      // Cleanup function, we return the last stateList
+      stateList => Some(stateList))
   }
 
-  private def translateScene(sceneOrig: Vector[SubtitleBlock]) = {
+  private def translateScene(sceneOrig: List[SubtitleBlock]) = {
     logger.info(s"About to translate scene with: ${sceneOrig.size} original blocks")
 
     val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEbNewLine)
@@ -121,11 +120,12 @@ object SubtitleTranslator extends App {
     logger.info(s"Translation prompt: $toTranslate")
 
     // First try with the cheaper 'gpt-3.5-turbo' model
-    val translatedCheap = new OpenAICompletions().runChatCompletions(toTranslate)
+    // Also possible to use 'gpt-4'
+    val translatedCheap = new OpenAICompletions().runChatCompletions(defaultModel, toTranslate)
     val translated = translatedCheap match {
       case translatedCheap if !isTranslationPlausible(translatedCheap.getLeft, sceneOrig.size) =>
-        logger.info(s"Translation from 'gpt-3.5-turbo' is not plausible, lines do not match. Fallback to 'text-davinci-003'")
-        new OpenAICompletions().runCompletions(toTranslate)
+        logger.info(s"Translation with: $defaultModel is not plausible, lines do not match. Fallback to: $fallbackModel")
+        new OpenAICompletions().runCompletions(fallbackModel, toTranslate)
       case _ => translatedCheap
     }
 
@@ -200,7 +200,7 @@ object SubtitleTranslator extends App {
       logger.warn(s"Translated block text is too long (${textCleaned.length} chars). Try to shorten via API call. Check result manually")
       val toShorten = generateShortenPrompt(textCleaned)
       logger.info(s"Shorten prompt: $toShorten")
-      val responseShort = new OpenAICompletions().runCompletions(toShorten)
+      val responseShort = new OpenAICompletions().runCompletions(fallbackModel, toShorten)
       splitSentence(clean(responseShort.getLeft))
     }
     else splitSentence(textCleaned)
@@ -244,19 +244,7 @@ object SubtitleTranslator extends App {
     s"$hours:$minutes:$seconds,$milliSeconds"
   }
 
-  private def addBlockCounter() = {
-    () => {
-      var counter = 0
-      block: SubtitleBlock =>
-        block match {
-          case block: SubtitleBlock =>
-            counter = counter + 1
-            List((block, counter))
-        }
-    }
-  }
-
-  private def formatOutBlock(block: SubtitleBlock, blockCounter: Int) = {
+  private def formatOutBlock(block: SubtitleBlock, blockCounter: Long) = {
     val ls = sys.props("line.separator")
     // Spec: https://wiki.videolan.org/SubRip
     val outputFormatted = s"$blockCounter$ls${toTime(block.start)} --> ${toTime(block.end)}$ls${block.lines.mkString("\n")}$ls$ls"
@@ -270,7 +258,7 @@ object SubtitleTranslator extends App {
         println(s"Flow Success. Finished writing to target file: $targetFilePath. Around $totalTokensUsed tokens used. About to terminate...")
         system.terminate()
       case Failure(e) =>
-        println(s"Flow Failure: $e. Partial results are in target file:$targetFilePath About to terminate...")
+        println(s"Flow Failure: $e. Partial translations are in target file: $targetFilePath About to terminate...")
         system.terminate()
     }
   }
