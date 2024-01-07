@@ -2,21 +2,21 @@ package alpakka.xml
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
-import org.apache.pekko.stream.connectors.xml.{EndElement, ParseEvent, StartElement, TextEvent}
+import org.apache.pekko.stream.connectors.xml.{EndElement, StartElement, TextEvent}
 import org.apache.pekko.stream.scaladsl.{FileIO, Sink, Source}
 import org.apache.pekko.util.ByteString
 
 import java.nio.file.Paths
 import java.util.Base64
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
   * Parse XML file to get a stream of consecutive events of type `ParseEvent`.
+  *
   * As a side effect:
-  * Detect embedded base64 encoded `application/jpg`, extract and decode it
-  * in memory and write to file
+  * Detect embedded base64 encoded `application/jpg` files,
+  * extract and decode them in memory and write to disk
   *
   */
 
@@ -29,37 +29,33 @@ object XmlProcessing extends App {
 
   val done = FileIO.fromPath(Paths.get("src/main/resources/xml_with_base64_embedded.xml"))
     .via(XmlParsing.parser)
-    .statefulMapConcat(() => {
-
-      // state
-      val base64ContentAggregator = new StringBuilder()
-      var counter = 0
-      var fileEnding = ""
-
-      // aggregation function
-      parseEvent: ParseEvent =>
-        parseEvent match {
+    .statefulMap(() => State(new StringBuilder(), 1, ""))(
+      (state, nextElem) => {
+        nextElem match {
           case s: StartElement if s.attributes.contains("mediaType") =>
-            base64ContentAggregator.clear()
+            state.base64Content.clear()
             val mediaType = s.attributes.head._2
-            fileEnding = mediaType.split("/").toList.reverse.head
+            val fileEnding = mediaType.split("/").toList.reverse.head
             println(s"mediaType: $mediaType / file ending: $fileEnding")
-            immutable.Seq.empty
+            state.fileEnding = fileEnding
+            (state, Nil)
           case s: EndElement if s.localName == "embeddedDoc" =>
-            val base64Content = base64ContentAggregator.toString
-            Source.single(ByteString(base64Content))
+            Source.single(ByteString(state.base64Content.toString))
               .map(each => ByteString(Base64.getMimeDecoder.decode(each.toByteBuffer)))
-              .runWith(FileIO.toPath(Paths.get(s"$counter-$resultFileName.$fileEnding")))
-            counter = counter + 1
-            immutable.Seq.empty
+              .runWith(FileIO.toPath(Paths.get(s"${state.counter}-$resultFileName.${state.fileEnding}")))
+            state.counter = state.counter + 1
+            (state, Nil)
           case t: TextEvent =>
-            println(s"TextEvent with chunked content: ${t.text}")
-            base64ContentAggregator.append(t.text)
-            immutable.Seq.empty
+            println(s"TextEvent with (chunked) content: ${t.text}")
+            state.base64Content.append(t.text)
+            (state, Nil)
           case _ =>
-            immutable.Seq.empty
+            (state, Nil)
         }
-    })
+      },
+      // Cleanup function, we return the last state
+      state => Some(state))
+
     .runWith(Sink.ignore)
 
   terminateWhen(done)
@@ -75,4 +71,6 @@ object XmlProcessing extends App {
         system.terminate()
     }
   }
+
+  case class State(base64Content: StringBuilder, var counter: Int, var fileEnding: String)
 }
