@@ -70,7 +70,6 @@ object SubtitleTranslator extends App {
 
   val workflow = Flow[SubtitleBlock]
     .via(groupByScene(maxGapSeconds))
-    .filterNot(scene => scene.isEmpty)
     .map(translateScene)
 
   val fileSink = FileIO.toPath(Paths.get(targetFilePath))
@@ -110,6 +109,7 @@ object SubtitleTranslator extends App {
       },
       // Cleanup function, we return the last stateList
       stateList => Some(stateList))
+      .filterNot(scene => scene.isEmpty)
   }
 
   private def translateScene(sceneOrig: List[SubtitleBlock]) = {

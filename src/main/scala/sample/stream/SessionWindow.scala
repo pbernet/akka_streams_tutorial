@@ -39,6 +39,7 @@ object SessionWindow extends App {
       },
       // Cleanup function, we return the last stateList
       stateList => Some(stateList))
+      .filterNot(each => each.isEmpty)
 
   val input = Source(List(
     Event(1, "A"),
@@ -51,7 +52,6 @@ object SessionWindow extends App {
 
   val result: Future[Seq[List[Event[String]]]] = input
     .via(groupBySessionWindow(maxGap))
-    .filterNot(each => each.isEmpty)
     .runWith(Sink.seq)
 
   result.onComplete {

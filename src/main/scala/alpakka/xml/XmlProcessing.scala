@@ -13,12 +13,10 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * Parse XML and extract embedded base64 application/jpg
-  * and stream results to file
-  *
-  * Remarks:
-  * - A case class could be used inside statefulMapConcat, to model the state
-  * - The payload could be streamed directly to the result file to avoid memory overhead
+  * Parse XML file to get a stream of consecutive events of type `ParseEvent`.
+  * As a side effect:
+  * Detect embedded base64 encoded `application/jpg`, extract and decode it
+  * in memory and write to file
   *
   */
 
@@ -27,34 +25,36 @@ object XmlProcessing extends App {
 
   import system.dispatcher
 
-  val resultFileName = "testfile_result.jpg"
+  val resultFileName = "extracted_from_xml"
 
   val done = FileIO.fromPath(Paths.get("src/main/resources/xml_with_base64_embedded.xml"))
     .via(XmlParsing.parser)
     .statefulMapConcat(() => {
 
       // state
-      val stringBuilder: StringBuilder = new StringBuilder()
-      var counter: Int = 0
+      val base64ContentAggregator = new StringBuilder()
+      var counter = 0
+      var fileEnding = ""
 
       // aggregation function
       parseEvent: ParseEvent =>
         parseEvent match {
           case s: StartElement if s.attributes.contains("mediaType") =>
-            stringBuilder.clear()
+            base64ContentAggregator.clear()
             val mediaType = s.attributes.head._2
-            println("mediaType: " + mediaType)
-            immutable.Seq(mediaType)
+            fileEnding = mediaType.split("/").toList.reverse.head
+            println(s"mediaType: $mediaType / file ending: $fileEnding")
+            immutable.Seq.empty
           case s: EndElement if s.localName == "embeddedDoc" =>
-            val text = stringBuilder.toString
-            println("File content: " + text) //large embedded files are read into memory
-            Source.single(ByteString(text))
+            val base64Content = base64ContentAggregator.toString
+            Source.single(ByteString(base64Content))
               .map(each => ByteString(Base64.getMimeDecoder.decode(each.toByteBuffer)))
-              .runWith(FileIO.toPath(Paths.get(s"$counter-$resultFileName")))
+              .runWith(FileIO.toPath(Paths.get(s"$counter-$resultFileName.$fileEnding")))
             counter = counter + 1
-            immutable.Seq(text)
+            immutable.Seq.empty
           case t: TextEvent =>
-            stringBuilder.append(t.text)
+            println(s"TextEvent with chunked content: ${t.text}")
+            base64ContentAggregator.append(t.text)
             immutable.Seq.empty
           case _ =>
             immutable.Seq.empty

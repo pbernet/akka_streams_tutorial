@@ -55,7 +55,7 @@ object SplitWhen2 extends App {
       }
     }
 
-  val groupByKeyChange: Flow[Record, List[Record], NotUsed] = {
+  val groupByKeyChange = {
     Flow[Record].statefulMap(() => List.empty[Record])(
       (stateList, nextElem) => {
         val newStateList = stateList :+ nextElem
@@ -72,6 +72,7 @@ object SplitWhen2 extends App {
       },
       // Cleanup function, we return the last stateList
       stateList => Some(stateList))
+      .filterNot(list => list.isEmpty)
   }
 
   val printSink = Sink.foreach[List[Record]](each => println(s"Reached sink: $each"))
@@ -83,7 +84,7 @@ object SplitWhen2 extends App {
         .via(csvToRecord)
         .via(terminationHook)
         .via(groupByKeyChange)
-        .filterNot(each => each.isEmpty)
+
         .runWith(printSink)
     case Failure(exception) => logger.info(s"Exception: $exception")
   }
