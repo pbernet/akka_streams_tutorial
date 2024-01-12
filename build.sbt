@@ -42,7 +42,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
   "javax.jms" % "jms" % "1.1",
-  "javax.xml.bind" % "jaxb-api" % "2.3.0",
+  "javax.xml.bind" % "jaxb-api" % "2.3.1",
   "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
