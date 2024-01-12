@@ -129,8 +129,8 @@ libraryDependencies ++= Seq(
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
-  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
-  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
+  "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.3" % Test,
+  "org.junit.jupiter" % "junit-jupiter-api" % "5.9.3" % Test,
 
   // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
   "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
