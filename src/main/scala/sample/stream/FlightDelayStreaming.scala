@@ -33,11 +33,11 @@ import scala.util.{Failure, Success, Try}
   *
   * Typical results on 2012 vintage MacBook Pro with 8 cores
   * with default dispatcher and default JVM param:
-  * JDK 11.0.11    6925126 elements in 41 seconds (168905/sec)
-  * JDK 17.0.2     6876230 elements in 33 seconds (208370/sec)
-  * JDK 19.0.1     6975988 elements in 29 seconds (240551/sec)
-  * graalvm-ce-19  6977018 elements in 28 seconds (249179/sec)
-  * graalvm-jdk-21 6839762 elements in 27 seconds (253324/sec)
+  * JDK 11.0.11    41 seconds (168905/sec)
+  * JDK 17.0.2     33 seconds (208370/sec)
+  * JDK 19.0.1     29 seconds (240551/sec)
+  * graalvm-ce-19  28 seconds (249179/sec)
+  * graalvm-jdk-21 27 seconds (253324/sec)
   *
   * Doc:
   * https://fullgc.github.io/how-to-tune-akka-to-get-the-most-from-your-actor-based-system-part-1

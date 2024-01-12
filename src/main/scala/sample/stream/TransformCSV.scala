@@ -13,17 +13,14 @@ import scala.sys.process._
   * Inspired by:
   * https://discuss.lightbend.com/t/transform-a-csv-file-into-multiple-csv-files-using-akka-stream/3142
   *
-  * Solution proposal in three steps (sort/split/count) according to "use the best tool available" strategy.
-  * Thus instead of akka-streams we use linux tools for each step (sort/awk/wc) to apply the "chainsaw style"
-  * transformations
+  * Instead of akka-streams we use linux tools (sort/split) for each step to apply the
+  * "chainsaw style" transformations to the large csv file.
+  * With the additional count this does the same as: [[FlightDelayStreaming]].
+  * However the performance is not as good as in FlightDelayStreaming.
   *
   * Remarks:
   *  - Instead of putting all steps in a shell script, we want to use Scala [[Process]] for each step
-  *  - Yes, the steps have side effects
-  *  - See also: [[FlightDelayStreaming]] where the csv data file originates
-  *
-  * Doc Scala ProcessBuilder:
-  * https://dotty.epfl.ch/api/scala/sys/process/ProcessBuilder.html
+  *  - Doc Scala ProcessBuilder: https://dotty.epfl.ch/api/scala/sys/process/ProcessBuilder.html
   */
 object TransformCSV extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
