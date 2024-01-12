@@ -3,6 +3,7 @@ package sample.stream_shared_state
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 
+import java.time.format.DateTimeFormatter
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -39,7 +40,7 @@ object WindowingExample extends App {
   val delayFactor = 8
   val acceptedMaxDelay = 4.seconds.toMillis // Lower value leads to dropping of events
 
-  implicit val ordering = new Ordering[MyEvent]{
+  implicit val ordering: Ordering[MyEvent] = new Ordering[MyEvent] {
     def compare(x: MyEvent, y: MyEvent): Int = {
       if (x.timestamp < y.timestamp) -1
       else if (x.timestamp > y.timestamp) 1
@@ -50,10 +51,14 @@ object WindowingExample extends App {
   Source
     .tick(0.seconds, 1.second, "")
     .map(_ => createEvent())
-    .statefulMapConcat { () =>
-      val generator = new CommandGenerator()
-      ev => generator.forEvent(ev)
-    }
+    .statefulMap(
+      // state creation function
+      () => new CommandGenerator())(
+      // mapping function
+      (generator, nextElem) => (generator, generator.forEvent(nextElem)),
+      // cleanup function
+      generator => Some(generator.forEvent(createEvent())))
+    .mapConcat(identity) // flatten
     .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
     .takeWhile(!_.isInstanceOf[CloseWindow])
     .fold(AggregateEventData(Window(0L, 0L), mutable.TreeSet[MyEvent]())) {
@@ -116,7 +121,7 @@ object WindowingExample extends App {
       // watermark: the timestamp of the *newest* event minus acceptedMaxDelay
       watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
       if (ev.timestamp < watermark) {
-        println(s"Dropping $ev, watermark is at: ${tsToString(watermark)}")
+        println(s"Dropping event: $ev, watermark is at: ${tsToString(watermark)}")
         Nil
       } else {
         val eventWindows = Window.windowsFor(ev.timestamp)
@@ -129,11 +134,11 @@ object WindowingExample extends App {
           } else None
         }
 
-        val openCommands = eventWindows.flatMap { w =>
-          if (!openWindows.contains(w)) {
-            println(s"Open new $w")
-            openWindows.add(w)
-            Some(OpenWindow(w))
+        val openCommands = eventWindows.flatMap { ew =>
+          if (!openWindows.contains(ew)) {
+            println(s"Open new $ew")
+            openWindows.add(ew)
+            Some(OpenWindow(ew))
           } else None
         }
 
@@ -144,7 +149,7 @@ object WindowingExample extends App {
     }
   }
 
- case class AggregateEventData(w: Window, events: mutable.TreeSet[MyEvent]) {
+  case class AggregateEventData(w: Window, events: mutable.TreeSet[MyEvent]) {
     override def toString =
       s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were: ${events.size} events. Details: $events"
   }
@@ -152,5 +157,5 @@ object WindowingExample extends App {
   def tsToString(ts: Long) = OffsetDateTime
     .ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault())
     .toLocalTime
-    .toString
+    .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
 }

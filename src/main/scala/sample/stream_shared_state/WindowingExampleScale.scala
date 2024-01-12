@@ -5,6 +5,7 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComp
 import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.time.format.DateTimeFormatter
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import scala.collection.mutable
 import scala.collection.parallel.CollectionConverters._
@@ -29,7 +30,7 @@ object WindowingExampleScale extends App {
   val delayFactor = 8
   val acceptedMaxDelay = 6.seconds.toMillis // Lower value leads to dropping of events
 
-  implicit val ordering = new Ordering[MyEvent] {
+  implicit val ordering: Ordering[MyEvent] = new Ordering[MyEvent] {
     def compare(x: MyEvent, y: MyEvent): Int = {
       if (x.timestamp < y.timestamp) -1
       else if (x.timestamp > y.timestamp) 1
@@ -44,10 +45,14 @@ object WindowingExampleScale extends App {
   val windowingProcessorSourceQueue: SourceQueueWithComplete[MyEvent] =
     Source
       .queue[MyEvent](bufferSize, OverflowStrategy.backpressure, maxConcurrentOffers)
-      .statefulMapConcat { () =>
-        val generator = new CommandGenerator()
-        ev => generator.forEvent(ev)
-      }
+      .statefulMap(
+        // state creation function
+        () => new CommandGenerator())(
+        // mapping function
+        (generator, nextElem) => (generator, generator.forEvent(nextElem)),
+        // cleanup function
+        generator => Some(generator.forEvent(createEvent(0))))
+      .mapConcat(identity) // flatten
       .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
       .takeWhile(!_.isInstanceOf[CloseWindow])
       .fold(AggregateEventData(Window(0L, 0L), mutable.TreeSet[MyEvent]())) {
@@ -64,19 +69,19 @@ object WindowingExampleScale extends App {
 
   (1 to numberOfPublishingClients).par.foreach(each => client(each))
 
-  def client(nbr: Int) = {
-    logger.info(s"Starting client with id: $nbr")
+  def client(id: Int) = {
+    logger.info(s"Starting client with id: $id")
     Source
       .tick(0.seconds, 10.millis, "")
-      .map(_ => createEvent())
+      .map(_ => createEvent(id))
       .map(offerToSourceQueue)
       .runWith(Sink.ignore)
   }
 
-  private def createEvent() = {
+  private def createEvent(id: Int) = {
     val now = System.currentTimeMillis()
     val delay = random.nextInt(delayFactor)
-    val myEvent = MyEvent(now - delay * 1000L)
+    val myEvent = MyEvent(now - delay * 1000L, id)
     logger.debug(s"$myEvent")
     myEvent
   }
@@ -90,9 +95,9 @@ object WindowingExampleScale extends App {
     }
   }
 
-  case class MyEvent(timestamp: Long) {
+  case class MyEvent(timestamp: Long, id: Int) {
     override def toString =
-      s"Event: ${tsToString(timestamp)}"
+      s"Event: ${tsToString(timestamp)} source: $id"
   }
 
   case class Window(startTs: Long, stopTs: Long) {
@@ -132,7 +137,7 @@ object WindowingExampleScale extends App {
       // watermark: the timestamp of the *newest* event minus acceptedMaxDelay
       watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
       if (ev.timestamp < watermark) {
-        logger.debug(s"Dropping $ev, watermark is at: ${tsToString(watermark)}")
+        logger.debug(s"Dropping event: $ev, watermark is at: ${tsToString(watermark)}")
         Nil
       } else {
         val eventWindows = Window.windowsFor(ev.timestamp)
@@ -168,5 +173,5 @@ object WindowingExampleScale extends App {
   def tsToString(ts: Long) = OffsetDateTime
     .ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault())
     .toLocalTime
-    .toString
+    .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
 }
