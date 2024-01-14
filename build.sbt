@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.pekko" %% "pekko-http" % pekkoHTTPVersion,
   "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
-  "org.json" % "json" % "20230227",
+  "org.json" % "json" % "20231013",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
