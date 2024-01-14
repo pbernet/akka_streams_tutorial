@@ -57,7 +57,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.35.0",
+  "com.hierynomus" % "sshj" % "0.38.0",
   "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-elasticsearch" % pekkoConnectorVersion,
