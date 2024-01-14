@@ -96,7 +96,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.2",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.2.4",
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
