@@ -144,7 +144,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.2.15" % Test,
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
-  "org.assertj" % "assertj-core" % "3.24.2" % Test
+  "org.assertj" % "assertj-core" % "3.25.1" % Test
 )
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
