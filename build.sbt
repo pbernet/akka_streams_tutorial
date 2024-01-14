@@ -80,7 +80,7 @@ libraryDependencies ++= Seq(
 
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion, // not (yet) migrated to pekko
   "com.influxdb" % "flux-dsl" % influxdbVersion,
-  "org.influxdb" % "influxdb-java" % "2.23",
+  "org.influxdb" % "influxdb-java" % "2.24",
 
   "ca.uhn.hapi" % "hapi-base" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
