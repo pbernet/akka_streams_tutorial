@@ -125,7 +125,7 @@ libraryDependencies ++= Seq(
   "com.clickhouse" % "clickhouse-jdbc" % "0.5.0",
   "com.crobox.clickhouse" %% "client" % "1.1.4",
 
-  "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
+  "org.opensearch" % "opensearch-testcontainers" % "2.0.1",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
