@@ -92,7 +92,7 @@ libraryDependencies ++= Seq(
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
-  "com.typesafe.play" %% "play-json" % "2.9.4",
+  "com.typesafe.play" %% "play-json" % "2.10.4",
   "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
