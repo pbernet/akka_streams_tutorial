@@ -9,7 +9,8 @@ import scala.jdk.javaapi.FutureConverters;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,10 +32,14 @@ public class S3EchoMinioIT {
     }
 
     @Test
-    public void testLocal() throws IOException {
+    public void testLocal() throws IOException, ExecutionException, InterruptedException {
         S3Echo echo = new S3Echo(minioContainer.getHostAddress(), ACCESS_KEY, SECRET_KEY);
 
-        assertThat(FutureConverters.asJava(echo.run())).succeedsWithin(15, TimeUnit.SECONDS);
+        CompletionStage<Object> result = FutureConverters.asJava(echo.run());
+
+        // Number of files in bucket: n uploaded files + 1 zip
+        assertThat(result.toCompletableFuture().get()).isEqualTo(11);
+
         assertThat(Files.list(echo.localTmpDir()).count()).isEqualTo(10);
     }
 }

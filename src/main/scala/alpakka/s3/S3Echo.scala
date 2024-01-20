@@ -20,9 +20,9 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
-  * S3 file upload/download roundtrips:
-  *  - roundtrip1Client: upload n files -> download n files
-  *  - roundtrip2Client: download n files -> zip locally -> upload zip file
+  * Implement two S3 file upload/download roundtrips, where the 2nd depends on the 1st:
+  *  - roundtrip1Client: upload n files   -> download n files
+  *  - roundtrip2Client: download n files -> zip n files locally -> upload zip file
   *
   * Run this class against your AWS account using the settings in application.conf
   * or
@@ -36,7 +36,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   implicit val system = ActorSystem("S3Echo")
   implicit val executionContext = system.dispatcher
 
-  private val resourceFileName = "testfile.jpg"
+  private val resourceFileName = "63MB.pdf"
   private val archiveFileName = "archive.zip"
 
   // Bucket name must be unique and may only contain certain characters
@@ -60,17 +60,18 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   logger.info(s"Using localTmpDir dir: $localTmpDir")
   FileUtils.forceMkdir(localTmpDir.toFile)
 
-  def run(): Future[Done] = {
-    val done = for {
+  def run(): Future[Int] = {
+
+    val doneSequentialProcessing: Future[Int] = for {
       _ <- makeBucket()
       _ <- roundtrip1Client()
       _ <- countFilesBucket()
       _ <- roundtrip2Client()
-      _ <- countFilesBucket()
-    } yield Done
+      nbrOfFilesBucket <- countFilesBucket()
+    } yield nbrOfFilesBucket
 
-    terminateWhen(done)
-    done
+    terminateWhen(doneSequentialProcessing)
+    doneSequentialProcessing
   }
 
   private def makeBucket() = {
@@ -79,9 +80,16 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
     S3.checkIfBucketExists(bucketName)
       .flatMap {
         case BucketAccess.NotExists =>
-          logger.info(s"Bucket: $bucketName does not exist. Creating bucket")
-          // Hangs, when "endpoint-url" is not correct
-          S3.makeBucket(bucketName)
+          logger.info(s"Bucket: $bucketName does not exist. About to create bucket...")
+
+          S3.makeBucket(bucketName).flatMap {
+            case Done =>
+              logger.info(s"Successfully created bucket with name: $bucketName")
+              Future.successful(Done)
+            case _ =>
+              // Hangs, when "endpoint-url" is not correct
+              Future.failed(new RuntimeException(s"Unable to create bucket: $bucketName"))
+          }
         case BucketAccess.AccessGranted =>
           logger.info(s"Bucket: $bucketName already exists. Proceed...")
           Future.successful(Done)
@@ -94,9 +102,11 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
 
   private def roundtrip1Client() = {
     logger.info(s"About to start 1st roundtrip...")
+
     Source(1 to 10)
       .mapAsync(5)(each => uploadClient(each))
-      .runForeach(key => downloadClient(key))
+      .map(key => downloadClient(key))
+      .runWith(Sink.ignore)
   }
 
   private def uploadClient(id: Int) = {
@@ -112,8 +122,10 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
     val result: Future[MultipartUploadResult] =
       fileSource.runWith(s3Sink)
 
-    result.onComplete(content => logger.info(s"Upload completed: $content"))
-    Future(bucketKey)
+    result.flatMap { bucket =>
+      logger.info(s"Upload completed: $bucket")
+      Future(bucket.key)
+    }
   }
 
   private def downloadClient(bucketKey: String) = {
@@ -123,7 +135,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
 
     val (metadataFuture, dataFuture) = getObject(bucketKey)
 
-    dataFuture.collect { data =>
+    dataFuture.flatMap { data =>
       val source = Source(data)
       val tmpPath = localTmpDir.resolve(bucketKey)
       val sink = FileIO.toPath(tmpPath)
@@ -133,16 +145,21 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   }
 
   private def countFilesBucket() = {
+    logger.info(s"About to count files in bucket...")
     val resultFut: Future[Seq[ListBucketResultContents]] = S3
       .listBucket(bucketName, None)
       .withAttributes(s3attributes)
       .runWith(Sink.seq)
 
-    resultFut.onComplete(result => logger.info(s"Number of files in bucket: ${result.get.size}"))
-    resultFut
+    resultFut.flatMap { result =>
+      val size = result.size
+      logger.info(s"Number of files in bucket: $size")
+      Future(size)
+    }
+
   }
 
-  // requires that files are present in bucket
+  // requires that files are present in s3 bucket (eg from 1st roundtrip)
   private def roundtrip2Client() = {
     logger.info(s"About to start 2nd roundtrip...")
     val s3Sink = S3.multipartUpload(bucketName, archiveFileName).withAttributes(s3attributes)
@@ -150,9 +167,9 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
     S3
       .listBucket(bucketName, None)
       .withAttributes(s3attributes)
-      .mapAsync(4) { resContents =>
+      .mapAsync(5) { resContents =>
         val (metadataFuture, dataFuture) = getObject(resContents.key)
-        dataFuture.map { seqbs => (ArchiveMetadata(resContents.key), Source(seqbs)) }
+        dataFuture.map(seqbs => (ArchiveMetadata(resContents.key), Source(seqbs)))
       }
       .via(Archive.zip())
       .runWith(s3Sink)
@@ -166,7 +183,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
       .toMat(Sink.seq)(Keep.both).run()
   }
 
-  private def terminateWhen(done: Future[Done]): Unit = {
+  private def terminateWhen(done: Future[Int]): Unit = {
     done.onComplete {
       case Success(_) =>
         logger.info(s"Flow Success. About to terminate...")
