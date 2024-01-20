@@ -13,17 +13,14 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
-  * Run a fast and two slow flows with the same elements in parallel
-  * and wait for the flows to complete using for comprehension or Futures
+  * Run a fast and a slow flow as well as a slow faulty flow
+  * with the same elements in parallel
+  * Wait for the flows to complete using for comprehension or Futures
+  * Processing with Futures allows for more control
   *
   * Remarks:
   *  - Use custom dispatcher for slow FileIO flows
   *    See [[actor.BlockingRight]] for use of custom dispatcher in typed Actor
-  *  - Shows finalisation strategies when using Futures:
-  *    Stop when all flows are OK, or one is NOK
-  *    vs
-  *    Stop when all flows are OK, or NOK
-  *
   */
 object WaitForFlowsToComplete extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -43,18 +40,18 @@ object WaitForFlowsToComplete extends App {
   // scan (= transform) the source
   val factorialsSource = origSource.scan(BigInt(1))((acc, next) => acc * next)
 
-  val fastFlow = origSource.runForeach(i => logger.info(s"Reached sink: $i"))
+  val fastFlow = origSource.runForeach(i => logger.info(s"Reached fast sink: $i"))
 
   val slowFlow = factorialsSource
     .map(_.toString)
     .throttle(1, 1.second, 1, ThrottleMode.shaping)
-    .mapAsync(parallelism = 1)(each => simulateFaultyProcessing(each))
-    .runWith(lineSink("factorial1.txt"))
+    .runWith(lineSink("factorials_slow.txt"))
 
   val slowFaultyFlow = factorialsSource
     .map(_.toString)
     .throttle(1, 1.second, 1, ThrottleMode.shaping)
-    .runWith(lineSink("factorial2.txt"))
+    .map(each => simulateFaultyProcessing(false, each))
+    .runWith(lineSink("factorial_slow_faulty.txt"))
 
   //processWithForComprehension()
 
@@ -62,31 +59,36 @@ object WaitForFlowsToComplete extends App {
 
   private def processWithForComprehension() = {
     val allDone = for {
+      slowFaultyFlowDone <- slowFaultyFlow
+      slowFlowDone <- slowFlow
       fastFlowDone <- fastFlow
-      slowFlow1Done <- slowFlow
-      slowFlow2Done <- slowFaultyFlow
-    } yield (fastFlowDone, slowFlow1Done, slowFlow2Done)
+    } yield (fastFlowDone, slowFlowDone, slowFaultyFlowDone)
 
-    allDone.onComplete { results =>
-      logger.info(s"Resulting futures from flows: $results - about to terminate")
+    allDone.onComplete {
+      case Success(r) =>
+        logger.info(s"Success. Flow results: $r")
+        system.terminate()
+      case Failure(e) =>
+        logger.info(s"Failure. Exception message: ${e.getMessage}")
       system.terminate()
     }
   }
 
+  // Allows for more control
   private def processWithFutureSequence() = {
 
     // completes when either:
-    // - all the futures have completed successfully, or
-    // - one of the futures has failed
+    //  - all futures have completed successfully, or
+    //  - one of the futures has failed
     val futSeq = Future.sequence(List(fastFlow, slowFlow, slowFaultyFlow)
-      // Lifting each Flow result to a Try allows to wait for all results (OK or NOK)
+      // Lifting each flow result to a Try allows to wait for *all* flow results (Success OR Failure)
       // see: https://stackoverflow.com/questions/29344430/scala-waiting-for-sequence-of-futures
       //.map(each => each.transform(Success(_)))
     )
 
     futSeq.onComplete {
-      case Success(b) =>
-        logger.info(s"Success: $b")
+      case Success(r) =>
+        logger.info(s"Success. Flow results: $r")
         system.terminate()
       case Failure(e) =>
         logger.info(s"Failure. Exception message: ${e.getMessage}")
@@ -94,13 +96,15 @@ object WaitForFlowsToComplete extends App {
     }
   }
 
-  private def simulateFaultyProcessing(each: String) = {
+  private def simulateFaultyProcessing(isFaulty: Boolean, payload: String) = {
+    if (isFaulty) {
     val time = LocalTime.now()
-    logger.info(s"Processing at: $time")
+      logger.info(s"Processing $payload at: $time")
     if (time.getSecond % 2 == 0) {
       logger.info(s"RuntimeException at: $time")
       throw new RuntimeException("BOOM - RuntimeException")
     }
-    Future(each)
+      payload
+    } else payload
   }
 }
