@@ -167,9 +167,7 @@ source `.srt` file to a target language using the OpenAI API endpoints:
   see [Doc](https://beta.openai.com/docs/api-reference/completions/create)
 
 Pekko streams helps in these areas:
-
-* Easy workflow modelling
-* Scene splitting with `session windows`. All blocks of a scene are grouped in one session and thus translated in one
-  API call
-* Throttling to not exceed the API rate-limits
-* Continuous writing of translated blocks to the target file
+* Workflow modelling
+* Scene splitting to `session windows`. All blocks of a scene are grouped in one session and then translated in one API call
+* Throttling to not exceed the [OpenAI API rate limits](https://platform.openai.com/docs/guides/rate-limits?context=tier-free)
+* Continuous writing of translated blocks to the target file to avoid data loss on NW failure
