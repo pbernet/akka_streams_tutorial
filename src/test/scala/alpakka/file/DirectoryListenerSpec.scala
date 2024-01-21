@@ -15,31 +15,31 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
 
   var listener: DirectoryListener = _
   var tmpRootDir: Path = _
-  var uploadDir: Path = _
+  var parentDir: Path = _
   var processedDir: Path = _
 
   "DirectoryListener" should {
     "detect_files_on_startup" in {
 
       Thread.sleep(3000)
-      listener.countFilesProcessed() shouldEqual 2
+      listener.countFilesProcessed().shouldEqual(2)
     }
 
-    "detect_added_files_at_runtime" in {
-      copyTestFileToDir(uploadDir)
+    "detect_added_files_at_runtime_in_parent" in {
+      copyTestFileToDir(parentDir)
 
       Thread.sleep(3000)
-      listener.countFilesProcessed() shouldEqual 2 + 1
+      listener.countFilesProcessed().shouldEqual(2 + 1)
     }
 
     "detect_added_files_at_runtime_in_subdir" in {
-      copyTestFileToDir(uploadDir.resolve("subdir"))
+      copyTestFileToDir(parentDir.resolve("subdir"))
 
       Thread.sleep(3000)
-      listener.countFilesProcessed() shouldEqual 2 + 1
+      listener.countFilesProcessed().shouldEqual(2 + 1)
     }
 
-    "detect_added_nested_dir_with_files_in_subdir" in {
+    "detect_added_nested_subdir_at_runtime_with_files_in_subdir" in {
       val tmpDir = Files.createTempDirectory("tmp")
       val sourcePath = Paths.get("src/main/resources/testfile.jpg")
       val targetPath = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
@@ -47,11 +47,11 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
       Files.copy(sourcePath, targetPath)
       Files.copy(sourcePath, targetPath2)
 
-      val targetDir = Files.createDirectories(uploadDir.resolve("subdir").resolve("nestedDirWithFiles"))
+      val targetDir = Files.createDirectories(parentDir.resolve("subdir").resolve("nestedDirWithFiles"))
       FileUtils.copyDirectory(tmpDir.toFile, targetDir.toFile)
 
       Thread.sleep(3000)
-      listener.countFilesProcessed() shouldEqual 2 + 2
+      listener.countFilesProcessed().shouldEqual(2 + 2)
     }
   }
 
@@ -61,17 +61,17 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
     tmpRootDir = Files.createTempDirectory(testData.text)
     logger.info(s"Created tmp dir: $tmpRootDir")
 
-    uploadDir = tmpRootDir.resolve("upload")
+    parentDir = tmpRootDir.resolve("upload")
     processedDir = tmpRootDir.resolve("processed")
-    Files.createDirectories(uploadDir)
-    Files.createDirectories(uploadDir.resolve("subdir"))
+    Files.createDirectories(parentDir)
+    Files.createDirectories(parentDir.resolve("subdir"))
     Files.createDirectories(processedDir)
 
     // Populate dirs BEFORE startup
     copyTestFileToDir(tmpRootDir.resolve("upload"))
     copyTestFileToDir(tmpRootDir.resolve("upload/subdir"))
 
-    listener = DirectoryListener(uploadDir, processedDir)
+    listener = DirectoryListener(parentDir, processedDir)
   }
 
   override protected def afterEach(testData: TestData): Unit = {
@@ -87,7 +87,7 @@ final class DirectoryListenerSpec extends AsyncWordSpec with Matchers with Befor
   }
 
   private def createUniqueFileName(fileName: Path) = {
-    val splitted = fileName.toString.split('.').map(_.trim)
-    Paths.get(splitted.head + Random.nextInt() + "." + splitted.reverse.head)
+    val parts = fileName.toString.split('.').map(_.trim)
+    Paths.get(s"${parts.head}${Random.nextInt()}.${parts.reverse.head}")
   }
 }
