@@ -73,7 +73,7 @@ public class ClickhousedbIT {
     }
 
     @BeforeEach
-    public void setupBeforeTest(TestInfo testInfo) throws SQLException {
+    public void setupBeforeTest(TestInfo testInfo) {
         searchAfterPattern = String.format("Starting test: %s", testInfo.getTestMethod().toString());
         LOGGER.info(searchAfterPattern);
     }
@@ -102,7 +102,7 @@ public class ClickhousedbIT {
     void testWriteJDBC() throws SQLException {
         createTable();
 
-        String newLine = System.getProperty("line.separator");
+        String newLine = System.lineSeparator();
         String insertDataTextBlock =
                 "INSERT INTO test.my_table (myfloat_nullable, mystr, myint_id)"
                         + newLine
@@ -171,7 +171,7 @@ public class ClickhousedbIT {
     protected void createTable() throws SQLException {
         // Since we want to be Java 11 source compatible
         // Doc: https://clickhouse.com/docs/en/engines/table-engines
-        String newLine = System.getProperty("line.separator");
+        String newLine = System.lineSeparator();
         String createStatementTextBlock =
                 "CREATE TABLE test.my_table"
                         + newLine
@@ -198,7 +198,7 @@ public class ClickhousedbIT {
 
         LOGGER.info(dropStatementTextBlock);
 
-        LOGGER.info("About execute DROP TABLE statement: {}", dropStatementTextBlock);
+        LOGGER.info("About to execute DROP TABLE statement: {}", dropStatementTextBlock);
         Integer resultCreate = performStatement(clickhouseDBContainer, dropStatementTextBlock);
         LOGGER.info("Successfully executed DROP TABLE statement: {}", resultCreate);
     }
