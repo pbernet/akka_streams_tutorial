@@ -30,6 +30,8 @@ import scala.util.Random
   *  - The additional param allowClosedSubstreamRecreation on groupBy
   *    allows reusing closed substreams and thus avoids potential memory issues
   *  - Nice paper on watermarks: http://vldb.org/pvldb/vol14/p3135-begoli.pdf
+  *  - See also TumblingWindow example with Apache Flink:
+  *    https://github.com/pbernet/flink-scala-3/blob/main/src/main/scala/com/custom/TumblingWindow.scala
   */
 object WindowingExample extends App {
   implicit val system: ActorSystem = ActorSystem()
