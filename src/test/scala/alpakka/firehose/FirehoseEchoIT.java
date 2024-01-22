@@ -32,7 +32,7 @@ public class FirehoseEchoIT {
     private static final int LOCALSTACK_PORT = 4566;
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
+    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.0.2"))
             .withServices(FIREHOSE, S3, KINESIS)
             // Make sure that init_firehose.sh is executable and has linux line separator (LF)
             .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_firehose.sh", 700), "/etc/localstack/init/ready.d/init_firehose.sh")

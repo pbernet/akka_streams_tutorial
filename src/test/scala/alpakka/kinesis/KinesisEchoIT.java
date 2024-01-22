@@ -44,7 +44,7 @@ public class KinesisEchoIT {
     private static KinesisClient kinesisClient;
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
+    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.0.2"))
             .withServices(KINESIS)
             // Make sure that init_kinesis.sh is executable and has linux line separator (LF)
             .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_kinesis.sh", 700), "/etc/localstack/init/ready.d/init_kinesis.sh")

@@ -23,7 +23,7 @@ public class SqsEchoIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(SqsEchoIT.class);
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
+    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.0.2"))
             .withServices(SQS)
             // https://docs.localstack.cloud/user-guide/aws/sqs/#queue-urls
             .withEnv("SQS_ENDPOINT_STRATEGY", "domain")
