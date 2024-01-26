@@ -9,7 +9,7 @@ scalaVersion := "2.13.12"
 val pekkoVersion = "1.0.2"
 val pekkoHTTPVersion = "1.0.0"
 
-val pekkoConnectorVersion = "1.0.0"
+val pekkoConnectorVersion = "1.0.2"
 val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.6"
