@@ -18,7 +18,7 @@ val artemisVersion = "2.31.2"
 val testContainersVersion = "1.19.3"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
-val influxdbVersion = "6.10.0"
+val influxdbVersion = "6.12.0"
 val awsClientVersion = "2.23.11"
 
 libraryDependencies ++= Seq(
