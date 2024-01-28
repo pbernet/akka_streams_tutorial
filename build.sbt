@@ -9,7 +9,8 @@ scalaVersion := "2.13.12"
 val pekkoVersion = "1.0.2"
 val pekkoHTTPVersion = "1.0.0"
 
-val pekkoConnectorVersion = "1.0.0"
+val pekkoConnectorVersion = "1.0.2"
+val pekkoConnectorKafkaVersion = "1.0.0"
 val kafkaVersion = "3.4.1"
 
 val activemqVersion = "5.17.6"
@@ -18,7 +19,7 @@ val testContainersVersion = "1.19.3"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
 val influxdbVersion = "6.10.0"
-val awsClientVersion = "2.20.162"
+val awsClientVersion = "2.23.11"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -49,7 +50,7 @@ libraryDependencies ++= Seq(
 
   "org.bouncycastle" % "bcprov-jdk15to18" % "1.76",
 
-  "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorVersion,
+  "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
   "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
