@@ -11,15 +11,15 @@ val pekkoHTTPVersion = "1.0.0"
 
 val pekkoConnectorVersion = "1.0.2"
 val pekkoConnectorKafkaVersion = "1.0.0"
-val kafkaVersion = "3.4.1"
+val kafkaVersion = "3.6.1"
 
-val activemqVersion = "5.17.6"
+val activemqVersion = "5.18.3"
 val artemisVersion = "2.31.2"
-val testContainersVersion = "1.19.3"
+val testContainersVersion = "1.19.4"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
 val influxdbVersion = "6.10.0"
-val awsClientVersion = "2.23.11"
+val awsClientVersion = "2.23.12"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
@@ -32,7 +32,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.pekko" %% "pekko-http" % pekkoHTTPVersion,
   "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
-  "org.json" % "json" % "20230227",
+  "org.json" % "json" % "20231013",
 
   // sttp wraps around akka-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
@@ -43,12 +43,12 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
   "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
   "javax.jms" % "jms" % "1.1",
-  "javax.xml.bind" % "jaxb-api" % "2.3.0",
+  "javax.xml.bind" % "jaxb-api" % "2.3.1",
   "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.76",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.77",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.35.0",
+  "com.hierynomus" % "sshj" % "0.38.0",
   "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-elasticsearch" % pekkoConnectorVersion,
@@ -89,15 +89,15 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.2.0",
+  "org.apache.opennlp" % "opennlp-tools" % "2.3.1",
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
   "com.typesafe.play" %% "play-json" % "2.9.4",
   "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
 
-  "org.apache.httpcomponents.client5" % "httpclient5" % "5.2.1",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.2",
+  "org.apache.httpcomponents.client5" % "httpclient5" % "5.3.1",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.2.4",
   "commons-io" % "commons-io" % "2.11.0",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
   "com.twitter" %% "bijection-avro" % "0.9.7",
@@ -126,7 +126,7 @@ libraryDependencies ++= Seq(
   "com.clickhouse" % "clickhouse-jdbc" % "0.6.0",
   "com.crobox.clickhouse" %% "client" % "1.1.4",
 
-  "org.opensearch" % "opensearch-testcontainers" % "2.0.0",
+  "org.opensearch" % "opensearch-testcontainers" % "2.0.1",
   "com.github.dasniko" % "testcontainers-keycloak" % "2.5.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,

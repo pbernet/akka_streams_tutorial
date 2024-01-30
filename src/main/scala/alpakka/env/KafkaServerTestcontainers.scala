@@ -20,7 +20,7 @@ class KafkaServerTestcontainers {
   // Pin cp-kafka version for now, because 'latest' does not work on github actions anymore
   // https://hub.docker.com/r/confluentinc/cp-kafka
   // https://docs.confluent.io/platform/current/installation/versions-interoperability.html#cp-and-apache-kafka-compatibility
-  val kafkaVersion = "7.1.1"
+  val kafkaVersion = "7.5.3"
   val imageName = s"confluentinc/cp-kafka:$kafkaVersion"
   val originalPort = 9093
   var mappedPort = 1111
