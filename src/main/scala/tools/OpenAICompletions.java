@@ -4,12 +4,10 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,7 +58,8 @@ public class OpenAICompletions {
         // High temperature value: the model generates a more creative or expressive translation
         // Low temperature value:  the model generates a more literal or faithful translation
         requestParams.put("temperature", 0.2);
-        return extractPayloadCompletions(postRequest(requestParams, "completions"));
+        String endpointURL = "https://api.openai.com/v1/" + "completions";
+        return extractPayloadCompletions(postRequest(requestParams, endpointURL));
     }
 
     public ImmutablePair<String, Integer> runChatCompletions(String model, String prompt) {
@@ -81,11 +80,12 @@ public class OpenAICompletions {
         // High temperature value: the model generates a more creative or expressive translation
         // Low temperature value:  the model generates a more literal or faithful translation
         requestParams.put("temperature", 0.2);
-        return extractPayloadChatCompletions(postRequest(requestParams, "chat/completions"));
+        String endpointURL = "https://api.openai.com/v1/" + "chat/completions";
+        return extractPayloadChatCompletions(postRequest(requestParams, endpointURL));
     }
 
-    private String postRequest(JSONObject requestParams, String endpoint) {
-        HttpPost request = new HttpPost("https://api.openai.com/v1/" + endpoint);
+    public String postRequest(JSONObject requestParams, String endpointURL) {
+        HttpPost request = new HttpPost(endpointURL);
         request.setHeader("Authorization", "Bearer " + API_KEY);
         StringEntity requestEntity = new StringEntity(
                 requestParams.toString(),
@@ -98,7 +98,7 @@ public class OpenAICompletions {
 
         try (CloseableHttpClient httpClient = HttpClientBuilder.create()
                 .setDefaultRequestConfig(timeoutsConfig)
-                .setRetryStrategy(new DefaultHttpRequestRetryStrategy(5, TimeValue.ofMinutes(5L)))
+                .setRetryStrategy(new HttpRequestRetryStrategyOpenAI())
                 .build()) {
             return IOUtils.toString(httpClient.execute(request).getEntity().getContent(), StandardCharsets.UTF_8);
         } catch (IOException e) {

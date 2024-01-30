@@ -42,8 +42,8 @@ object SubtitleTranslator extends App {
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val sourceFilePath = "src/main/resources/EN_challenges.srt"
-  private val targetFilePath = "DE_challenges.srt"
+  val sourceFilePath = "The.Quiet.Girl.2022.BluRay.1080p.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.srt"
+  private val targetFilePath = "DE_The.Quiet.Girl.2022.BluRay.1080p.DTS-HD.MA.5.1.AVC.REMUX-FraMeSToR.srt"
   private val targetLanguage = "German"
 
   private val defaultModel = "gpt-3.5-turbo"
