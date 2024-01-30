@@ -19,7 +19,7 @@ val testContainersVersion = "1.19.4"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
 val influxdbVersion = "6.10.0"
-val awsClientVersion = "2.23.12"
+val awsClientVersion = "2.23.13"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
