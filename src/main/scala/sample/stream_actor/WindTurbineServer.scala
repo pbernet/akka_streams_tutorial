@@ -1,5 +1,6 @@
 package sample.stream_actor
 
+import io.circe.generic.auto._
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, Props}
 import org.apache.pekko.http.scaladsl.Http
@@ -9,7 +10,6 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json._
 import sample.stream_actor.Total.Increment
 
 import java.time.LocalTime
@@ -36,9 +36,10 @@ object WindTurbineServer {
   object Messages {
 
     def parse(messages: immutable.Seq[String]): Seq[MeasurementsContainer] = messages.map { message =>
-      implicit val measurementsFormat = Json.format[Measurements]
-      implicit val windTurbineDataFormat = Json.format[MeasurementsContainer]
-      Json.parse(message).as[MeasurementsContainer]
+      io.circe.parser
+        .parse(message)
+        .flatMap(_.as[MeasurementsContainer])
+        .toOption.get
     }
 
     def ack(aString: String) = TextMessage(Source.single("Ack from server: " + aString))
@@ -67,7 +68,7 @@ object WindTurbineServer {
       .mapAsync(1)(identity)
       .groupedWithin(100, 1.second)
       .map(messages => (messages.last, Messages.parse(messages)))
-      .map { elem => println(s"After parsing size: ${elem._2.size}"); elem }
+      //.wireTap(elem => println(s"After parsing size: ${elem._2.size}"))
       .mapAsync(1) {
         case (lastMessage: String, measurements: Seq[MeasurementsContainer]) =>
           import org.apache.pekko.pattern.ask

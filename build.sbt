@@ -31,16 +31,22 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-slf4j" % pekkoVersion,
 
   "org.apache.pekko" %% "pekko-http" % pekkoHTTPVersion,
+  // JSON (un)marshalling support for pekko-http
   "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
+  // JSON (un)marshalling in Java examples
   "org.json" % "json" % "20231013",
 
-  // sttp wraps around akka-http to allow for concise clients
+  "io.circe" %% "circe-core" % "0.14.6",
+  "io.circe" %% "circe-generic" % "0.14.6",
+  "io.circe" %% "circe-parser" % "0.14.6",
+
+  // sttp wraps around pekko-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
   "com.softwaremill.sttp.client3" %% "pekko-http-backend" % sttpVersion,
 
-  "org.apache.activemq" % "activemq-client" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.apache.activemq" % "activemq-broker" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.apache.activemq" % "activemq-client" % activemqVersion,
+  "org.apache.activemq" % "activemq-broker" % activemqVersion,
+  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
   "javax.jms" % "jms" % "1.1",
   "javax.xml.bind" % "jaxb-api" % "2.3.1",
@@ -70,12 +76,11 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-s3" % pekkoConnectorVersion,
 
   "org.apache.pekko" %% "pekko-connectors-kinesis" % pekkoConnectorVersion,
-  // Use latest. Ref in alpakka: 2.17.113
-  "software.amazon.awssdk" % "kinesis" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "software.amazon.awssdk" % "apache-client" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "software.amazon.awssdk" % "kinesis" % awsClientVersion,
+  "software.amazon.awssdk" % "apache-client" % awsClientVersion,
 
   "org.apache.pekko" %% "pekko-connectors-sqs" % pekkoConnectorVersion,
-  "software.amazon.awssdk" % "sqs" % awsClientVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "software.amazon.awssdk" % "sqs" % awsClientVersion,
 
   "org.squbs" %% "squbs-ext" % "0.15.0", // not (yet) migrated to pekko
 
@@ -93,9 +98,6 @@ libraryDependencies ++= Seq(
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
-  "com.typesafe.play" %% "play-json" % "2.9.4",
-  "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
-
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.3.1",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.2.4",
   "commons-io" % "commons-io" % "2.11.0",
@@ -111,7 +113,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.6",
 
   "com.github.blemale" %% "scaffeine" % "5.2.1",
-  "ch.qos.logback" % "logback-classic" % "1.4.7",
+  "ch.qos.logback" % "logback-classic" % "1.4.12",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -133,10 +135,9 @@ libraryDependencies ++= Seq(
   "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
   "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
 
-  // org.keycloak introduces com.fasterxml.jackson.core:jackson-core:2.12.1, which causes runtime ex
-  "org.keycloak" % "keycloak-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-adapter-core" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
-  "org.keycloak" % "keycloak-admin-client" % keycloakVersion exclude("com.fasterxml.jackson.core", "jackson-databind"),
+  "org.keycloak" % "keycloak-core" % keycloakVersion,
+  "org.keycloak" % "keycloak-adapter-core" % keycloakVersion,
+  "org.keycloak" % "keycloak-admin-client" % keycloakVersion,
   "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
   "org.postgresql" % "postgresql" % "42.6.0",

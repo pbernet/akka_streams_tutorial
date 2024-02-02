@@ -16,7 +16,7 @@ class Total extends Actor {
 
   override def receive: Receive = {
     case Increment(value, avg, id) =>
-      println(s"Received $value new measurements from turbine with id: $id -  Avg wind speed is: $avg")
+      println(s"Received: $value new measurements from turbine with id: $id -  Avg wind speed is: $avg")
       total = total + value
 
       val date = new Date()

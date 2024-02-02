@@ -1,5 +1,8 @@
 package alpakka.sse_to_elasticsearch
 
+import io.circe._
+import io.circe.generic.auto._
+import io.circe.parser._
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
@@ -18,7 +21,6 @@ import org.apache.pekko.stream.{ActorAttributes, RestartSettings, Supervision}
 import org.opensearch.testcontainers.OpensearchContainer
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.utility.DockerImageName
-import play.api.libs.json.{JsArray, JsString, Json}
 import spray.json.DefaultJsonProtocol._
 import spray.json.JsonFormat
 
@@ -29,7 +31,6 @@ import java.time.{Instant, ZoneId}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.sys.process.{Process, stringSeqToProcess}
-import scala.util.Try
 import scala.util.control.NonFatal
 
 /**
@@ -138,35 +139,29 @@ object SSEtoElasticsearch extends App {
   val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
     event: ServerSentEvent => {
 
-      def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
-
       def isNamedBot(bot: Boolean, user: String): Boolean = {
         if (bot) user.toLowerCase().contains("bot") else false
       }
 
-      // We use the title as identifier
-      val title = (Json.parse(event.data) \ "title").as[String]
+      val cursor = parse(event.data).getOrElse(Json.Null).hcursor
 
-      val timestamp = (Json.parse(event.data) \ "timestamp").as[Long]
-
-      val serverName = (Json.parse(event.data) \ "server_name").as[String]
-
-      val user = (Json.parse(event.data) \ "user").as[String]
-
-      val cmdType = (Json.parse(event.data) \ "type").as[String]
-
-      val bot = (Json.parse(event.data) \ "bot").as[Boolean]
+      val titleAsID = cursor.get[String]("title").toOption.getOrElse("")
+      val timestamp: Long = cursor.get[Long]("timestamp").toOption.getOrElse(0)
+      val serverName = cursor.get[String]("server_name").toOption.getOrElse("")
+      val user = cursor.get[String]("user").toOption.getOrElse("")
+      val cmdType = cursor.get[String]("type").toOption.getOrElse("")
+      val bot = cursor.get[Boolean]("bot").toOption.getOrElse(false)
 
       if (cmdType == "new" || cmdType == "edit") {
-        val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
-        val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
-        Change(timestamp, title, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
+        val length = cursor.downField("length")
+        val lengthNew = length.get[Int]("new").toOption.getOrElse(0)
+        val lengthOld = length.get[Int]("old").toOption.getOrElse(0)
+        Change(timestamp, titleAsID, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
       } else {
-        Change(timestamp, title, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
+        Change(timestamp, titleAsID, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
       }
     }
   }
-
   def fetchContent(ctx: Ctx): Future[Ctx] = {
     logger.info(s"About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
@@ -210,9 +205,11 @@ object SSEtoElasticsearch extends App {
     val content = ctx.content
     val resultRaw = new NerRequestOpenAI().run(content)
 
-    val choices: JsArray = (Json.parse(resultRaw) \ "choices").as[JsArray]
-    val text = (Json.parse(choices.value(0).toString()) \ "text").as[String]
-    val personsFound = text.split("\n").filter(_.nonEmpty).toList
+    case class Choice(text: String, score: Double)
+
+    val cursor = parse(resultRaw).getOrElse(Json.Null).hcursor
+    val choices = cursor.downField("choices").as[Seq[Choice]].toOption.getOrElse(List.empty)
+    val personsFound = choices.head.text.split("\n").filter(_.nonEmpty).toList
     if (personsFound.isEmpty) {
       Future(ctx)
     } else {

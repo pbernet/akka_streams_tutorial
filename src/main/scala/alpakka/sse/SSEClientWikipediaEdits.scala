@@ -1,5 +1,7 @@
 package alpakka.sse
 
+import io.circe._
+import io.circe.parser._
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
@@ -9,15 +11,12 @@ import org.apache.pekko.stream.connectors.sse.scaladsl.EventSource
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.apache.pekko.stream.{Supervision, ThrottleMode}
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json._
 
 import java.time.{Instant, ZoneId}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.sys.process._
-import scala.util.Try
 import scala.util.control.NonFatal
-
 
 case class Change(timestamp: Long, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
   override def toString = {
@@ -69,26 +68,22 @@ object SSEClientWikipediaEdits extends App {
     val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
       event: ServerSentEvent => {
 
-        def tryToInt(s: String) = Try(s.toInt).toOption.getOrElse(0)
-
         def isNamedBot(bot: Boolean, user: String): Boolean = {
           if (bot) user.toLowerCase().contains("bot") else false
         }
 
-        val timestamp = (Json.parse(event.data) \ "timestamp").as[Long]
-
-        val serverName = (Json.parse(event.data) \ "server_name").as[String]
-
-        val user = (Json.parse(event.data) \ "user").as[String]
-
-        val cmdType = (Json.parse(event.data) \ "type").as[String]
-
-        val bot = (Json.parse(event.data) \ "bot").as[Boolean]
+        val cursor = parse(event.data).getOrElse(Json.Null).hcursor
+        val timestamp: Long = cursor.get[Long]("timestamp").toOption.getOrElse(0)
+        val serverName = cursor.get[String]("server_name").toOption.getOrElse("")
+        val user = cursor.get[String]("user").toOption.getOrElse("")
+        val cmdType = cursor.get[String]("type").toOption.getOrElse("")
+        val bot = cursor.get[Boolean]("bot").toOption.getOrElse(false)
 
         if (cmdType == "new" || cmdType == "edit") {
-          val lengthNew = (Json.parse(event.data) \ "length" \ "new").getOrElse(JsString("0")).toString()
-          val lengthOld = (Json.parse(event.data) \ "length" \ "old").getOrElse(JsString("0")).toString()
-          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), tryToInt(lengthNew), tryToInt(lengthOld))
+          val length = cursor.downField("length")
+          val lengthNew = length.get[Int]("new").toOption.getOrElse(0)
+          val lengthOld = length.get[Int]("old").toOption.getOrElse(0)
+          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
         } else {
           Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
         }
