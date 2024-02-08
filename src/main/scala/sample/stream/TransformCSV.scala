@@ -13,7 +13,7 @@ import scala.sys.process._
   * Inspired by:
   * https://discuss.lightbend.com/t/transform-a-csv-file-into-multiple-csv-files-using-akka-stream/3142
   *
-  * Instead of akka-streams we use linux tools (sort/split) for each step to apply the
+  * Instead of pekko-streams we use linux tools (sort/split) for each step to apply the
   * "chainsaw style" transformations to the large csv file.
   * With the additional count this does the same as: [[FlightDelayStreaming]].
   * However the performance is not as good as in FlightDelayStreaming.

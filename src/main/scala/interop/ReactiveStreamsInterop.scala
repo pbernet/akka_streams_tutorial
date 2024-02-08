@@ -21,7 +21,7 @@ import scala.concurrent.duration.DurationInt
   * to distribute messages to different consumers:
   *  - Reactor
   *  - RxJava
-  *  - akka-streams
+  *  - pekko-streams
   *
   * Doc:
   * https://doc.akka.io/docs/akka/current/stream/reactive-streams-interop.html
@@ -57,11 +57,11 @@ object ReactiveStreamsInterop extends App {
     .doOnNext(each => logger.info(s"Consumed with RxJava: $each"))
     .subscribe()
 
-  // Slow consumer with akka-streams
+  // Slow consumer with pekko-streams
   Source.fromPublisher(publisher)
     .throttle(2, 2.seconds, 2, ThrottleMode.shaping)
     .map(each => each.toUpperCase())
-    .wireTap(each => logger.info(s"Consumed with akka-streams: $each"))
+    .wireTap(each => logger.info(s"Consumed with pekko-streams: $each"))
     .runWith(Sink.ignore)
 
   // Sender endpoint with Camel

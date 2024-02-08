@@ -32,7 +32,7 @@ import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 /**
-  * A "one-click" Keycloak OIDC server with akka-http frontend
+  * A "one-click" Keycloak OIDC server with pekko-http frontend
   *
   * Inspired by:
   * https://scalac.io/blog/user-authentication-keycloak-1

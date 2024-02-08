@@ -18,7 +18,7 @@ import java.util.Date;
  * Inspired by:
  * https://mindchasers.com/dev/ping
  * <p>
- * No akka-streams here
+ * No pekko-streams here
  */
 public class ConnectionStatusChecker {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionStatusChecker.class);

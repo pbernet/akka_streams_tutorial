@@ -18,7 +18,7 @@ import scala.util.control.NonFatal;
 
 /**
   *
-  * Doc read data via akka-streams via Scala client:
+  * Doc read data via pekko-streams via Scala client:
   * https://github.com/influxdata/influxdb-client-java/tree/master/client-scala
   *
   * Doc Flux query lang:

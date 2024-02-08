@@ -65,7 +65,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
   }
 
   val parseFormData: Route =
-  // Set loglevel to "DEBUG" in application.conf for verbose akka-http log output
+    // Set loglevel to "DEBUG" in application.conf for verbose pekko-http log output
     logRequest("log post request") {
       post {
         path("post") {
