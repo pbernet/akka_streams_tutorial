@@ -10,29 +10,29 @@ import scala.util.{Failure, Success}
 
 /**
   * Similar to: [[OneBillionRowChallenge]]
-  * The file reading is still sequential, but the aggregation is parallel
-  * The file reading and the subsequent grouping is still the bottleneck
-  * Runtime is around 4 minutes on i7-11850H, still nothing to write home about...
+  * File reading is still sequential, but now:
+  *  - the stream is partitioned, see batchSize
+  *  - the aggregation is parallel, see parallelisationFactor
   *
+  * Runtime is still around 4 minutes on i7-11850H,
+  * so still nothing to write home about...
   */
 object OneBillionRowChallengeScale extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
-  val batchSize = 1000 // Raise for large files
-  val parallelisationFactor = 4 // Increase to utilize machine CPU
+  val batchSize = 1024 * 1000 * 10 // 10MB
+  val parallelisationFactor = 16 // Increase to utilize machine cores
 
-  // Wire generated 1 Billion records resource file
-  val sourceOfRows = FileIO.fromPath(Paths.get("measurements_subset_10000.txt"), chunkSize = 100 * 1024)
+  // Wire the generated 1 Billion records resource file
+  val sourceOfRows = FileIO.fromPath(Paths.get("measurements_subset_10000.txt"), chunkSize = 1024 * 1000)
     .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 256, allowTruncation = true)
       .map(_.utf8String))
 
-  def stringArrayToMeasurement(cols: Array[String]) = Measurement(cols(0), cols(1).toFloat)
-
   val csvToMeasurement: Flow[String, Measurement, NotUsed] = Flow[String]
     .map(_.split(";"))
-    .map(stringArrayToMeasurement)
+    .map(cols => Measurement(cols(0), cols(1).toFloat))
 
   val aggregate: Flow[Measurement, MeasurementAggregate, NotUsed] =
     Flow[Measurement]
@@ -55,16 +55,25 @@ object OneBillionRowChallengeScale extends App {
       .runWith(Sink.seq)
   }
 
-  val intermediateResult = sourceOfRows
+  val result = sourceOfRows
     .grouped(batchSize)
-    .mapAsync(parallelisationFactor)(eachSeq => aggregateFlow(eachSeq))
+    .mapAsync(parallelisationFactor)(batchSeq => aggregateFlow(batchSeq))
     .mapConcat(identity) // flatten
+    .groupBy(420, _.location, allowClosedSubstreamRecreation = true)
+    .fold(MeasurementAggregate("", 0, 0, 0, 0)) {
+      (agg: MeasurementAggregate, each: MeasurementAggregate) =>
+        val count = agg.count + each.count
+        val totalTemp = agg.totalTemp + each.totalTemp
+        val minTemp = Math.min(agg.minTemp, each.minTemp)
+        val maxTemp = Math.max(agg.maxTemp, each.maxTemp)
+        MeasurementAggregate(each.location, count, totalTemp, minTemp, maxTemp)
+    }
+    .mergeSubstreams
     .runWith(Sink.seq)
 
-  // TODO Reduce the MeasurementAggregate(s) to obtain the final result
-  intermediateResult.onComplete {
+  result.onComplete {
     case Success(seq: Seq[MeasurementAggregate]) =>
-      print("Results from all parallel processes: \n")
+      print("Sorted results from all parallel processes: \n")
       seq.toList.sortWith(_.location < _.location).foreach(println)
       println(s"Run with: " + Runtime.getRuntime.availableProcessors + " cores")
       println("Flow Success. About to terminate...")
