@@ -34,7 +34,7 @@ libraryDependencies ++= Seq(
   // JSON (un)marshalling support for pekko-http
   "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
   // JSON (un)marshalling in Java examples
-  "org.json" % "json" % "20231013",
+  "org.json" % "json" % "20240205",
 
   "io.circe" %% "circe-core" % "0.14.6",
   "io.circe" %% "circe-generic" % "0.14.6",
