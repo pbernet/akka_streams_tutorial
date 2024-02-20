@@ -96,8 +96,6 @@ libraryDependencies ++= Seq(
 
   "org.apache.opennlp" % "opennlp-tools" % "2.3.1",
 
-  "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
-
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.3.1",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.2.4",
   "commons-io" % "commons-io" % "2.11.0",
