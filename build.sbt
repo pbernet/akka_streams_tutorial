@@ -94,7 +94,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.3.1",
+  "org.apache.opennlp" % "opennlp-tools" % "2.3.2",
 
   "com.crowdscriber.captions" %% "caption-parser" % "0.1.6",
 
