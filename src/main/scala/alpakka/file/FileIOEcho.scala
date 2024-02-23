@@ -8,16 +8,15 @@ import java.nio.file.Paths
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-/** FileIO echo flow with base64 encoding/decoding:
+/** FileIO echo flow with chunked base64 encoding/decoding:
   *
   * testfile.jpg -> base64 encoding -> testfile.enc -> base64 decoding -> testfile_result.jpg
   *
   * Remark:
-  *
-  * The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
+  * - The chunkSize of the encoding file source MUST be a multiples of 3 byte, eg 3000
   *
   * @see [[https://stackoverflow.com/questions/7920780/is-it-possible-to-base64-encode-a-file-in-chunks]]
-  *
+  *      see also: [[alpakka.file.FileEncDec]]
   */
 object FileIOEcho extends App {
   implicit val system: ActorSystem = ActorSystem()
@@ -28,7 +27,7 @@ object FileIOEcho extends App {
   val encFileName = "testfile.enc"
   val resultFileName = "testfile_result.jpg"
 
-  val sourceOrig = FileIO.fromPath(Paths.get(sourceFileName), 3000)
+  val sourceOrig = FileIO.fromPath(Paths.get(sourceFileName), chunkSize = 3000)
   val sinkEnc = FileIO.toPath(Paths.get(encFileName))
 
   val doneEnc = sourceOrig

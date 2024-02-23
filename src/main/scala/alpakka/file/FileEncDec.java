@@ -11,7 +11,7 @@ import java.util.Base64;
  * Avoids OutOfMemoryError:
  * https://stackoverflow.com/questions/9579874/out-of-memory-when-encoding-file-to-base64
  *
- * Same with akka streams: alpakka.file.FileIOEcho
+ * Same with pekko-streams: alpakka.file.FileIOEcho
  *
  */
 public class FileEncDec {
