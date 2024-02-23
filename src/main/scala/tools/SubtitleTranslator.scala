@@ -45,7 +45,7 @@ object SubtitleTranslator extends App {
   private val fallbackModel = "gpt-3.5-turbo-instruct"
 
   private val maxGapSeconds = 1 // gap time between two scenes (= session windows)
-  private val endBlockTag = sys.props("line.separator") // one block per line
+  private val endLineTag = "\n"
   private val maxCharPerTranslatedLine = 40 // recommendation
   private val conversationPrefix = "-"
 
@@ -127,7 +127,7 @@ object SubtitleTranslator extends App {
 
     val sceneTranslated: Vector[SubtitleBlock] =
       rawResponseText
-        .split(endBlockTag)
+        .split(endLineTag)
         .filterNot(each => each.isEmpty)
         .zipWithIndex
         .foldLeft(seed) { (acc: Vector[SubtitleBlock], rawResponseTextSplit: (String, Int)) =>
@@ -144,14 +144,13 @@ object SubtitleTranslator extends App {
           logger.info(s"Translated block to: ${translatedBlock.allLines}")
           acc.appended(translatedBlock)
         }
-    logger.info(s"Finished line by line translation of scene with: ${sceneTranslated.size} blocks")
-
+    logger.info(s"Finished translation of scene with: ${sceneTranslated.size} blocks")
     sceneTranslated
   }
 
   private def isTranslationPlausible(rawResponseText: String, originalSize: Int) = {
     val resultSize = rawResponseText
-      .split(endBlockTag)
+      .split(endLineTag)
       .filterNot(each => each.isEmpty)
       .length
 
@@ -173,7 +172,7 @@ object SubtitleTranslator extends App {
 
   private def generateShortenPrompt(text: String) = {
     s"""
-       |Rewrite to ${maxCharPerTranslatedLine * 2} characters at most:
+       |Rewrite to ${maxCharPerTranslatedLine * 2 - 10} characters at most:
        |$text
        |
        |""".stripMargin
@@ -185,7 +184,7 @@ object SubtitleTranslator extends App {
     if (textCleaned.startsWith(conversationPrefix)) {
       textCleaned.split(conversationPrefix).map(line => conversationPrefix + line).toList.tail
     }
-    else if (textCleaned.length > maxCharPerTranslatedLine * 2) {
+    else if (textCleaned.length > maxCharPerTranslatedLine * 2 + 10) {
       logger.warn(s"Translated block text is too long (${textCleaned.length} chars). Try to shorten via API call. Check result manually")
       val toShorten = generateShortenPrompt(textCleaned)
       logger.info(s"Shorten prompt: $toShorten")

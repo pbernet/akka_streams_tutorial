@@ -51,7 +51,9 @@ class SrtParser(sourceFilePath: String) {
 
   def runSync(): Seq[SubtitleBlock] = {
     val resultFut = source.runWith(Sink.seq)
-    Await.result(resultFut, 10.seconds)
+    val result = Await.result(resultFut, 10.seconds)
+    system.terminate()
+    result
   }
 }
 
@@ -67,11 +69,12 @@ object SrtParser extends App {
 
 case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val ls = sys.props("line.separator")
+  val endLineTag = "\n" // for openAI API
+  val ls = sys.props("line.separator") // for file IO
 
   def allLines: String = lines.mkString(" ")
 
-  def allLinesEnd: String = allLines + ls + ls
+  def allLinesEnd: String = allLines + endLineTag + endLineTag
 
   def formatOutBlock(blockCounter: Long): String = {
     // Spec: https://wiki.videolan.org/SubRip
