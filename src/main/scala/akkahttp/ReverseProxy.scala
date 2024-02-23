@@ -27,15 +27,16 @@ import scala.util.{Failure, Success}
   *  - weighted round robin load balancing
   *  - retry on 5xx
   *
-  * Setup:
-  * HTTP client(s) --> ReverseProxy --> target server(s)
+  * Setup local:
+  * HTTP client(s) --> ReverseProxy --> local target server(s)
   *
-  * Inspired by:
-  * https://github.com/mathieuancelin/akka-http-reverse-proxy
+  * Setup external:
+  * HTTP client(s) --> ReverseProxy --> httpstat.us
   *
   * curl client:
   * curl -H "Host: local" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/mypath
   * curl -H "Host: external" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/200
+  *
   * wrk perf client:
   * wrk -t2 -c10 -d10s -H "Host: external" --latency http://127.0.0.1:8080/200
   */
@@ -100,32 +101,41 @@ object ReverseProxy extends App {
     )
   )
 
-  def extractHost(request: HttpRequest): String = request.header[Host].map(_.host.address()).getOrElse("--")
+  def getHost(request: HttpRequest): String = request.header[Host].map(_.host.address()).getOrElse("--")
 
   def handlerWithCircuitBreaker(request: HttpRequest): Future[HttpResponse] = {
-    val host = extractHost(request)
+    val host = getHost(request)
+
+    def headers(target: Target) = {
+      val headersIn: Seq[HttpHeader] =
+        request.headers.filterNot(t => t.name() == "Host") :+
+          Host(target.host, target.port) :+
+          RawHeader("X-Fowarded-Host", host) :+
+          RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+      // Filter, to avoid log noise, see: https://github.com/akka/akka-http/issues/64
+      val filteredHeaders = headersIn.toList.filterNot(each => each.name() == "Timeout-Access")
+      filteredHeaders
+    }
+
+    def uri(target: Target) = {
+      val uri: Uri = request.uri.copy(
+        scheme = target.scheme,
+        authority = Authority(host = Uri.NamedHost(target.host), port = target.port))
+      uri
+    }
+
     services.get(host) match {
       case Some(rawSeq) =>
         val seq = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
-        Retry.retry[HttpResponse](3) {
-          val index = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
+        Retry.retry[HttpResponse](times = 3) {
+          val index = counter.incrementAndGet() % (if (seq.isEmpty) 1 else seq.size)
           val target = seq.apply(index)
           val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => new CircuitBreaker(
             system.scheduler,
             maxFailures = 5,
             callTimeout = 30.seconds,
             resetTimeout = 10.seconds))
-          val headersIn: Seq[HttpHeader] =
-            request.headers.filterNot(t => t.name() == "Host") :+
-              Host(target.host) :+
-              RawHeader("X-Fowarded-Host", host) :+
-              RawHeader("X-Fowarded-Scheme", request.uri.scheme)
-          val uri: Uri = request.uri.copy(
-            scheme = target.scheme,
-            authority = Authority(host = Uri.NamedHost(target.host), port = target.port))
-          // Filter, to avoid log noise, see: https://github.com/akka/akka-http/issues/64
-          val filteredHeaders = headersIn.toList.filterNot(each => each.name() == "Timeout-Access")
-          val proxyReq = request.withUri(uri).withHeaders(filteredHeaders)
+          val proxyReq = request.withUri(uri(target)).withHeaders(headers(target))
           circuitBreaker.withCircuitBreaker(http.singleRequest(proxyReq))
         }.recover {
           case _: akka.pattern.CircuitBreakerOpenException => BadGateway("Circuit breaker opened")
@@ -153,8 +163,8 @@ object ReverseProxy extends App {
         // Adjust to provoke more retries on ReverseProxy
         val codes = List(200, 200, 200, 500, 500, 500)
         val randomResponse = codes(new scala.util.Random().nextInt(codes.length))
-        // TODO Why is the port 0?
-        logger.info(s"Local target server listening on: ${uri.authority.port} got echo request, reply with: $randomResponse")
+        logger.info(s"" +
+          s"Target server listening on: ${uri.authority.host}:${uri.effectivePort} got echo request, reply with: $randomResponse")
         StatusCode.int2StatusCode(randomResponse)
       }
     }
@@ -215,7 +225,7 @@ object Retry {
             // we need to cast here
             val code = t.asInstanceOf[HttpResponse].status.intValue()
             if (code >= 500) {
-              logger.info(s"Got 5xx server error from target server on attempt: $times/3")
+              logger.info(s"Got 5xx server error from target server. Retries left: ${times - 1}")
               retryPromise[T](times - 1, promise, Some(new RuntimeException("Got 500")), f)
             } else {
               promise.trySuccess(t)
