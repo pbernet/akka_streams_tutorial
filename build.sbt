@@ -12,7 +12,7 @@ val pekkoConnectorVersion = "1.0.2"
 val pekkoConnectorKafkaVersion = "1.0.0"
 
 val kafkaVersion = "3.6.1"
-val activemqVersion = "5.18.3"
+val activemqVersion = "6.0.1"
 val artemisVersion = "2.31.2"
 val testContainersVersion = "1.19.4"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
