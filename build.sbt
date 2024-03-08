@@ -16,7 +16,7 @@ val activemqVersion = "5.18.3"
 val artemisVersion = "2.31.2"
 val testContainersVersion = "1.19.4"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
-val sttpVersion = "3.9.0"
+val sttpVersion = "3.9.4"
 val influxdbVersion = "6.10.0"
 val awsClientVersion = "2.23.12"
 
