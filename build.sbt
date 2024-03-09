@@ -14,11 +14,11 @@ val pekkoConnectorKafkaVersion = "1.0.0"
 val kafkaVersion = "3.6.1"
 val activemqVersion = "5.18.3"
 val artemisVersion = "2.31.2"
-val testContainersVersion = "1.19.4"
+val testContainersVersion = "1.19.7"
 val keycloakVersion = "21.1.2" // stay with 21.x because of Java 11 compatibility
 val sttpVersion = "3.9.0"
 val influxdbVersion = "6.10.0"
-val awsClientVersion = "2.23.12"
+val awsClientVersion = "2.23.21"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
