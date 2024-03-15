@@ -18,13 +18,13 @@ import scala.sys.process.{Process, stringSeqToProcess}
 
 
 /**
-  * Roundtrip with the Alpakka MQTT connector based on Eclipse Paho,
-  * which works only via tcp.
-  * Implements Publisher/Subscriber client(s), which handle
-  * initial connection failures as well as subsequent connection failures.
+  * MQTT 3.1.1 echo flow based on Eclipse Paho
+  * Shows Publisher/Subscriber client(s), which handle
+  * initial connection failures as well as subsequent connection failures
+  * See also: [[MqttEcho]]
   *
   * Doc:
-  * https://doc.akka.io/docs/alpakka/current/mqtt.html
+  * https://pekko.apache.org/docs/pekko-connectors/current/mqtt.html
   * https://akka.io/alpakka-samples/mqtt-to-kafka/example.html
   * https://akka.io/alpakka-samples/mqtt-to-kafka/full-source.html
   *
@@ -47,11 +47,12 @@ object MqttPahoEcho extends App {
 
   val connectionSettings = MqttConnectionSettings(
     s"tcp://$host:$port",
-    "N/A",
+    "",
     new MemoryPersistence
-    // One might think that this setting should be set to `true`. However, for yet unknown reasons
-    // setting this to `false` works better (especially in case of lost subscriber connections).
-  ).withAutomaticReconnect(false)
+  )
+    // Setting this to `true` does not work as expected
+    // Instead we use RestartSource.withBackoff to reconnect in the publisher/subscriber
+    .withAutomaticReconnect(false)
 
   val topic = "myTopic"
 
@@ -62,42 +63,32 @@ object MqttPahoEcho extends App {
   def clientPublisher(clientId: Int)= {
     val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$clientId-$i"))))
 
-    val sink = wrapWithRestartSink(
+    val publisherSink = wrapWithRestartSink(
       MqttSink(connectionSettings.withClientId(s"Pub: $clientId"), MqttQoS.AtLeastOnce))
 
     Source(messages)
       .throttle(1, 1.second, 1, ThrottleMode.shaping)
       .wireTap(each => logger.info(s"Pub: $clientId sending payload: ${each.payload.utf8String}"))
-      .runWith(sink)
+      .runWith(publisherSink)
   }
 
   def clientSubscriber(clientId: Int): Unit= {
-    // Wait with the subscribe to show the behaviour reading of the "last known good value" of retained messages
+    // Delay the subscription to get a "last known good value" eg 6
     Thread.sleep(5000)
     val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
 
-    val subscriberSource =
-      MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8)
+    val subscriberSource = wrapWithRestartSource(
+      MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8))
 
     val (subscribed, streamCompletion) = subscriberSource
-      .wireTap(each => logger.info(s"Sub: $clientId received payload: ${each.payload.utf8String}"))
+      .wireTap(msg => logger.info(s"Sub: $clientId received payload: ${msg.payload.utf8String}"))
+      .wireTap(msg => logger.debug(s"Sub: $clientId received payload: ${msg.payload.utf8String}. Details: ${msg.toString()}"))
       .toMat(Sink.ignore)(Keep.both)
       .run()
 
     subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
-
-    streamCompletion
-      .recover {
-        case ex =>
-          logger.error(s"Sub stream failed with: ${ex.getCause} retry...")
-          clientSubscriber(clientId)
-      }
   }
 
-
-  /**
-    * Wrap the Source with restart logic and expose an equivalent materialized value
-    */
   private def wrapWithRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
     val fut = Promise[Done]()
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute)
@@ -106,14 +97,8 @@ object MqttPahoEcho extends App {
     }.mapMaterializedValue(_ => fut.future)
   }
 
-  /**
-    * Wrap the Sink with restart logic and expose an equivalent materialized value
-    */
   private def wrapWithRestartSink[M](sink: => Sink[M, Future[Done]]): Sink[M, Future[Done]] = {
     val fut = Promise[Done]()
-
-    // TODO Despite setting log levels logging on failure does not work, see:
-    // https://discuss.lightbend.com/t/error-handling-in-restartsink-withbackoff/9437/2
     val logSettings = RestartSettings.LogSettings(Logging.DebugLevel).withCriticalLogLevel(Logging.InfoLevel, 1)
 
     val restartSettings = RestartSettings(1.second, 10.seconds, 0.2).withMaxRestarts(10, 1.minute).withLogSettings(logSettings)
@@ -122,7 +107,7 @@ object MqttPahoEcho extends App {
     }.mapMaterializedValue(_ => fut.future)
   }
 
-  // No User/PW but change to ws port 9001 to connect
+  // No User/PW needed
   private def browserClientAdminConsole() = {
     val os = System.getProperty("os.name").toLowerCase
     val url = "http://localhost:8090"
