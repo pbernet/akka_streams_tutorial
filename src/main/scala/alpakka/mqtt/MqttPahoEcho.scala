@@ -64,11 +64,11 @@ object MqttPahoEcho extends App {
     val messages = (0 to 100).flatMap(i => Seq(MqttMessage(topic, ByteString(s"$clientId-$i"))))
 
     val publisherSink = wrapWithRestartSink(
-      MqttSink(connectionSettings.withClientId(s"Pub: $clientId"), MqttQoS.AtLeastOnce))
+      MqttSink(connectionSettings.withClientId(s"Pub-$clientId"), MqttQoS.AtLeastOnce))
 
     Source(messages)
       .throttle(1, 1.second, 1, ThrottleMode.shaping)
-      .wireTap(each => logger.info(s"Pub: $clientId sending payload: ${each.payload.utf8String}"))
+      .wireTap(each => logger.info(s"Pub-$clientId sending payload: ${each.payload.utf8String}"))
       .runWith(publisherSink)
   }
 
@@ -78,15 +78,15 @@ object MqttPahoEcho extends App {
     val subscriptions = MqttSubscriptions.create(topic, MqttQoS.atLeastOnce)
 
     val subscriberSource = wrapWithRestartSource(
-      MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub: $clientId"), subscriptions, 8))
+      MqttSource.atMostOnce(connectionSettings.withClientId(s"Sub-$clientId"), subscriptions, 8))
 
     val (subscribed, streamCompletion) = subscriberSource
-      .wireTap(msg => logger.info(s"Sub: $clientId received payload: ${msg.payload.utf8String}"))
-      .wireTap(msg => logger.debug(s"Sub: $clientId received payload: ${msg.payload.utf8String}. Details: ${msg.toString()}"))
+      .wireTap(msg => logger.info(s"Sub-$clientId received payload: ${msg.payload.utf8String}"))
+      .wireTap(msg => logger.debug(s"Sub-$clientId received payload: ${msg.payload.utf8String}. Details: ${msg.toString()}"))
       .toMat(Sink.ignore)(Keep.both)
       .run()
 
-    subscribed.onComplete(each => logger.info(s"Sub: $clientId subscribed: $each"))
+    subscribed.onComplete(each => logger.info(s"Sub-$clientId subscribed: $each"))
   }
 
   private def wrapWithRestartSource[M](source: => Source[M, Future[Done]]): Source[M, Future[Done]] = {
