@@ -11,7 +11,7 @@ val pekkoHTTPVersion = "1.0.1"
 val pekkoConnectorVersion = "1.0.2"
 val pekkoConnectorKafkaVersion = "1.0.0"
 
-val kafkaVersion = "3.6.1"
+val kafkaVersion = "3.6.2"
 val activemqVersion = "5.18.4"
 val artemisVersion = "2.33.0"
 val testContainersVersion = "1.19.7"
