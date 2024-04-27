@@ -37,9 +37,9 @@ libraryDependencies ++= Seq(
   // JSON (un)marshalling in Java examples
   "org.json" % "json" % "20240303",
 
-  "io.circe" %% "circe-core" % "0.14.6",
-  "io.circe" %% "circe-generic" % "0.14.6",
-  "io.circe" %% "circe-parser" % "0.14.6",
+  "io.circe" %% "circe-core" % "0.14.7",
+  "io.circe" %% "circe-generic" % "0.14.7",
+  "io.circe" %% "circe-parser" % "0.14.7",
 
   // sttp wraps around pekko-http to allow for concise clients
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
