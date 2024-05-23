@@ -16,7 +16,7 @@ val activemqVersion = "5.18.4"
 val artemisVersion = "2.33.0"
 val testContainersVersion = "1.19.8"
 val keycloakVersion = "24.0.4"
-val sttpVersion = "3.9.0"
+val sttpVersion = "3.9.7"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
 
