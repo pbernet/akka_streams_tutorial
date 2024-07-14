@@ -20,7 +20,7 @@ val sttpVersion = "3.9.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.11.5"
-val circeVersion = "0.14.8"
+val circeVersion = "0.14.9"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
