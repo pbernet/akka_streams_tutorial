@@ -3,4 +3,4 @@ addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.12.1")
 //https://www.scala-sbt.org/1.x/docs/sbt-1.4-Release-Notes.html#sbt-dependency-graph+is+in-sourced
 //addDependencyTreePlugin
 
-addSbtPlugin("io.gatling" % "gatling-sbt" % "4.9.2")
+addSbtPlugin("io.gatling" % "gatling-sbt" % "4.10.0")
