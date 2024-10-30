@@ -57,7 +57,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.78.1",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.79",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
