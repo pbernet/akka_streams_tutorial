@@ -114,7 +114,7 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "5.3.0",
   "ch.qos.logback" % "logback-classic" % "1.4.12",
 
-  "org.apache.tika" % "tika-core" % "2.9.2",
+  "org.apache.tika" % "tika-core" % "3.0.0",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
