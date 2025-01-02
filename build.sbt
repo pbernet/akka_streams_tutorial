@@ -37,7 +37,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-http-xml" % pekkoHTTPVersion,
 
   // JSON (un)marshalling in Java examples
-  "org.json" % "json" % "20240303",
+  "org.json" % "json" % "20241224",
 
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
