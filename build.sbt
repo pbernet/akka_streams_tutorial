@@ -98,7 +98,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.0",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.3",
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.4",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3",
