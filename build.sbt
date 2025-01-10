@@ -23,7 +23,7 @@ val gatlingVersion = "3.13.1"
 val circeVersion = "0.14.8"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.1.0",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
 
   "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
   "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
