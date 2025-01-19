@@ -145,7 +145,7 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
-  "org.assertj" % "assertj-core" % "3.25.3" % Test,
+  "org.assertj" % "assertj-core" % "3.27.3" % Test,
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin/
   "io.gatling" % "gatling-core" % gatlingVersion,
