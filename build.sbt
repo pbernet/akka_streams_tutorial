@@ -11,7 +11,7 @@ val pekkoHTTPVersion = "1.1.0"
 val pekkoConnectorVersion = "1.1.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
-val kafkaVersion = "3.8.1"
+val kafkaVersion = "3.9.0"
 val activemqVersion = "5.18.5" // We are stuck with 5.x
 val artemisVersion = "2.39.0"
 val testContainersVersion = "1.20.4"
@@ -52,12 +52,12 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
   "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
   "javax.jms" % "jms" % "1.1",
-  "javax.xml.bind" % "jaxb-api" % "2.3.1",
+  "jakarta.xml.bind" % "jakarta.xml.bind-api" % "4.0.2",
   "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk15to18" % "1.78.1",
+  "org.bouncycastle" % "bcprov-jdk15to18" % "1.80",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
