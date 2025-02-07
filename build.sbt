@@ -92,11 +92,11 @@ libraryDependencies ++= Seq(
   "com.influxdb" % "flux-dsl" % influxdbVersion,
   "org.influxdb" % "influxdb-java" % "2.24",
 
-  "ca.uhn.hapi" % "hapi-base" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
+  "ca.uhn.hapi" % "hapi-base" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v23" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v24" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v25" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v281" % "2.6.0",
 
   "org.apache.opennlp" % "opennlp-tools" % "2.5.3",
 
