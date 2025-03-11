@@ -19,7 +19,7 @@ val keycloakVersion = "26.0.8"
 val sttpVersion = "3.10.1"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
-val gatlingVersion = "3.13.1"
+val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.8"
 
 libraryDependencies ++= Seq(
