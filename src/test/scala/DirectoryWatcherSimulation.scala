@@ -13,11 +13,9 @@ import scala.concurrent.duration.*
 /**
   * Show the use of Gatling ActionBuilder to create a custom action
   * In our case to generate files to be picked up by the [[DirectoryWatcher]]
-  * Since there are not HTTP requests issued by this simulation,
-  * we do not get a report at the end
   *
   * Run from terminal:
-  * sbt 'Gatling/testOnly DirectoryWatcherSimulation'
+  * sbt 'Gatling/testOnly DirectoryWatcherSimulation -- --no-reports'
   */
 class DirectoryWatcherSimulation extends Simulation {
   private val rootDir = "/tmp/directory-watcher-simulation"
