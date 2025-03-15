@@ -16,6 +16,7 @@ import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
 import org.apache.pekko.stream.ThrottleMode
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.apache.pekko.util.ByteString
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.security.MessageDigest
@@ -172,11 +173,18 @@ object ReverseProxy extends App {
         uri
       }
 
-      def computeHashWithPayloadAndPayloadLength: Flow[ByteString, (MessageDigest, ByteString, Int), NotUsed] =
-        Flow[ByteString].fold((MessageDigest.getInstance("SHA-256"), ByteString.empty, 0)) { (acc, chunk) =>
-          acc._1.update(chunk.toByteBuffer)
-          (acc._1, acc._2 ++ chunk, acc._3 + chunk.length)
+      case class HashAccumulator(digest: MessageDigest, payload: ByteString, length: Int)
+
+      def computeHashFromPayloadAndPayloadLength: Flow[ByteString, HashAccumulator, NotUsed] =
+        Flow[ByteString].fold(HashAccumulator(
+          MessageDigest.getInstance("SHA-256"),
+          ByteString.empty,
+          0)) { (acc, chunk) =>
+          val bytes = chunk.toArray
+          acc.digest.update(bytes, 0, bytes.length)
+          HashAccumulator(acc.digest, acc.payload ++ chunk, acc.length + chunk.length)
         }
+
 
       services.get(mode) match {
         case Some(rawSeq) =>
@@ -196,11 +204,12 @@ object ReverseProxy extends App {
 
             //  Example of an on-the-fly processing scenario
             val hashFuture = request.entity.dataBytes
-              .via(computeHashWithPayloadAndPayloadLength)
+              .via(computeHashFromPayloadAndPayloadLength)
               .runWith(Sink.head)
-              .map { case (digest, _, _) =>
-                RawHeader("X-Content-Hash", digest.digest().map("%02x".format(_)).mkString)
+              .map { accumulator =>
+                RawHeader("X-Content-Hash", Hex.toHexString(accumulator.digest.digest()))
               }
+
 
             hashFuture.flatMap { hashHeader =>
               val proxyReq = request
@@ -217,7 +226,6 @@ object ReverseProxy extends App {
         case None => Future.successful(NotFound(id, host))
       }
     }
-
     val futReverseProxy = Http().newServerAt(proxyHost, proxyPort).bind(handlerWithCircuitBreaker)
 
     futReverseProxy.onComplete {
