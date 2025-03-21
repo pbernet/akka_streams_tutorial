@@ -4,4 +4,4 @@ addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.2")
 //addDependencyTreePlugin
 
 // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
-addSbtPlugin("io.gatling" % "gatling-sbt" % "4.13.1")
+addSbtPlugin("io.gatling" % "gatling-sbt" % "4.13.2")
