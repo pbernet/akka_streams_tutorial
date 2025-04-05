@@ -12,23 +12,22 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /**
-  * Translate all blocks of an English .srt file to a target lang using OpenAI API
+  * Translate all blocks of an English .srt file to a target lang using LLMs via LangChain4j
   *
   * Workflow:
   *  - Load all blocks from the .srt source file with [[SrtParser]]
   *  - Group blocks to scenes (= all blocks within a session window), depending on `maxGapSeconds`
-  *  - Translate all blocks of a scene in one prompt (one line per block) via the openAI API
+  *  - Translate all blocks of a scene in one prompt (one line per block) via the API
   *  - Continuously write translated blocks to target file
-  *
-  * Works with these OpenAI API endpoints:
-  *  - Default:  /chat/completions (gpt-3.5-turbo)          https://platform.openai.com/docs/guides/chat/chat-vs-completions
-  *  - Fallback: /completions      (gpt-3.5-turbo-instruct) https://platform.openai.com/docs/api-reference/completions/create
-  *
+  *    *
   * Usage:
-  *  - Wire .srt source file
-  *  - Add API_KEY in [[OpenAICompletions]] and run this class
+  *  - Wire Params
+  *  - Add API_KEY in [[AnthropicCompletions]], [[OpenAICompletions]]  and then run this class
   *  - Scan log for WARN log messages and improve corresponding blocks in target file manually
-  *  - Note that the numerical block headers in the .srt files are not interpreted, only timestamps matter
+  *
+  * Remarks:
+  *  - Numerical block headers in the .srt files are not interpreted, only timestamps matter
+  *    . - Default params are just example values
   *
   * Similar to: [[sample.stream.SessionWindow]]
   */
@@ -37,12 +36,15 @@ object SubtitleTranslator extends App {
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val sourceFilePath = "src/main/resources/EN_challenges.srt"
-  private val targetFilePath = "DE_challenges.srt"
+  // Params
+  private val sourceFilePath = "Killers.Of.The.Flower.Moon.2023.720p.WEBRip.x264.AAC-[YTS.MX].srt"
+  private val targetFilePath = "DE_NEW_Killers.Of.The.Flower.Moon.2023.720p.WEBRip.x264.AAC-[YTS.MX].srt"
   private val targetLanguage = "German"
+  private val movieTitle = "Killers of the Flower Moon"
+  private val movieReleaseYear = 2023
 
-  private val defaultModel = "gpt-4o"
-  private val fallbackModel = "gpt-4-turbo"
+  private val defaultModel = OpenAICompletions.withContext(movieTitle, movieReleaseYear)
+  private val fallbackModel = AnthropicCompletions.withContext(movieTitle, movieReleaseYear)
 
   private val maxGapSeconds = 1 // gap time between two scenes (= session windows)
   private val endLineTag = "\n"
@@ -102,18 +104,18 @@ object SubtitleTranslator extends App {
   }
 
   private def translateScene(sceneOrig: List[SubtitleBlock]) = {
-    logger.info(s"About to translate scene with: ${sceneOrig.size} original blocks")
+    logger.info(s"About to translate scene with: ${sceneOrig.size} original blocks targeting: $defaultModel")
 
     val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEnd)
     val toTranslate = generateTranslationPrompt(allLines)
     logger.info(s"Translation prompt: $toTranslate")
 
-    val translatedCheap = new OpenAICompletions().runChatCompletions(defaultModel, toTranslate)
-    val translated = translatedCheap match {
+    val firstShot = defaultModel.runCompletions(toTranslate)
+    val translated = firstShot match {
       case translatedCheap if !isTranslationPlausible(translatedCheap.getLeft, sceneOrig.size) =>
         logger.info(s"Translation with: $defaultModel is not plausible, lines do not match. Fallback to: $fallbackModel")
-        new OpenAICompletions().runChatCompletions(fallbackModel, toTranslate)
-      case _ => translatedCheap
+        fallbackModel.runCompletions(toTranslate)
+      case _ => firstShot
     }
 
     val newTokens = translated.getRight
@@ -134,7 +136,7 @@ object SubtitleTranslator extends App {
             if (sceneOrig.isDefinedAt(rawResponseTextSplit._2)) {
               sceneOrig(rawResponseTextSplit._2)
             } else {
-              // Root cause: No plausible translation provided by openAI, eg due to added lines at beginning or at end of response
+              // Root cause: No plausible translation eg due to added lines at beginning or at end of response
               logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: ${rawResponseTextSplit._2} requested. Fallback to last original block")
               sceneOrig.last
             }
@@ -178,18 +180,36 @@ object SubtitleTranslator extends App {
 
   private def massageResultText(text: String) = {
     val textCleaned = clean(text)
-    // Two people conversation in one block
-    if (textCleaned.startsWith(conversationPrefix)) {
-      textCleaned.split(conversationPrefix).map(line => conversationPrefix + line).toList.tail
+
+    if (isConversation(textCleaned)) {
+      splitConversation(textCleaned)
     }
-    else if (textCleaned.length > maxCharPerTranslatedLine * 2 + 10) {
-      logger.warn(s"Translated block text is too long (${textCleaned.length} chars). Try to shorten via API call. Check result manually")
-      val toShorten = generateShortenPrompt(textCleaned)
-      logger.info(s"Shorten prompt: $toShorten")
-      val responseShort = new OpenAICompletions().runChatCompletions(defaultModel, toShorten)
-      splitSentence(clean(responseShort.getLeft))
+    else if (isTextTooLong(textCleaned)) {
+      shortenLongText(textCleaned)
     }
-    else splitSentence(textCleaned)
+    else {
+      splitSentence(textCleaned)
+    }
+  }
+
+  private def isConversation(text: String): Boolean = {
+    text.startsWith(conversationPrefix)
+  }
+
+  private def splitConversation(text: String): List[String] = {
+    text.split(conversationPrefix).map(line => conversationPrefix + line).toList.tail
+  }
+
+  private def isTextTooLong(text: String): Boolean = {
+    text.length > maxCharPerTranslatedLine * 2 + 10
+  }
+
+  private def shortenLongText(text: String): List[String] = {
+    logger.warn(s"Translated block text is too long (${text.length} chars). Try to shorten via API call. Check result manually")
+    val toShorten = generateShortenPrompt(text)
+    logger.info(s"Shorten prompt: $toShorten")
+    val responseShort = new AnthropicCompletions().runCompletions(toShorten)
+    splitSentence(clean(responseShort.getLeft))
   }
 
   private def clean(text: String) = {

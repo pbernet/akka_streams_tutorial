@@ -78,9 +78,17 @@ case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
 
   def formatOutBlock(blockCounter: Long): String = {
     // Spec: https://wiki.videolan.org/SubRip
-    val outputFormatted = s"$blockCounter$ls${toTime(start)} --> ${toTime(end)}$ls${lines.mkString("\n")}$ls$ls"
+    val outputFormatted = s"$blockCounter$ls${startTime()} --> ${endTime()}$ls${lines.mkString("\n")}$ls$ls"
     logger.info(s"Writing block:$ls {}", outputFormatted)
     outputFormatted
+  }
+
+  def startTime() = {
+    toTime(start)
+  }
+
+  def endTime() = {
+    toTime(end)
   }
 
   private def toTime(ms: Long) = {

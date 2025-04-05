@@ -36,9 +36,6 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHTTPVersion,
   "org.apache.pekko" %% "pekko-http-xml" % pekkoHTTPVersion,
 
-  // JSON (un)marshalling in Java examples
-  "org.json" % "json" % "20240303",
-
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
@@ -146,6 +143,12 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
   "org.assertj" % "assertj-core" % "3.25.3" % Test,
+
+  "org.apache.poi" % "poi-ooxml" % "5.3.0",
+  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta2",
+  "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta2",
+
+
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin/
   "io.gatling" % "gatling-core" % gatlingVersion,
