@@ -145,8 +145,8 @@ libraryDependencies ++= Seq(
   "org.assertj" % "assertj-core" % "3.25.3" % Test,
 
   "org.apache.poi" % "poi-ooxml" % "5.3.0",
-  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta2",
-  "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta2",
+  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta3",
+  "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta3",
 
 
 
