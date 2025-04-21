@@ -18,7 +18,8 @@ and [Pekko HTTP](https://pekko.apache.org/docs/pekko-http/current/) tutorials, b
 >
 > For now the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
 > contains the migration (with a few losses). Currently, this is the only maintained branch.
-> The plan is to move the content of this branch to a new `pekko_tutorial` repo and support Scala 3.
+> The plan is to move the content of this branch to a new `pekko_tutorial` repo and to support Scala 3 when Pekko
+> Connectors is ready.
 
 ## Project Description
 
@@ -154,7 +155,6 @@ Start the classes in the order below and watch the console output.
 | [WordCountProducer](src/main/scala/alpakka/kafka/WordCountProducer.scala)     | [pekko-streams-kafka](https://pekko.apache.org/docs/pekko-connectors-kafka/current/ "Doc") client which feeds random words to topic `wordcount-input`                                                                                                                                     |
 | [WordCountKStreams.java](src/main/scala/alpakka/kafka/WordCountKStreams.java) | [Kafka Streams DSL](https://kafka.apache.org/documentation/streams "Doc") client to count words and messages and feed the results to `wordcount-output` and `messagecount-output` topics. Contains additional interactive queries which should yield the same results `WordCountConsumer` |
 | [WordCountConsumer](src/main/scala/alpakka/kafka/WordCountConsumer.scala)     | [pekko-streams-kafka](https://pekko.apache.org/docs/pekko-connectors-kafka/current/ "Doc") client which consumes aggregated results from topic `wordcount-output` and `messagecount-output`                                                                                               |
-| [DeleteTopicUtil](src/main/scala/alpakka/kafka/DeleteTopicUtil.scala)         | Utility to reset the offset                                                                                                                                                                                                                                                               |
 
 ## HL7 V2 over TCP via Kafka to Websockets ##
 
@@ -183,15 +183,10 @@ The index is queried periodically and the content may also be viewed with a Brow
 
 `http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`
 
-## Movie subtitle translation via OpenAI API ##
+## Movie subtitle translation via LLMs ##
 
 [SubtitleTranslator](src/main/scala/tools/SubtitleTranslator.scala) translates all blocks of an English
-source `.srt` file to a target language using the OpenAI API endpoints:
-
-* `/chat/completions` (gpt-3.5-turbo/gpt-4) used by default,
-  see [Doc](https://platform.openai.com/docs/guides/chat/chat-vs-completions)
-* `/completions`      (gpt-3.5-turbo-instruct) used as fallback,
-  see [Doc](https://beta.openai.com/docs/api-reference/completions/create)
+source `.srt` file to a target language using LLMs via [LangChain4j](https://docs.langchain4j.dev)
 
 Pekko streams helps with:
 * Workflow modelling
