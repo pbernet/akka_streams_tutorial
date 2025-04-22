@@ -11,7 +11,7 @@ val pekkoHTTPVersion = "1.1.0"
 val pekkoConnectorVersion = "1.1.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
-val kafkaVersion = "3.9.0"
+val kafkaVersion = "4.0.1"
 val activemqVersion = "5.18.5" // We are stuck with 5.x
 val artemisVersion = "2.39.0"
 val testContainersVersion = "1.20.4"
