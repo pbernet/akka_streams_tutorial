@@ -97,7 +97,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.opennlp" % "opennlp-tools" % "2.5.3",
 
-  "org.apache.httpcomponents.client5" % "httpclient5" % "5.4",
+  "org.apache.httpcomponents.client5" % "httpclient5" % "5.4.4",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3",
   "commons-io" % "commons-io" % "2.16.1",
   "org.apache.commons" % "commons-lang3" % "3.12.0",
