@@ -41,9 +41,10 @@ Java 17 or higher (recommended: [GraalVM](https://www.graalvm.org/downloads))
 
 ### Running Examples
 
-Each example class contains instructions on how to run it from the IDE. Most examples are throttled, so you can see the
-console output and observe what is happening. Some examples deliberately throw `RuntimeException` to show recovery
-behavior.
+Each example class contains instructions on how to run it from the IDE. Most examples are throttled and provide a
+verbose log,
+by searching the log you see what is happening. Some examples deliberately throw `RuntimeException` eg to show recovery
+behaviour.
 
 ## Examples Overview
 
@@ -53,7 +54,7 @@ Some larger examples:
 * [Apache Kafka WordCount](#apache-kafka-wordcount)
 * [HL7 V2 over TCP via Kafka to Websockets](#hl7-v2-over-tcp-via-kafka-to-websockets)
 * [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
-* [Movie subtitle translation via OpenAI API](#movie-subtitle-translation-via-openai-api)
+* [Movie subtitle translation via LLMs](#movie-subtitle-translation-via-llms)
 
 Many examples deal with shared state management. While most Pekko
 Streams [operators](https://pekko.apache.org/docs/pekko/current/stream/operators/index.html) are
@@ -80,7 +81,9 @@ Examples of integrating AWS services with Pekko Connectors:
 * [SqsEcho](src/main/scala/alpakka/sqs/SqsEcho.scala)
 * [S3Echo](src/main/scala/alpakka/s3/S3Echo.scala)
 
-Run them via the corresponding IT test classes locally in localstack/minio or against your AWS account.
+Run them via the corresponding IT test classes locally
+in [localstack](https://github.com/localstack/localstack)/[minio](https://github.com/minio/minio) or against your AWS
+account.
 
 ### Other example resources
 

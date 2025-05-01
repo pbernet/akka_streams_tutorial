@@ -144,13 +144,10 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
   "org.assertj" % "assertj-core" % "3.25.3" % Test,
 
-  "org.apache.poi" % "poi-ooxml" % "5.3.0",
   "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta2",
   "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta2",
 
-
-
-  // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin/
+  // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
   "io.gatling.highcharts" % "gatling-charts-highcharts" % gatlingVersion,
   "io.gatling" % "gatling-test-framework" % gatlingVersion
@@ -175,7 +172,7 @@ Test / parallelExecution := false
 
 enablePlugins(GatlingPlugin)
 
-// Needed as long as this lib is in the dependencies
+// Needed as long as "scala-java8-compat" is in the dependencies
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
