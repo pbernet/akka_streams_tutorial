@@ -144,7 +144,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
   "org.assertj" % "assertj-core" % "3.25.3" % Test,
 
-  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta2",
+  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta4",
   "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta2",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
