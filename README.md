@@ -180,11 +180,16 @@ The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEto
 workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API,
 eg
 for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
-Text processing on this content using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html)
-yields `personsFound`, which are added to the `wikipediaedits` Elasticsearch index.
-The index is queried periodically and the content may also be viewed with a Browser, eg
+Local NER processing on this content using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html)
+yields `personsFound`, which are then added to the `wikipediaedits` Elasticsearch/Opensearch index.
 
+Also, remote NER processing using `GPT_4_O_MINI` yields `personsFoundRemote`.
+
+All persons found can be viewed with a Browser, eg
 `http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`
+
+The content is also written as embeddings using [LangChain4j](https://docs.langchain4j.dev) to a local
+`InMemoryEmbeddingStore` to be able to RAG chat with them via a local AI Assistant `http://localhost:8080/assistant`
 
 ## Movie subtitle translation via LLMs ##
 

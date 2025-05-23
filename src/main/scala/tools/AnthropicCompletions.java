@@ -3,7 +3,7 @@ package tools;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
@@ -23,7 +23,7 @@ public class AnthropicCompletions {
     public static final String API_KEY = "***";
     public static final String MODEL_NAME = "claude-3-7-sonnet-20250219";
 
-    private final ChatLanguageModel model;
+    private final ChatModel model;
     private final String moviePlotContext;
 
     public AnthropicCompletions() {
@@ -52,7 +52,7 @@ public class AnthropicCompletions {
      * @return A new AnthropicCompletions instance with the resolved movie plot context
      */
     public static AnthropicCompletions withContext(String movieTitle, int movieReleaseYear) {
-        ChatLanguageModel contextModel = AnthropicChatModel.builder()
+        ChatModel contextModel = AnthropicChatModel.builder()
                 .apiKey(API_KEY)
                 .modelName(MODEL_NAME)
                 .temperature(0.1)

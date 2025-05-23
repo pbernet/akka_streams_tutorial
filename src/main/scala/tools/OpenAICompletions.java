@@ -2,7 +2,7 @@ package tools;
 
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -24,7 +24,7 @@ public class OpenAICompletions {
     public static final String API_KEY = "***";
     public static final String MODEL_NAME = "gpt-4o";
 
-    private final ChatLanguageModel model;
+    private final ChatModel model;
     private final String moviePlotContext;
 
     public OpenAICompletions() {
@@ -51,7 +51,7 @@ public class OpenAICompletions {
      * @return A new OpenAICompletions instance with the resolved movie plot context
      */
     public static OpenAICompletions withContext(String movieTitle, int movieReleaseYear) {
-        ChatLanguageModel contextModel = OpenAiChatModel.builder()
+        ChatModel contextModel = OpenAiChatModel.builder()
                 .apiKey(API_KEY)
                 .modelName(MODEL_NAME)
                 .temperature(0.2)

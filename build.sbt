@@ -22,6 +22,9 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.8"
 
+// https://github.com/langchain4j/langchain4j/issues/2955
+val langchain4jVersion = "1.0.0"
+
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
 
@@ -95,7 +98,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.3",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.4",
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.4",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3",
@@ -144,8 +147,16 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
   "org.assertj" % "assertj-core" % "3.25.3" % Test,
 
-  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.0-beta2",
-  "dev.langchain4j" % "langchain4j-open-ai" % "1.0.0-beta2",
+  "dev.langchain4j" % "langchain4j" % langchain4jVersion,
+  "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
+  "dev.langchain4j" % "langchain4j-anthropic" % "1.0.1-beta6",
+
+  // LangChain4j PgVector extension
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.0.1-beta6",
+
+  // LangChain4j embedding models
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.0.1-beta6",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.0.1-beta6",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
