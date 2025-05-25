@@ -23,12 +23,64 @@
 
         #input-container {
             display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #persons-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #query-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #persons-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
 
         #query-input {
             flex-grow: 1;
             padding: 8px;
             margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 100px;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .autocomplete-item.selected {
+            background-color: #e6f3ff;
         }
 
         button {
@@ -37,6 +89,20 @@
             color: white;
             border: none;
             cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .clear-btn {
+            background: #f44336;
+            padding: 8px 12px;
+        }
+
+        .clear-btn:hover {
+            background: #da190b;
         }
 
         .user-message {
@@ -47,32 +113,190 @@
             color: green;
         }
 
+        .error {
+            color: red;
+        }
+
         pre {
             white-space: pre-wrap;
             background: #f5f5f5;
             padding: 10px;
             border-radius: 5px;
         }
+
+        label {
+            font-weight: bold;
+            min-width: 100px;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
 <div id="chat-container">
-    <h1>Assistant</h1>
+    <h1>Chat with currently edited Wikipedia pages</h1>
     <div id="messages"></div>
     <div id="input-container">
-        <input type="text" id="query-input" placeholder="What do you know about {a person found in index}">
-        <button onclick="sendQuery()">Send</button>
+        <div id="persons-container">
+            <label for="persons-input">Select Person</label>
+            <input type="text" id="persons-input" placeholder="Start typing to search for persons (or **)">
+            <button class="clear-btn" onclick="clearPersonSelection()">Clear</button>
+            <div id="autocomplete-list"></div>
+        </div>
+        <div id="query-container">
+            <label for="query-input">Query</label>
+            <input type="text" id="query-input" placeholder="What do you know about the selected person?">
+            <button onclick="sendQuery()">Send</button>
+        </div>
     </div>
 </div>
 
 <script>
+    let selectedPerson = null;
+    let autocompleteData = [];
+    let currentSelection = -1;
+
+    // Initialize autocomplete functionality
+    document.addEventListener('DOMContentLoaded', function () {
+        const personsInput = document.getElementById('persons-input');
+        const autocompleteList = document.getElementById('autocomplete-list');
+
+        personsInput.addEventListener('input', function () {
+            const query = this.value.trim();
+            if (query.length >= 2) {
+                searchPersons(query);
+            } else {
+                hideAutocomplete();
+            }
+        });
+
+        personsInput.addEventListener('keydown', function (event) {
+            const items = autocompleteList.querySelectorAll('.autocomplete-item');
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                currentSelection = Math.min(currentSelection + 1, items.length - 1);
+                updateSelection(items);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                currentSelection = Math.max(currentSelection - 1, -1);
+                updateSelection(items);
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (currentSelection >= 0 && items[currentSelection]) {
+                    selectPerson(items[currentSelection].dataset.person);
+                }
+            } else if (event.key === 'Escape') {
+                hideAutocomplete();
+            }
+        });
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', function (event) {
+            if (!personsInput.contains(event.target) && !autocompleteList.contains(event.target)) {
+                hideAutocomplete();
+            }
+        });
+    });
+
+    function searchPersons(query) {
+        fetch('/assistant/personsSearch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({query: query}),
+        })
+            .then(response => response.json())
+            .then(data => {
+                autocompleteData = data.persons || [];
+                showAutocomplete(autocompleteData);
+            })
+            .catch(error => {
+                console.error('Error searching persons:', error);
+                hideAutocomplete();
+            });
+    }
+
+    function showAutocomplete(persons) {
+        const autocompleteList = document.getElementById('autocomplete-list');
+        autocompleteList.innerHTML = '';
+        currentSelection = -1;
+
+        if (persons.length === 0) {
+            const noResultsItem = document.createElement('div');
+            noResultsItem.className = 'autocomplete-item';
+            noResultsItem.textContent = 'No persons found';
+            noResultsItem.style.color = '#999';
+            autocompleteList.appendChild(noResultsItem);
+        } else {
+            persons.forEach((person) => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.textContent = person.name;
+                item.dataset.person = JSON.stringify(person);
+                item.addEventListener('click', () => selectPerson(person));
+                autocompleteList.appendChild(item);
+            });
+        }
+
+        autocompleteList.style.display = 'block';
+    }
+
+    function hideAutocomplete() {
+        const autocompleteList = document.getElementById('autocomplete-list');
+        autocompleteList.style.display = 'none';
+        currentSelection = -1;
+    }
+
+    function updateSelection(items) {
+        items.forEach((item, index) => {
+            item.classList.toggle('selected', index === currentSelection);
+        });
+    }
+
+    function selectPerson(person) {
+        if (typeof person === 'string') {
+            person = JSON.parse(person);
+        }
+
+        selectedPerson = person;
+        const personsInput = document.getElementById('persons-input');
+        personsInput.value = person.name;
+        hideAutocomplete();
+
+        const queryInput = document.getElementById('query-input');
+        const placeholder = `What do you know about ${person.name}?`;
+        queryInput.placeholder = placeholder;
+        queryInput.value = placeholder;
+    }
+
+    function clearPersonSelection() {
+        selectedPerson = null;
+        const personsInput = document.getElementById('persons-input');
+        const queryInput = document.getElementById('query-input');
+
+        personsInput.value = '';
+        queryInput.placeholder = 'What do you know about the selected person?';
+        hideAutocomplete();
+    }
+
     function sendQuery() {
         const queryInput = document.getElementById('query-input');
         const query = queryInput.value.trim();
 
         if (query === '') return;
 
-        addMessage('You: ' + query, 'user-message');
+        // Include selected person in the query context
+        const queryContext = {
+            query: query,
+            selectedPerson: selectedPerson
+        };
+
+        const displayQuery = selectedPerson
+            ? `You: ${query} (about ${selectedPerson.name})`
+            : `You: ${query}`;
+
+        addMessage(displayQuery, 'user-message');
         queryInput.value = '';
 
         fetch('/assistant/query', {
@@ -80,7 +304,7 @@
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({query: query}),
+            body: JSON.stringify(queryContext),
         })
             .then(response => response.json())
             .then(data => {

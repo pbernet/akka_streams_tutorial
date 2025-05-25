@@ -176,20 +176,26 @@ test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophyS
 
 Find out whose Wikipedia articles were changed in (near) real time by tapping into
 the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
-The class [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala) implements a
-workflow, using the `title` attribute as identifier from the SSE entity to fetch the `extract` from the Wikipedia API,
+The class [WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/WikipediaEditsAnalyser.scala) implements
+the following workflow:
+
+Use the `title` as identifier to fetch the `extract` from the Wikipedia API,
 eg
 for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
-Local NER processing on this content using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html)
-yields `personsFound`, which are then added to the `wikipediaedits` Elasticsearch/Opensearch index.
 
-Also, remote NER processing using `GPT_4_O_MINI` yields `personsFoundRemote`.
+Local NER processing on the `extract` / `content`
+using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html)
+yields `personsFoundLocal`, which are then added to the `wikipediaedits` Elasticsearch/Opensearch Index.
 
-All persons found can be viewed with a Browser, eg
-`http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFound:*`
+Also, do remote NER processing on the `extract` / `content` using OpenAI `GPT_4_O_MINI` to obtain `personsFoundRemote`.
 
-The content is also written as embeddings using [LangChain4j](https://docs.langchain4j.dev) to a local
-`InMemoryEmbeddingStore` to be able to RAG chat with them via a local AI Assistant `http://localhost:8080/assistant`
+All persons found (local and remote) can be viewed in the Index with a Browser, eg
+`http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFoundLocal:*`
+
+All `content` is also transformed into embeddings using [LangChain4j](https://docs.langchain4j.dev)
+`BgeSmallEnV15QuantizedEmbeddingModel` to a local
+`InMemoryEmbeddingStore` to be able to RAG chat against the `content` of the currently edited Wikipedia pages via a
+local AI Assistant `http://localhost:8080/assistant`
 
 ## Movie subtitle translation via LLMs ##
 

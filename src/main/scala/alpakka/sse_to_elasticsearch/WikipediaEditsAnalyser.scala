@@ -14,16 +14,19 @@ import dev.langchain4j.rag.query.router.DefaultQueryRouter
 import dev.langchain4j.service.AiServices
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore
 import io.circe.*
+import io.circe.generic.auto.*
 import io.circe.parser.*
+import io.circe.syntax.*
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
+import org.apache.commons.lang3.StringUtils
 import org.apache.commons.text.StringEscapeUtils
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, path, pathEndOrSingleSlash, pathPrefix, post}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
@@ -49,16 +52,16 @@ import scala.util.control.NonFatal
 
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
-  * fetch the abstract via Wikipedia API,
+  * fetch the extract via Wikipedia API,
   * do local and remote NER processing for persons in EN
   * and then write the results to either:
   *  - Elasticsearch version 7.x server
   *  - Opensearch version 2.x server
-  *    Also write the edits as embeddings to a local [[InMemoryEmbeddingStore]]
+  *    Also transform the content as embeddings to a local [[InMemoryEmbeddingStore]]
   *    to be able to RAG chat with them via a local [[Assistant]]
   *
   * Remarks:
-  *  - We use [[spray.json]] because of the elasticsearch pekko connectors
+  *  - We use [[spray.json]] because of the elasticsearch pekko connector
   *
   * Doc:
   * https://pekko.apache.org/docs/pekko-connectors/current/elasticsearch.html
@@ -66,13 +69,11 @@ import scala.util.control.NonFatal
   * https://pekko.apache.org/docs/pekko-connectors/current/opensearch.html
   * https://github.com/opensearch-project/opensearch-testcontainers
   */
-
-
 trait Assistant {
   def answer(query: String): String
 }
 
-object SSEtoElasticsearch extends App {
+object WikipediaEditsAnalyser extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
@@ -99,7 +100,9 @@ object SSEtoElasticsearch extends App {
     .build()
   val OPENAI_API_KEY = "***"
 
-  case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0)
+  case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+    def traceId: String = title.hashCode.abs.toString
+  }
 
   object Change extends ((Long, String, String, String, String, Boolean, Boolean, Int, Int) => Change) {
     def apply(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0): Change =
@@ -109,14 +112,18 @@ object SSEtoElasticsearch extends App {
   }
 
   // Helps to carry the data through the stages, although this violates functional principles
-  case class Ctx(change: Change, personsFound: List[String] = List.empty, personsFoundRemote: List[String] = List.empty, content: String = "")
+  case class Ctx(change: Change, personsFoundLocal: List[String] = List.empty, personsFoundRemote: List[String] = List.empty, content: String = "") {
+    def traceId: String = change.traceId
+  }
 
   private object Ctx extends ((Change, List[String], List[String], String) => Ctx) {
-    def apply(change: Change, personsFound: List[String] = List.empty, personsFoundRemote: List[String] = List.empty, content: String = ""): Ctx =
-      new Ctx(change, personsFound, personsFoundRemote, content)
+    def apply(change: Change, personsFoundLocal: List[String] = List.empty, personsFoundRemote: List[String] = List.empty, content: String = ""): Ctx =
+      new Ctx(change, personsFoundLocal, personsFoundRemote, content)
 
     implicit def formatCtx: RootJsonFormat[Ctx] = jsonFormat4(Ctx.apply)
   }
+
+  final case class Person(name: String)
 
   //  private val dockerImageName = DockerImageName
   //    .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
@@ -210,7 +217,7 @@ object SSEtoElasticsearch extends App {
   }
 
   private def fetchContent(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
+    logger.info(s"[${ctx.traceId}] About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
 
     val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
@@ -225,7 +232,7 @@ object SSEtoElasticsearch extends App {
   private def findPersons(ctx: Ctx): Future[Ctx] = {
     findPersonsLocalNER(ctx).flatMap { localResult =>
       findPersonsRemoteNER(localResult).map { remoteResult =>
-        val localPersons = localResult.personsFound
+        val localPersons = localResult.personsFoundLocal
         val remotePersons = remoteResult.personsFoundRemote
         val allPersons = (localPersons ++ remotePersons).distinct
 
@@ -250,9 +257,9 @@ object SSEtoElasticsearch extends App {
             rowsListToDisplay += Array("Found by both", both.size.toString, both.mkString(", "))
           }
           val table = formatAsAsciiTable(title, headers, rowsListToDisplay.toArray)
-          logger.info(s"\n$table")
+          logger.info(s"[${ctx.traceId}]\n$table")
 
-          ctx.copy(personsFound = allPersons, personsFoundRemote = remotePersons)
+          ctx.copy(personsFoundLocal = allPersons, personsFoundRemote = remotePersons)
         } else {
           ctx
         }
@@ -261,7 +268,7 @@ object SSEtoElasticsearch extends App {
   }
 
   private def findPersonsLocalNER(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"Local NER: About to find person names in: ${ctx.change.title}")
+    logger.info(s"[${ctx.traceId}] Local NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     // We need a new instance, because TokenizerME is not thread safe
@@ -278,14 +285,20 @@ object SSEtoElasticsearch extends App {
     if (personsFound.isEmpty) {
       Future(ctx)
     } else {
-      val personsFoundCleaned = personsFound.map(each => StringEscapeUtils.unescapeJava(each))
-      logger.debug(s"Local NER found persons: $personsFoundCleaned from content: $content")
-      Future(ctx.copy(personsFound = personsFoundCleaned))
+      val personsFoundCleaned = personsFound
+        .map(each => StringEscapeUtils.unescapeJava(each))
+        // Keep name related content (letters, whitespace, apostrophes, periods, hyphens)
+        .map(_.replaceAll("[^\\p{L}\\s'.\\-]", ""))
+        .map(StringUtils.trim)
+        .filter(StringUtils.isNotBlank)
+
+      logger.debug(s"[${ctx.traceId}] Local NER found persons: $personsFoundCleaned from content: $content")
+      Future(ctx.copy(personsFoundLocal = personsFoundCleaned))
     }
   }
 
   private def findPersonsRemoteNER(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"Remote NER: About to find person names in: ${ctx.change.title}")
+    logger.info(s"[${ctx.traceId}] Remote NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     if (content.isEmpty) {
@@ -298,13 +311,33 @@ object SSEtoElasticsearch extends App {
       .build()
 
     val promptPersons =
-      """Extract all person names from the following text.
-        |Return only the names, one per line. If no names are found, return an empty string.
-        |Do NOT include organizations, places, products, or other entities
+      """You are an expert Named Entity Recognition (NER) system specialized in identifying person names.
         |
-        |Text: {{content}}
+        |Task: Extract all person names from the provided text. Follow these rules strictly:
         |
-        |Person names:""".stripMargin
+        |INCLUDE:
+        |- Full names of real people (e.g., "John Smith", "Marie Curie")
+        |- Single names when clearly referring to people (e.g., "Einstein", "Shakespeare")
+        |- Historical figures and public personalities
+        |- Names with titles when referring to people (e.g., "Dr. Johnson", "President Lincoln")
+        |
+        |EXCLUDE:
+        |- Organizations, companies, institutions
+        |- Places, cities, countries, geographical locations
+        |- Products, brands, software names
+        |- Book titles, movie titles, song titles
+        |- Abstract concepts or general terms
+        |
+        |OUTPUT FORMAT:
+        |- Return each person name on a separate line
+        |- Use the exact form as it appears in the text
+        |- If no person names are found, return exactly: "NONE"
+        |- Do not include explanations or additional text
+        |
+        |TEXT TO ANALYZE:
+        |{{content}}
+        |
+        |PERSON NAMES:""".stripMargin
 
     val message = UserMessage.from(promptPersons.replace("{{content}}", content))
 
@@ -312,25 +345,29 @@ object SSEtoElasticsearch extends App {
       val response = model.chat(message)
       val personsFoundText = response.aiMessage().text().trim()
 
-      val personsFoundList = if (personsFoundText.isEmpty) {
+      val personsFoundList = if (personsFoundText.isEmpty || personsFoundText.equalsIgnoreCase("NONE")) {
         List.empty[String]
       } else {
-        personsFoundText.split("\n").map(_.trim).filter(_.nonEmpty).toList
+        personsFoundText.split("\n")
+          .map(_.trim)
+          .filter(_.nonEmpty)
+          .filter(!_.equalsIgnoreCase("NONE"))
+          .toList
       }
 
       if (personsFoundList.isEmpty) {
         Future(ctx)
       } else {
-
-        logger.debug(s"Remote NER found persons: $personsFoundList from content: $content")
+        logger.debug(s"[${ctx.traceId}] Remote NER found persons: $personsFoundList from content: $content")
         Future(ctx.copy(personsFoundRemote = personsFoundList))
       }
     } catch {
       case e: Exception =>
-        logger.error(s"Error during remote LLM call: ${e.getMessage}", e)
+        logger.error(s"[${ctx.traceId}] Error during remote LLM call: ${e.getMessage}", e)
         Future(ctx)
     }
   }
+
 
   /**
     * Formats data as an ASCII table with proper borders and alignment.
@@ -374,7 +411,7 @@ object SSEtoElasticsearch extends App {
     .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
     .mapAsync(3)(ctx => findPersons(ctx))
-    .filter(ctx => ctx.personsFound.nonEmpty)
+    .filter(ctx => ctx.personsFoundLocal.nonEmpty)
 
   private val embeddingStoreSink = Flow[Ctx]
     .filter(ctx => ctx.content.nonEmpty)
@@ -394,8 +431,6 @@ object SSEtoElasticsearch extends App {
     .withAttributes(ActorAttributes.supervisionStrategy(decider))
     .runWith(elasticsearchSink)
 
-
-
   // Wait for the index to populate
   Thread.sleep(10.seconds.toMillis)
   indexClient()
@@ -407,7 +442,7 @@ object SSEtoElasticsearch extends App {
 
   private def indexClient() = {
     val os = System.getProperty("os.name").toLowerCase
-    val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFound:*&size=100"
+    val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFoundLocal:*&size=100"
     if (os == "mac os x") Process(s"open $url").!
     else if (os.startsWith("windows")) Seq("cmd", "/c", s"start $url").!
     else logger.info(s"Please open a browser at: $url")
@@ -431,26 +466,96 @@ object SSEtoElasticsearch extends App {
         .withMaxMessages(10)).build
   }
 
+  // Doc:
+  // https://pekko.apache.org/docs/pekko-connectors/current/opensearch.html
+  // https://docs.opensearch.org/docs/latest/query-dsl/full-text/simple-query-string/#simple-query-string-syntax
+  private def searchPersons(query: String): Future[List[Person]] = {
+    logger.info(s"Searching for persons with query: $query")
+
+    val wildcard = "**";
+    val searchQuery = if (query.equals(wildcard)) {
+      """{
+        "exists": {
+          "field": "personsFoundLocal"
+        }
+    }"""
+    } else {
+      s"""{
+        "simple_query_string": {
+          "fields": [ "personsFoundLocal", "personsFoundRemote" ],
+          "query": "$query*"
+        }
+    }"""
+    }
+
+    val searchSource = ElasticsearchSource
+      .typed[Ctx](
+        searchParams,
+        query = searchQuery,
+        settings = sourceSettings
+      )
+
+    searchSource
+      .runWith(Sink.seq)
+      .map { results =>
+        val allPersonsFound = results.flatMap { readResult =>
+          val localPersons = readResult.source.personsFoundLocal
+          val remotePersons = readResult.source.personsFoundRemote
+          (localPersons ++ remotePersons).sorted
+        }.distinct
+        allPersonsFound.map(Person(_)).toList
+
+      }
+      .recover {
+        case ex =>
+          logger.error(s"Error searching persons with query: $query", ex)
+          List.empty[Person]
+      }
+  }
+
   private def startConversationWith(assistant: Assistant): Unit = {
     final case class QueryRequest(query: String)
     final case class QueryResponse(answer: String)
-
-    import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.*
-    import spray.json.*
-    import DefaultJsonProtocol.*
-
-    implicit val queryRequestFormat: RootJsonFormat[QueryRequest] = jsonFormat1(QueryRequest.apply)
-    implicit val queryResponseFormat: RootJsonFormat[QueryResponse] = jsonFormat1(QueryResponse.apply)
+    final case class PersonSearchRequest(query: String)
+    final case class PersonSearchResponse(persons: List[Person])
 
     val route: Route =
       pathPrefix("assistant") {
         concat(
+          path("personsSearch") {
+            post {
+              entity(as[String]) { jsonString =>
+                decode[PersonSearchRequest](jsonString) match {
+                  case Right(request) =>
+                    complete {
+                      searchPersons(request.query).map { persons =>
+                        PersonSearchResponse(persons: List[Person])
+                      }.map(response =>
+                        HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
+                      ).recover {
+                        case ex =>
+                          logger.error("Error searching persons: ", ex)
+                          HttpEntity(ContentTypes.`application/json`,
+                            PersonSearchResponse(List.empty).asJson.noSpaces)
+                      }
+                    }
+                  case Left(error) =>
+                    complete(HttpResponse(400, entity = s"Invalid JSON: $error"))
+                }
+              }
+            }
+          },
           path("query") {
             post {
-              entity(as[QueryRequest]) { queryRequest =>
-                val answer = assistant.answer(queryRequest.query)
-                val response = QueryResponse(answer)
-                complete(HttpEntity(ContentTypes.`application/json`, response.toJson.toString))
+              entity(as[String]) { jsonString =>
+                decode[QueryRequest](jsonString) match {
+                  case Right(queryRequest) =>
+                    val answer = assistant.answer(queryRequest.query)
+                    val response = QueryResponse(answer)
+                    complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
+                  case Left(error) =>
+                    complete(HttpResponse(400, entity = s"Invalid JSON: $error"))
+                }
               }
             }
           },
@@ -473,9 +578,6 @@ object SSEtoElasticsearch extends App {
     else if (os.startsWith("windows")) Seq("cmd", "/c", s"start $url").!
     else logger.info(s"Please open a browser at: $url")
   }
-
-
-
 
   private def dateTimeFormatted(timestamp: Long) = {
     Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString

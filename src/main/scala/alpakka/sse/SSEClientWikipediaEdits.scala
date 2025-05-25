@@ -31,7 +31,7 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   * https://wikitech.wikimedia.org/wiki/EventStreams
   *
   * Uses Alpakka SSE client, Doc: https://doc.akka.io/docs/alpakka/current/sse.html
-  * Similar usage in [[alpakka.sse_to_elasticsearch.SSEtoElasticsearch]])
+  * Similar usage in [[alpakka.sse_to_elasticsearch.WikipediaEditsAnalyser]])
   */
 object SSEClientWikipediaEdits extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
