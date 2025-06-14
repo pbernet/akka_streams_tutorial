@@ -20,7 +20,7 @@ val sttpVersion = "3.10.1"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.13.5"
-val circeVersion = "0.14.8"
+val circeVersion = "0.14.14"
 
 // https://github.com/langchain4j/langchain4j/issues/2955
 val langchain4jVersion = "1.0.0"
