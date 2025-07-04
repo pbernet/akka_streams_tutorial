@@ -3,18 +3,341 @@
 <head>
     <meta charset="utf-8">
     <title>Sample routes for akka-http</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        form {
+            margin: 10px 0;
+        }
+
+        input, textarea, select {
+            margin: 5px;
+            padding: 5px;
+        }
+
+        button, input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover, input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            display: none;
+        }
+
+        .error {
+            border-left-color: #f44336;
+            background-color: #ffebee;
+        }
+    </style>
 </head>
 <body>
-<a href="http://127.0.0.1:6002/entries">entries</a>
-<br>
-<a href="http://127.0.0.1:6002/faultyActor">faultyActor</a>
-<br>
-<form method="post" action="http://127.0.0.1:6002/post">
-    <label for="color">Color:</label><br>
-    <input type="text" id="color" name="color"><br>
-    <label for="age">Age:</label><br>
-    <input type="text" id="age" name="age"><br>
-    <input type="submit" value="Submit">
-</form>
+<h1>Akka HTTP Sample Routes Demo</h1>
+
+<div class="section">
+    <h3>Browse Directory Entries</h3>
+    <p>Browse files in the system temp directory:</p>
+    <a href="http://127.0.0.1:6002/entries" target="_blank">
+        <button type="button">Browse Entries</button>
+    </a>
+</div>
+
+<div class="section">
+    <h3>Form Data Submission</h3>
+    <p>Submit form data with validation (age must be > 18):</p>
+    <form method="post" action="http://127.0.0.1:6002/post">
+        <label for="color">Color:</label><br>
+        <input type="text" id="color" name="color" placeholder="Enter a color" required><br><br>
+        <label for="age">Age:</label><br>
+        <input type="number" id="age" name="age" placeholder="Enter age" required><br><br>
+        <input type="submit" value="Submit Form Data">
+    </form>
+</div>
+
+<div class="section">
+    <h3>Faulty Actor Test</h3>
+    <p>Test the faulty actor that demonstrates error handling:</p>
+    <p><em>Note: This actor may behave differently on first vs subsequent requests</em></p>
+    <button onclick="testFaultyActor()">Test Faulty Actor</button>
+    <button onclick="testFaultyActorMultiple()">Test Multiple Times (5x)</button>
+    <button onclick="clearFaultyResults()">Clear Results</button>
+    <div id="faultyResult" class="result"></div>
+    <div id="faultyHistory" style="margin-top: 10px;"></div>
+</div>
+
+<div class="section">
+    <h3>Accept Header Test</h3>
+    <p>Test different Accept headers (always returns JSON):</p>
+    <button onclick="testAcceptHeader('application/json')">Test JSON Accept</button>
+    <button onclick="testAcceptHeader('text/csv')">Test CSV Accept</button>
+    <button onclick="testAcceptHeader('text/plain')">Test Plain Text Accept</button>
+    <button onclick="testAcceptHeader('text/xml')">Test XML Accept</button>
+    <div id="acceptResult" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>Raw JSON POST</h3>
+    <p>Send raw JSON data via POST:</p>
+    <textarea id="jsonInput" rows="4" cols="50" placeholder='{"account":{"name":"TEST"}}'></textarea><br>
+    <button onclick="sendRawJson()">Send Raw JSON</button>
+    <div id="jsonResult" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>XML Response Test</h3>
+    <p>Get a sample XML response:</p>
+    <button onclick="getXmlResponse()">Get XML Response</button>
+    <div id="xmlResult" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>User Path Matching</h3>
+    <p>Test different user path patterns:</p>
+    <div style="background-color: #f0f8ff; padding: 10px; margin: 10px 0; border-left: 4px solid #2196F3; font-family: monospace;">
+        <strong>Path Patterns:</strong><br>
+        <code>/users</code> - All users<br>
+        <code>/users/{userId}</code> - Single user (e.g., /users/123)<br>
+        <code>/users/{userId}/{action}</code> - User action (e.g., /users/123/edit)<br>
+        <code>/users/{userId}/{action}/...</code> - Complex nested paths
+    </div>
+    <div>
+        <a href="http://127.0.0.1:6002/users" target="_blank">
+            <button type="button">All Users</button>
+        </a>
+    </div>
+    <div>
+        <input type="text" id="userId" placeholder="Enter user ID" value="123">
+        <button onclick="testUserPath()">Test Single User</button>
+    </div>
+    <div>
+        <input type="text" id="userIdAction" placeholder="User ID" value="123">
+        <input type="text" id="userAction" placeholder="Action" value="edit">
+        <button onclick="testUserAction()">Test User Action</button>
+    </div>
+    <div>
+        <input type="text" id="complexPath" placeholder="users/123/edit/profile/settings"
+               value="users/123/edit/profile/settings">
+        <button onclick="testComplexPath()">Test Complex Path</button>
+    </div>
+</div>
+
+<script>
+    function showResult(elementId, content, isError = false) {
+        const resultDiv = document.getElementById(elementId);
+        resultDiv.innerHTML = content;
+        resultDiv.className = isError ? 'result error' : 'result';
+        resultDiv.style.display = 'block';
+    }
+
+    function testAcceptHeader(acceptType) {
+        fetch('http://127.0.0.1:6002/acceptAll', {
+            method: 'GET',
+            headers: {
+                'Accept': acceptType
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                showResult('acceptResult', `Accept: ${acceptType}<br>Response: ${JSON.stringify(data)}`);
+            })
+            .catch(error => {
+                showResult('acceptResult', `Error: ${error.message}`, true);
+            });
+    }
+
+    function sendRawJson() {
+        const jsonData = document.getElementById('jsonInput').value || '{"account":{"name":"TEST"}}';
+
+        fetch('http://127.0.0.1:6002/jsonRaw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: jsonData
+        })
+            .then(response => {
+                if (response.ok) {
+                    showResult('jsonResult', `JSON sent successfully!<br>Data: ${jsonData}`);
+                } else {
+                    showResult('jsonResult', `Error: ${response.status} ${response.statusText}`, true);
+                }
+            })
+            .catch(error => {
+                showResult('jsonResult', `Error: ${error.message}`, true);
+            });
+    }
+
+    function getXmlResponse() {
+        fetch('http://127.0.0.1:6002/okResponseXml')
+            .then(response => response.text())
+            .then(data => {
+                // Create a temporary element to safely escape the XML content
+                const tempDiv = document.createElement('div');
+                tempDiv.textContent = data;
+                showResult('xmlResult', `XML Response:<br><pre>${tempDiv.innerHTML}</pre>`);
+            })
+            .catch(error => {
+                showResult('xmlResult', `Error: ${error.message}`, true);
+            });
+    }
+
+    function testUserPath() {
+        const userId = document.getElementById('userId').value || '123';
+        window.open(`http://127.0.0.1:6002/users/${userId}`, '_blank');
+    }
+
+    function testUserAction() {
+        const userId = document.getElementById('userIdAction').value || '123';
+        const action = document.getElementById('userAction').value || 'edit';
+        window.open(`http://127.0.0.1:6002/users/${userId}/${action}`, '_blank');
+    }
+
+    function testComplexPath() {
+        const path = document.getElementById('complexPath').value || 'users/123/edit/profile/settings';
+        window.open(`http://127.0.0.1:6002/${path}`, '_blank');
+    }
+
+    // Set default JSON in textarea
+    document.getElementById('jsonInput').value = '{"account":{"name":"TEST"}}';
+
+    let faultyTestCount = 0;
+    let faultyHistory = [];
+
+    function testFaultyActor() {
+        faultyTestCount++;
+        const startTime = new Date();
+
+        showResult('faultyResult', `Testing faulty actor (Request #${faultyTestCount})...`);
+
+        fetch('http://127.0.0.1:6002/faultyActor', {
+            method: 'GET'
+        })
+            .then(response => {
+                const endTime = new Date();
+                const duration = endTime - startTime;
+
+                if (response.ok) {
+                    return response.text().then(text => {
+                        const result = `✅ Request #${faultyTestCount} - SUCCESS (${duration}ms)<br>Response: ${text}`;
+                        showResult('faultyResult', result);
+                        addToHistory(faultyTestCount, 'SUCCESS', duration, text);
+                    });
+                } else {
+                    // Handle error responses (4xx, 5xx status codes)
+                    return response.text().then(text => {
+                        let errorDisplay = `${response.status} ${response.statusText}`;
+                        try {
+                            const errorResponse = JSON.parse(text);
+                            if (errorResponse.error && errorResponse.message) {
+                                errorDisplay = `${errorResponse.error}: ${errorResponse.message}`;
+                            } else if (text) {
+                                errorDisplay = text;
+                            }
+                        } catch (parseError) {
+                            if (text) {
+                                errorDisplay = text;
+                            }
+                        }
+
+                        const result = `❌ Request #${faultyTestCount} - ERROR (${duration}ms)<br>Status: ${response.status}<br>Error: ${errorDisplay}`;
+                        showResult('faultyResult', result, true);
+                        addToHistory(faultyTestCount, 'ERROR', duration, errorDisplay);
+                    });
+                }
+            })
+            .catch(error => {
+                const endTime = new Date();
+                const duration = endTime - startTime;
+                const result = `❌ Request #${faultyTestCount} - FAILED (${duration}ms)<br>Network Error: ${error.message}`;
+                showResult('faultyResult', result, true);
+                addToHistory(faultyTestCount, 'FAILED', duration, error.message);
+            });
+    }
+
+    function testFaultyActorMultiple() {
+        const delay = 500; // 500ms delay between requests
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                testFaultyActor();
+            }, i * delay);
+        }
+    }
+
+    function addToHistory(requestNum, status, duration, response) {
+        const timestamp = new Date().toLocaleTimeString();
+        faultyHistory.unshift({
+            requestNum,
+            status,
+            duration,
+            response,
+            timestamp
+        });
+
+        // Keep only last 10 results
+        if (faultyHistory.length > 10) {
+            faultyHistory = faultyHistory.slice(0, 10);
+        }
+
+        updateHistoryDisplay();
+    }
+
+    function updateHistoryDisplay() {
+        const historyDiv = document.getElementById('faultyHistory');
+        if (faultyHistory.length === 0) {
+            historyDiv.innerHTML = '';
+            return;
+        }
+
+        let historyHtml = '<h4>Request History:</h4><div style="font-family: monospace; font-size: 12px;">';
+        faultyHistory.forEach(entry => {
+            const statusColor = entry.status === 'SUCCESS' ? '#4CAF50' : '#f44336';
+            historyHtml += `
+                <div style="margin: 5px 0; padding: 5px; border-left: 3px solid ${statusColor}; background-color: #f9f9f9;">
+                    <strong>#${entry.requestNum}</strong> [${entry.timestamp}]
+                    <span style="color: ${statusColor};">${entry.status}</span>
+                    (${entry.duration}ms)<br>
+                    <small>${entry.response}</small>
+                </div>
+            `;
+        });
+        historyHtml += '</div>';
+        historyDiv.innerHTML = historyHtml;
+    }
+
+    function clearFaultyResults() {
+        faultyTestCount = 0;
+        faultyHistory = [];
+        document.getElementById('faultyResult').style.display = 'none';
+        document.getElementById('faultyHistory').innerHTML = '';
+    }
+</script>
 </body>
 </html>

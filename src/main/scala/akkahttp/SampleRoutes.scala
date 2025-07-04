@@ -2,7 +2,7 @@ package akkahttp
 
 import actor.FaultyActor
 import actor.FaultyActor.DoIt
-import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props, Status}
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import org.apache.pekko.http.scaladsl.model.StatusCodes.InternalServerError
@@ -14,17 +14,17 @@ import org.slf4j.{Logger, LoggerFactory}
 import spray.json.DefaultJsonProtocol
 
 import java.nio.file.Paths
-import scala.concurrent.Await
 import scala.concurrent.duration.*
+import scala.concurrent.{Await, Future}
 import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
 /**
   * Shows some (lesser known) directives from the rich feature set:
-  * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/alphabetically.html
+  * https://pekko.apache.org/docs/pekko-http/current/routing-dsl/directives/alphabetically.html
   *
   * Also shows exception handling according to:
-  * https://doc.akka.io/docs/akka-http/current/routing-dsl/exception-handling.html?_ga=2.19174588.527792075.1647612374-1144924589.1645384786#exception-handling
+  * https://pekko.apache.org/docs/pekko-http/current/routing-dsl/directives/execution-directives/handleExceptions.html
   *
   * No streams here
   *
@@ -40,9 +40,13 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
 
   final case class FaultyActorResponse(totalAttempts: Int)
 
+  final case class ErrorResponse(error: String, message: String)
+
   object FaultyActorResponse extends Serializable {
     implicit def responseFormat: RootJsonFormat[FaultyActorResponse] = jsonFormat1(FaultyActorResponse.apply)
   }
+
+  implicit val errorResponseFormat: RootJsonFormat[ErrorResponse] = jsonFormat2(ErrorResponse.apply)
 
   val rejectionHandler = RejectionHandler.newBuilder()
     .handle { case ValidationRejection(msg, _) => complete(StatusCodes.InternalServerError, msg) }
@@ -104,7 +108,30 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
       get {
         import org.apache.pekko.pattern.ask
         implicit val askTimeout: Timeout = Timeout(30.seconds)
-        complete((faultyActor ? DoIt()).mapTo[FaultyActorResponse])
+        val futureResponse: Future[Any] = faultyActor ? DoIt()
+
+        onComplete(futureResponse) {
+          case Success(response: FaultyActorResponse) =>
+            complete(StatusCodes.OK, response)
+
+          case Success(Status.Failure(exception)) =>
+            complete(
+              StatusCodes.InternalServerError,
+              ErrorResponse("ActorFailure", exception.getMessage)
+            )
+
+          case Failure(exception) =>
+            complete(
+              StatusCodes.InternalServerError,
+              ErrorResponse("RequestTimeout", s"Request failed: ${exception.getMessage}")
+            )
+
+          case Success(other) =>
+            complete(
+              StatusCodes.InternalServerError,
+              ErrorResponse("UnexpectedResponse", s"Unexpected response: $other")
+            )
+        }
       }
     }
 
@@ -140,11 +167,39 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
       complete(StatusCodes.OK, HttpEntity(ContentTypes.`text/xml(UTF-8)`, minValidXml))
     }
 
+  val pathMatching: Route = {
+    path("users") {
+      complete("All users")
+    } ~
+      pathPrefix("users") {
+        path(Segment) { userId =>
+          complete(s"User: $userId")
+        } ~
+          path(Segment / Segment) { (userId, action) =>
+            complete(s"User: $userId, Action: $action")
+          } ~
+          // Remaining is a PathMatcher that matches and extracts the complete remaining, unmatched part of the request's URI path as an (encoded!) String.
+          // If you need access to the remaining unencoded elements of the path use the RemainingPath matcher!
+          path(Remaining) { remainingPath =>
+            val segments = remainingPath.split("/").filter(_.nonEmpty)
+            if (segments.length >= 2) {
+              val userId = segments(0)
+              val action = segments(1)
+              val extraParams = segments.drop(2)
+              complete(s"User: $userId, Action: $action, Extra: ${extraParams.mkString(", ")}")
+            } else {
+              complete("Invalid path")
+            }
+          }
+      }
+  }
+
+
   val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
 
   val routes = {
     handleErrors {
-      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor, acceptAll, jsonRaw, okResponseXml)
+      concat(getFromBrowsableDir, parseFormData, getFromDocRoot, getFromFaultyActor, acceptAll, jsonRaw, okResponseXml, pathMatching)
     }
   }
 
