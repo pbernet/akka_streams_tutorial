@@ -15,6 +15,7 @@ import dev.langchain4j.service.AiServices
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore
 import io.circe.*
 import io.circe.generic.auto.*
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.parser.*
 import io.circe.syntax.*
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
@@ -26,8 +27,8 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
-import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, path, pathEndOrSingleSlash, pathPrefix, post}
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, onComplete, path, pathEndOrSingleSlash, pathPrefix, post}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.connectors.elasticsearch.*
@@ -45,10 +46,12 @@ import java.io.FileInputStream
 import java.net.URLEncoder
 import java.nio.file.Paths
 import java.time.{Instant, ZoneId}
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 /**
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
@@ -89,6 +92,8 @@ object WikipediaEditsAnalyser extends App {
   private val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.2-2.5.0.bin").toFile))
   // 1.5 model from https://opennlp.sourceforge.net/models-1.5
   private val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
+
+  private val isProcessingEnabled = new AtomicBoolean(true)
 
   private val embeddingStore = new InMemoryEmbeddingStore[TextSegment]()
   private val embeddingModel = new BgeSmallEnV15QuantizedEmbeddingModel()
@@ -217,13 +222,16 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def fetchContent(ctx: Ctx): Future[Ctx] = {
+    if (!isProcessingEnabled.get()) {
+      logger.debug(s"[${ctx.traceId}] Processing disabled - skipping content fetch")
+      return Future.successful(ctx)
+    }
+
     logger.info(s"[${ctx.traceId}] About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
 
     val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
     Http().singleRequest(HttpRequest(uri = requestURL))
-      // Consume the streamed response entity
-      // Doc: https://doc.akka.io/docs/akka-http/current/client-side/request-level.html
       .flatMap(_.entity.toStrict(2.seconds))
       .map(_.data.utf8String.split("\"extract\":").reverse.head)
       .map(content => ctx.copy(content = content))
@@ -298,6 +306,11 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def findPersonsRemoteNER(ctx: Ctx): Future[Ctx] = {
+    if (!isProcessingEnabled.get()) {
+      logger.debug(s"[${ctx.traceId}] Processing disabled - skipping remote NER")
+      return Future.successful(ctx)
+    }
+
     logger.info(s"[${ctx.traceId}] Remote NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
@@ -414,7 +427,7 @@ object WikipediaEditsAnalyser extends App {
     .filter(ctx => ctx.personsFoundLocal.nonEmpty)
 
   private val embeddingStoreSink = Flow[Ctx]
-    .filter(ctx => ctx.content.nonEmpty)
+    .filter(ctx => ctx.content.nonEmpty && isProcessingEnabled.get())
     .map(ctx => addToEmbeddingStore(ctx.content))
     .to(Sink.ignore)
 
@@ -426,6 +439,7 @@ object WikipediaEditsAnalyser extends App {
     .via(parserFlow)
     .via(nerProcessingFlow)
     .alsoTo(embeddingStoreSink)
+    .filter(_ => isProcessingEnabled.get()) // Only index when processing is enabled
     .map(ctx => createIndexMessage(dateTimeFormatted(ctx.change.timestamp), ctx))
     .wireTap(each => logger.debug(s"Add to index: $each"))
     .withAttributes(ActorAttributes.supervisionStrategy(decider))
@@ -433,20 +447,11 @@ object WikipediaEditsAnalyser extends App {
 
   // Wait for the index to populate
   Thread.sleep(10.seconds.toMillis)
-  indexClient()
   aiClient()
 
   Source.tick(1.seconds, 10.seconds, ())
     .map(_ => query())
     .runWith(Sink.ignore)
-
-  private def indexClient() = {
-    val os = System.getProperty("os.name").toLowerCase
-    val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFoundLocal:*&size=100"
-    if (os == "mac os x") Process(s"open $url").!
-    else if (os.startsWith("windows")) Seq("cmd", "/c", s"start $url").!
-    else logger.info(s"Please open a browser at: $url")
-  }
 
   private def aiClient() = {
     val assistant = createAssistant()
@@ -465,6 +470,46 @@ object WikipediaEditsAnalyser extends App {
       .chatMemory(MessageWindowChatMemory
         .withMaxMessages(10)).build
   }
+
+  // Case classes for Circe JSON parsing
+  case class ElasticsearchCountResponse(count: Long, _shards: ShardsInfo)
+
+  case class ShardsInfo(total: Int, successful: Int, skipped: Int, failed: Int)
+
+  case class IndexCountResponse(count: Long)
+
+  // Circe decoders
+  implicit val shardsInfoDecoder: Decoder[ShardsInfo] = deriveDecoder[ShardsInfo]
+  implicit val elasticsearchCountResponseDecoder: Decoder[ElasticsearchCountResponse] = deriveDecoder[ElasticsearchCountResponse]
+  implicit val indexCountResponseEncoder: Encoder[IndexCountResponse] = deriveEncoder[IndexCountResponse]
+
+  private def getIndexCount(): Future[IndexCountResponse] = {
+    val urlCount = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_count"
+
+    Http().singleRequest(HttpRequest(uri = urlCount))
+      .flatMap { response =>
+        response.status match {
+          case StatusCodes.OK =>
+            Unmarshal(response.entity).to[String].flatMap { jsonString =>
+              decode[ElasticsearchCountResponse](jsonString) match {
+                case Right(esResponse) =>
+                  Future.successful(IndexCountResponse(esResponse.count))
+                case Left(error) =>
+                  Future.failed(new RuntimeException(s"Failed to parse Elasticsearch response: $error"))
+              }
+            }
+          case _ =>
+            response.discardEntityBytes()
+            Future.failed(new RuntimeException(s"Elasticsearch request failed with status: ${response.status}"))
+        }
+      }
+      .recover {
+        case ex: Exception =>
+          logger.error(s"Error fetching index count: ${ex.getMessage}")
+          IndexCountResponse(0) // Return 0 on error
+      }
+  }
+
 
   // Doc:
   // https://pekko.apache.org/docs/pekko-connectors/current/opensearch.html
@@ -513,15 +558,56 @@ object WikipediaEditsAnalyser extends App {
       }
   }
 
+  final case class QueryRequest(query: String)
+
+  final case class QueryResponse(answer: String)
+
+  final case class PersonSearchRequest(query: String)
+
+  final case class PersonSearchResponse(persons: List[Person])
+
+  final case class ProcessingControlRequest(enabled: Boolean)
+
+  final case class ProcessingControlResponse(enabled: Boolean, message: String)
+
+  final case class SearchIndexUrlResponse(url: String)
+
   private def startConversationWith(assistant: Assistant): Unit = {
-    final case class QueryRequest(query: String)
-    final case class QueryResponse(answer: String)
-    final case class PersonSearchRequest(query: String)
-    final case class PersonSearchResponse(persons: List[Person])
+    def enableProcessing(): ProcessingControlResponse = {
+      if (!isProcessingEnabled.get()) {
+        isProcessingEnabled.set(true)
+        logger.info("Processing enabled - resuming LLM calls and indexing")
+        ProcessingControlResponse(true, "Processing enabled - resuming LLM calls and indexing")
+      } else {
+        ProcessingControlResponse(true, "Processing already enabled")
+      }
+    }
+
+    def disableProcessing(): ProcessingControlResponse = {
+      if (isProcessingEnabled.get()) {
+        isProcessingEnabled.set(false)
+        logger.info("Processing disabled - suspending LLM calls and indexing (flow continues)")
+        ProcessingControlResponse(false, "Processing disabled - suspending LLM calls and indexing")
+      } else {
+        ProcessingControlResponse(false, "Processing already disabled")
+      }
+    }
 
     val route: Route =
       pathPrefix("assistant") {
         concat(
+          path("indexCount") {
+            get {
+              onComplete(getIndexCount()) {
+                case Success(countResponse) =>
+                  complete(HttpEntity(ContentTypes.`application/json`, countResponse.asJson.noSpaces))
+                case Failure(ex) =>
+                  logger.error(s"Failed to get index count: ${ex.getMessage}")
+                  complete(StatusCodes.InternalServerError -> s"""{"error": "Failed to get index count: ${ex.getMessage}"}""")
+              }
+            }
+          },
+
           path("personsSearch") {
             post {
               entity(as[String]) { jsonString =>
@@ -557,6 +643,33 @@ object WikipediaEditsAnalyser extends App {
                     complete(HttpResponse(400, entity = s"Invalid JSON: $error"))
                 }
               }
+            }
+          },
+          path("control") {
+            concat(
+              post {
+                entity(as[String]) { jsonString =>
+                  decode[ProcessingControlRequest](jsonString) match {
+                    case Right(controlRequest) =>
+                      val response = if (controlRequest.enabled) enableProcessing() else disableProcessing()
+                      complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
+                    case Left(error) =>
+                      complete(HttpResponse(400, entity = s"Invalid JSON: $error"))
+                  }
+                }
+              },
+              get {
+                val response = ProcessingControlResponse(isProcessingEnabled.get(),
+                  if (isProcessingEnabled.get()) "Processing enabled" else "Processing disabled")
+                complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
+              }
+            )
+          },
+          path("searchIndexUrl") {
+            get {
+              val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFoundLocal:*&size=100&pretty=true"
+              val response = SearchIndexUrlResponse(url)
+              complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
             }
           },
           pathEndOrSingleSlash {

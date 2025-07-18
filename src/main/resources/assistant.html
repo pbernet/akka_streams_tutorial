@@ -13,6 +13,11 @@
             margin: 0 auto;
         }
 
+        .section {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
         #messages {
             height: 400px;
             border: 1px solid #ccc;
@@ -129,11 +134,46 @@
             min-width: 100px;
             flex-shrink: 0;
         }
+
+        .control-section {
+            margin: 10px 0;
+        }
+
+        .control-section button {
+            margin-right: 10px;
+            padding: 8px 16px;
+        }
+
+        #statusResult {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .search-index-btn {
+            background: #2196F3;
+            padding: 8px 16px;
+        }
+
+        .search-index-btn:hover {
+            background: #1976D2;
+        }
+
+        .links-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .links-section h3 {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
 <div id="chat-container">
-    <h1>Chat with currently edited Wikipedia pages</h1>
+    <h3>Chat with currently edited Wikipedia pages</h3>
     <div id="messages"></div>
     <div id="input-container">
         <div id="persons-container">
@@ -149,13 +189,30 @@
         </div>
     </div>
 </div>
+<div class="section">
+    <h3>Processing Control</h3>
+    <div class="control-section">
+        <button id="statusBtn" onclick="getProcessingStatus()">Get Status</button>
+        <button id="startBtn" onclick="startProcessing()">Enable Processing</button>
+        <button id="stopBtn" onclick="stopProcessing()">Disable Processing</button>
+        <button id="countBtn" onclick="getIndexCount()">Get Index Count</button>
+        <div id="statusResult"></div>
+        <div id="countResult"></div>
+    </div>
+</div>
+<div class="section">
+    <div class="links-section">
+        <h3>External Links</h3>
+        <button class="search-index-btn" onclick="openSearchIndex()">Search Index</button>
+        <p><small>Opens the Elasticsearch/OpenSearch index in a new tab to browse raw data</small></p>
+    </div>
+</div>
 
 <script>
     let selectedPerson = null;
     let autocompleteData = [];
     let currentSelection = -1;
 
-    // Initialize autocomplete functionality
     document.addEventListener('DOMContentLoaded', function () {
         const personsInput = document.getElementById('persons-input');
         const autocompleteList = document.getElementById('autocomplete-list');
@@ -190,7 +247,6 @@
             }
         });
 
-        // Hide autocomplete when clicking outside
         document.addEventListener('click', function (event) {
             if (!personsInput.contains(event.target) && !autocompleteList.contains(event.target)) {
                 hideAutocomplete();
@@ -320,27 +376,7 @@
         const messagesDiv = document.getElementById('messages');
         const messageElement = document.createElement('div');
         messageElement.className = className;
-
-        // Format code blocks if present
-        if (message.includes('```')) {
-            const parts = message.split(/(```[\s\S]*?```)/);
-            let formattedMessage = '';
-
-            for (let i = 0; i < parts.length; i++) {
-                if (parts[i].startsWith('```') && parts[i].endsWith('```')) {
-                    // Extract the code content (remove the backticks)
-                    const code = parts[i].substring(3, parts[i].length - 3);
-                    formattedMessage += '<pre>' + code + '</pre>';
-                } else {
-                    formattedMessage += parts[i];
-                }
-            }
-
-            messageElement.innerHTML = formattedMessage;
-        } else {
-            messageElement.textContent = message;
-        }
-
+        messageElement.textContent = message;
         messagesDiv.appendChild(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -350,6 +386,78 @@
             sendQuery();
         }
     });
+
+    async function getIndexCount() {
+        try {
+            const response = await fetch('/assistant/indexCount');
+            const result = await response.json();
+            displayIndexCount(result.count);
+        } catch (error) {
+            document.getElementById('countResult').innerHTML = `<p style="color: red;">Error fetching index count: ${error.message}</p>`;
+        }
+    }
+
+    function displayIndexCount(count) {
+        const countDiv = document.getElementById('countResult');
+        countDiv.innerHTML = `<p style="color: blue;">Index contains: ${count} documents</p>`;
+        countDiv.style.backgroundColor = '#e6f3ff';
+        countDiv.style.padding = '10px';
+        countDiv.style.borderRadius = '4px';
+        countDiv.style.marginTop = '10px';
+    }
+
+    async function getProcessingStatus() {
+        try {
+            const response = await fetch('/assistant/control');
+            const result = await response.json();
+            displayStatus(result);
+            await getIndexCount();
+        } catch (error) {
+            document.getElementById('statusResult').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    async function startProcessing() {
+        await controlProcessing(true);
+    }
+
+    async function stopProcessing() {
+        await controlProcessing(false);
+    }
+
+    async function controlProcessing(enabled) {
+        try {
+            const response = await fetch('/assistant/control', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({enabled: enabled})
+            });
+            const result = await response.json();
+            displayStatus(result);
+        } catch (error) {
+            document.getElementById('statusResult').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    function displayStatus(result) {
+        const statusDiv = document.getElementById('statusResult');
+        const color = result.enabled ? 'green' : 'orange';
+        statusDiv.innerHTML = `<p style="color: ${color};">Status: ${result.message}</p>`;
+        statusDiv.style.backgroundColor = result.enabled ? '#e8f5e8' : '#fff3cd';
+    }
+
+    function openSearchIndex() {
+        fetch('/assistant/searchIndexUrl')
+            .then(response => response.json())
+            .then(data => {
+                window.open(data.url, '_blank');
+            })
+            .catch(error => {
+                console.error('Error getting search index URL:', error);
+                const fallbackUrl = `http://localhost:9200/wikipediaedits/_search?q=personsFoundLocal:*&size=100`;
+                window.open(fallbackUrl, '_blank');
+            });
+    }
 </script>
 </body>
 </html>
