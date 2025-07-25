@@ -21,13 +21,13 @@ import scala.util.{Failure, Success}
   *  - Continuously write translated blocks to target file
   *    *
   * Usage:
-  *  - Wire Params
-  *  - Add API_KEY in [[AnthropicCompletions]], [[OpenAICompletions]]  and then run this class
+  *  - Wire Params, eg sourceFilePath
+  *  - Decide, whether to use context info to streamline translation
+  *  - Add API_KEY in [[AnthropicCompletions]], [[OpenAICompletions]] and then run this class
   *  - Scan log for WARN log messages and improve corresponding blocks in target file manually
   *
   * Remarks:
   *  - Numerical block headers in the .srt files are not interpreted, only timestamps matter
-  *    . - Default params are just example values
   *
   * Similar to: [[sample.stream.SessionWindow]]
   */
@@ -37,14 +37,15 @@ object SubtitleTranslator extends App {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   // Params
-  private val sourceFilePath = "Killers.Of.The.Flower.Moon.2023.720p.WEBRip.x264.AAC-[YTS.MX].srt"
-  private val targetFilePath = "DE_NEW_Killers.Of.The.Flower.Moon.2023.720p.WEBRip.x264.AAC-[YTS.MX].srt"
+  private val sourceFilePath = "EN_Killers.Of.The.Flower.Moon.srt"
+  private val targetFilePath = "DE_Killers.Of.The.Flower.Moon.srt"
   private val targetLanguage = "German"
   private val movieTitle = "Killers of the Flower Moon"
   private val movieReleaseYear = 2023
 
-  private val defaultModel = OpenAICompletions.withContext(movieTitle, movieReleaseYear)
-  private val fallbackModel = AnthropicCompletions.withContext(movieTitle, movieReleaseYear)
+  private val useContext = true
+  private val defaultModel = if (useContext) OpenAICompletions.withContext(movieTitle, movieReleaseYear) else new OpenAICompletions()
+  private val fallbackModel = if (useContext) AnthropicCompletions.withContext(movieTitle, movieReleaseYear) else new AnthropicCompletions()
 
   private val maxGapSeconds = 1 // gap time between two scenes (= session windows)
   private val endLineTag = "\n"

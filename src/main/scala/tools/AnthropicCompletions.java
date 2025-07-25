@@ -20,7 +20,11 @@ import java.time.Duration;
  */
 public class AnthropicCompletions {
     private static final Logger LOGGER = LoggerFactory.getLogger(AnthropicCompletions.class);
+    // Add your API key
     public static final String API_KEY = "***";
+
+    // Note that sonnet 4 has a different output style
+    // https://docs.anthropic.com/en/docs/about-claude/models/overview#model-comparison-table
     public static final String MODEL_NAME = "claude-3-7-sonnet-20250219";
 
     private final ChatModel model;
@@ -79,12 +83,12 @@ public class AnthropicCompletions {
     }
 
     public static void main(String[] args) {
-        String toTranslate = CompletionsUtil.createTranslationPrompt("This is fun.", "English", "German");
+        String prompt = CompletionsUtil.createTranslationPrompt("This is fun.", "English", "German");
 
-        ImmutablePair<String, Integer> result = new AnthropicCompletions().runCompletions(toTranslate);
+        ImmutablePair<String, Integer> result = new AnthropicCompletions().runCompletions(prompt);
         CompletionsUtil.logCompletionResult(result.getLeft(), result.getRight(), "Translation");
 
-        ImmutablePair<String, Integer> resultWithContext = AnthropicCompletions.withContext("The Hangover", 2009).runCompletions(toTranslate);
+        ImmutablePair<String, Integer> resultWithContext = AnthropicCompletions.withContext("The Hangover", 2009).runCompletions(prompt);
         CompletionsUtil.logCompletionResult(resultWithContext.getLeft(), resultWithContext.getRight(), "Translation with context");
     }
 

@@ -22,6 +22,7 @@ public class OpenAICompletions {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenAICompletions.class);
     // Add your API key, see: https://platform.openai.com/api-keys
     public static final String API_KEY = "***";
+
     public static final String MODEL_NAME = "gpt-4o";
 
     private final ChatModel model;
@@ -78,12 +79,12 @@ public class OpenAICompletions {
     }
 
     public static void main(String[] args) {
-        String toTranslate = CompletionsUtil.createTranslationPrompt("This is fun.", "English", "German");
+        String prompt = CompletionsUtil.createTranslationPrompt("This is fun.", "English", "German");
 
-        ImmutablePair<String, Integer> result = new OpenAICompletions().runCompletions(toTranslate);
+        ImmutablePair<String, Integer> result = new OpenAICompletions().runCompletions(prompt);
         CompletionsUtil.logCompletionResult(result.getLeft(), result.getRight(), "Translation");
 
-        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext("The Hangover", 2009).runCompletions(toTranslate);
+        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext("The Hangover", 2009).runCompletions(prompt);
         CompletionsUtil.logCompletionResult(resultWithContext.getLeft(), resultWithContext.getRight(), "Translation with context");
     }
 

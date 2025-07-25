@@ -28,22 +28,22 @@ public class CompletionsUtil {
     }
 
     /**
-     * Creates a movie context prompt
+     * Creates a movie context prompt optimized for subtitle translation.
+     * Focuses on elements most relevant to understanding dialogue and cultural context.
      *
      * @param movieTitle       The title of the movie
      * @param movieReleaseYear The release year of the movie
-     * @return Formatted movie context prompt
+     * @return Formatted movie context prompt optimized for subtitle translation
      */
     public static String createMovieContextPrompt(String movieTitle, int movieReleaseYear) {
         return String.format(
-                "Find movie metadata about the movie '%s' released in %d\n" +
-                        "If you don't know this movie or if the title or release year is ambiguous: Respond with \"N/A\", do not apologize." +
-                        "Structure of the response:\n" +
-                        "Plot summary: [Max 100 words]" +
-                        "Locations: [Max 3 key locations]" +
-                        "Key characters: [Max 5 main character names, no actor names]" +
-                        "Themes: [Max 3 main themes]" +
-                        "Notable scenes: [Max 3 brief descriptions of memorable scenes]",
+                "Provide context for subtitle translation of '%s' (%d).\n" +
+                        "If unknown/ambiguous: respond \"N/A\".\n" +
+                        "Genre: [1-2 genres]\n" +
+                        "Setting: [Time period, main location]\n" +
+                        "Key characters: [Max 4 main character names with brief role]\n" +
+                        "Cultural context: [Important cultural/historical references for translation, Max 100 words]\n" +
+                        "Language style: [Formal/informal, period-specific terms, slang]",
                 movieTitle, movieReleaseYear);
     }
 
