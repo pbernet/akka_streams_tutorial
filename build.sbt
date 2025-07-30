@@ -149,7 +149,7 @@ libraryDependencies ++= Seq(
 
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
-  "dev.langchain4j" % "langchain4j-anthropic" % "1.1.0-rc1",
+  "dev.langchain4j" % "langchain4j-anthropic" % "1.2.0",
 
   // LangChain4j PgVector extension
   "dev.langchain4j" % "langchain4j-pgvector" % "1.1.0-beta7",
