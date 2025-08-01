@@ -26,8 +26,8 @@ import org.apache.commons.text.StringEscapeUtils
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
 import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
 import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, onComplete, path, pathEndOrSingleSlash, pathPrefix, post}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
@@ -275,6 +275,15 @@ object WikipediaEditsAnalyser extends App {
     }
   }
 
+  private def sanitizePersonNames(names: List[String]): List[String] = {
+    names
+      .map(each => StringEscapeUtils.unescapeJava(each))
+      // Keep name related content (letters, whitespace, apostrophes, periods, hyphens)
+      .map(_.replaceAll("[^\\p{L}\\s'.\\-]", ""))
+      .map(StringUtils.trim)
+      .filter(StringUtils.isNotBlank)
+  }
+
   private def findPersonsLocalNER(ctx: Ctx): Future[Ctx] = {
     logger.info(s"[${ctx.traceId}] Local NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
@@ -293,12 +302,7 @@ object WikipediaEditsAnalyser extends App {
     if (personsFound.isEmpty) {
       Future(ctx)
     } else {
-      val personsFoundCleaned = personsFound
-        .map(each => StringEscapeUtils.unescapeJava(each))
-        // Keep name related content (letters, whitespace, apostrophes, periods, hyphens)
-        .map(_.replaceAll("[^\\p{L}\\s'.\\-]", ""))
-        .map(StringUtils.trim)
-        .filter(StringUtils.isNotBlank)
+      val personsFoundCleaned = sanitizePersonNames(personsFound)
 
       logger.debug(s"[${ctx.traceId}] Local NER found persons: $personsFoundCleaned from content: $content")
       Future(ctx.copy(personsFoundLocal = personsFoundCleaned))
@@ -361,11 +365,12 @@ object WikipediaEditsAnalyser extends App {
       val personsFoundList = if (personsFoundText.isEmpty || personsFoundText.equalsIgnoreCase("NONE")) {
         List.empty[String]
       } else {
-        personsFoundText.split("\n")
+        val rawNames = personsFoundText.split("\n")
           .map(_.trim)
           .filter(_.nonEmpty)
           .filter(!_.equalsIgnoreCase("NONE"))
           .toList
+        sanitizePersonNames(rawNames)
       }
 
       if (personsFoundList.isEmpty) {
@@ -586,8 +591,9 @@ object WikipediaEditsAnalyser extends App {
     def disableProcessing(): ProcessingControlResponse = {
       if (isProcessingEnabled.get()) {
         isProcessingEnabled.set(false)
-        logger.info("Processing disabled - suspending LLM calls and indexing (flow continues)")
-        ProcessingControlResponse(false, "Processing disabled - suspending LLM calls and indexing")
+        val msg = "Processing disabled - suspending LLM calls and indexing (flow and local NER continues)"
+        logger.info(msg)
+        ProcessingControlResponse(false, msg)
       } else {
         ProcessingControlResponse(false, "Processing already disabled")
       }
@@ -660,7 +666,7 @@ object WikipediaEditsAnalyser extends App {
               },
               get {
                 val response = ProcessingControlResponse(isProcessingEnabled.get(),
-                  if (isProcessingEnabled.get()) "Processing enabled" else "Processing disabled")
+                  if (isProcessingEnabled.get()) "Processing enabled" else "Processing disabled (local NER active)")
                 complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
               }
             )

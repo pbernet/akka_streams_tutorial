@@ -24,7 +24,7 @@ val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.8"
 
 // https://github.com/langchain4j/langchain4j/issues/2955
-val langchain4jVersion = "1.1.0"
+val langchain4jVersion = "1.2.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -149,14 +149,14 @@ libraryDependencies ++= Seq(
 
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
-  "dev.langchain4j" % "langchain4j-anthropic" % "1.1.0-rc1",
+  "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
 
   // LangChain4j PgVector extension
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.1.0-beta7",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.2.0-beta8",
 
   // LangChain4j embedding models
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.1.0-beta7",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.1.0-beta7",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.2.0-beta8",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.2.0-beta8",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
