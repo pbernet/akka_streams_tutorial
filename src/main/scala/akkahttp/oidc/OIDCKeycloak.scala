@@ -11,11 +11,9 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.{AuthenticationFailedRejection, Directive1, Route}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.keycloak.TokenVerifier
-import org.keycloak.adapters.KeycloakDeploymentBuilder
 import org.keycloak.admin.client.{CreatedResponseUtil, Keycloak}
 import org.keycloak.jose.jws.AlgorithmType
 import org.keycloak.representations.AccessToken
-import org.keycloak.representations.adapters.config.AdapterConfig
 import org.keycloak.representations.idm.{ClientRepresentation, CredentialRepresentation, UserRepresentation}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -53,12 +51,15 @@ import scala.util.{Failure, Success}
 object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  private val CLIENT_ID = "my-test-client"
+  private val REALM_NAME = "test"
+
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   def runKeycloak() = {
     // Pin to same version as "keycloakVersion" in build.sbt
-    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:26.1")
+    val keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:26.3")
       // Keycloak config taken from:
       // https://github.com/keycloak/keycloak/blob/main/examples/js-console/example-realm.json
       .withRealmImportFile("keycloak_realm_config.json")
@@ -81,7 +82,7 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
     def createTestUser(keycloakAdminClient: Keycloak): Unit = {
       val username = "test"
       val password = "test"
-      val usersResource = keycloakAdminClient.realm("test").users()
+      val usersResource = keycloakAdminClient.realm(REALM_NAME).users()
 
       val user = new UserRepresentation()
       user.setEnabled(true)
@@ -106,13 +107,12 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
       userResource.resetPassword(passwordCred)
 
       logger.info(s"User $username created with userId: $userId")
-      logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/realms/test/account")
+      logger.info(s"User $username/$password may sign in via: http://localhost:${keycloak.getHttpPort}/realms/$REALM_NAME/account")
     }
 
     def createClientConfig(keycloakAdminClient: Keycloak): Unit = {
-      val clientId = "my-test-client"
       val clientRepresentation = new ClientRepresentation()
-      clientRepresentation.setClientId(clientId)
+      clientRepresentation.setClientId(CLIENT_ID)
       clientRepresentation.setProtocol("openid-connect")
 
       val redirectUriTestingOnly = new util.ArrayList[String]()
@@ -122,10 +122,10 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
       webOriginsTestingOnly.add("*")
       clientRepresentation.setWebOrigins(webOriginsTestingOnly)
 
-      val resp = keycloakAdminClient.realm("test").clients().create(clientRepresentation)
-      logger.info(s"Successfully created client config for clientId: $clientId, response status: " + resp.getStatus)
+      val resp = keycloakAdminClient.realm(REALM_NAME).clients().create(clientRepresentation)
+      logger.info(s"Successfully created client config for clientId: $CLIENT_ID, response status: " + resp.getStatus)
 
-      val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm("test").clients().findByClientId(clientId)
+      val clients: util.List[ClientRepresentation] = keycloakAdminClient.realm(REALM_NAME).clients().findByClientId(CLIENT_ID)
       logger.info(s"Successfully read ClientRepresentation for clientId: ${clients.get(0).getClientId}")
     }
 
@@ -136,12 +136,13 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   }
 
   def runBackendServer(keycloak: KeycloakContainer): Unit = {
-    val config = new AdapterConfig()
-    config.setAuthServerUrl(keycloak.getAuthServerUrl)
-    config.setRealm("test")
-    config.setResource("my-test-client")
-    val keycloakDeployment = KeycloakDeploymentBuilder.build(config)
-    logger.info("Dynamic authServerBaseUrl: " + keycloakDeployment.getAuthServerBaseUrl)
+    val authServerUrl = keycloak.getAuthServerUrl
+    val realmUrl = s"$authServerUrl/realms/$REALM_NAME"
+    val jwksUrl = s"$realmUrl/protocol/openid-connect/certs"
+
+    logger.info(s"Realm URL: $realmUrl")
+    logger.info(s"JSON Web Key Set (JWKS) URL: $jwksUrl")
+    logger.info(s"Client ID: $CLIENT_ID")
 
 
     def generateKey(keyData: KeyData): PublicKey = {
@@ -153,7 +154,7 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
     }
 
     val publicKeys: Future[Map[String, PublicKey]] =
-      Http().singleRequest(HttpRequest(uri = keycloakDeployment.getJwksUrl)).flatMap(response => {
+      Http().singleRequest(HttpRequest(uri = jwksUrl)).flatMap(response => {
         val json = Unmarshal(response).to[String]
         val keys = json.map { jsonString =>
           decode[Keys](jsonString) match {
@@ -164,9 +165,8 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
         keys.map(_.keys.map(k => (k.kid, generateKey(k))).toMap)
       })
 
-
-    // Alternative:
-    // https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/security-directives/authenticateOAuth2.html
+    // Alternative impl to:
+    // https://pekko.apache.org/docs/pekko-http/current/routing-dsl/directives/security-directives/authenticateOAuth2.html
     def authenticate: Directive1[AccessToken] =
       extractCredentials.flatMap {
         case Some(OAuth2BearerToken(token)) =>
@@ -205,7 +205,7 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
           get {
             authenticate { token =>
               // To have "real data": Read 'UserRepresentation' from Keycloak via the admin client and then strip down
-              val usersOrig = adminClient.realm("test").users().list().asScala
+              val usersOrig = adminClient.realm(REALM_NAME).users().list().asScala
               val usersBasic = UsersKeycloak(usersOrig.collect(each => UserKeycloak(Option(each.getFirstName), Option(each.getLastName), Option(each.getEmail))).toSeq)
               complete(HttpResponse(StatusCodes.OK, entity = usersBasic.asJson.noSpaces))
             }

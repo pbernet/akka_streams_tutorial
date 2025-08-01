@@ -15,7 +15,8 @@ val kafkaVersion = "3.9.0"
 val activemqVersion = "5.18.5" // We are stuck with 5.x
 val artemisVersion = "2.39.0"
 val testContainersVersion = "1.20.4"
-val keycloakVersion = "26.0.8"
+val keycloakVersion = "26.3.2"
+val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.10.1"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
@@ -128,15 +129,14 @@ libraryDependencies ++= Seq(
   "com.crobox.clickhouse" %% "client" % "1.2.6",
 
   "org.opensearch" % "opensearch-testcontainers" % "2.1.2",
-  "com.github.dasniko" % "testcontainers-keycloak" % "3.6.0",
+  "com.github.dasniko" % "testcontainers-keycloak" % "3.8.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
   "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
   "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
 
   "org.keycloak" % "keycloak-core" % keycloakVersion,
-  "org.keycloak" % "keycloak-adapter-core" % "25.0.3",
-  "org.keycloak" % "keycloak-admin-client" % "26.0.4",
+  "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
   "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
   "org.postgresql" % "postgresql" % "42.7.4",
