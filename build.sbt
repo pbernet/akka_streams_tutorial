@@ -99,7 +99,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.4",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.4",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3",
@@ -157,6 +157,9 @@ libraryDependencies ++= Seq(
   // LangChain4j embedding models
   "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.2.0-beta8",
   "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.2.0-beta8",
+
+  // Beautiful CLI output formatting
+  "xyz.matthieucourt" %% "layoutz" % "0.1.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,

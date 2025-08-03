@@ -18,6 +18,7 @@ import io.circe.generic.auto.*
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.parser.*
 import io.circe.syntax.*
+import layoutz.*
 import opennlp.tools.namefind.{NameFinderME, TokenNameFinderModel}
 import opennlp.tools.tokenize.{TokenizerME, TokenizerModel}
 import opennlp.tools.util.Span
@@ -388,40 +389,22 @@ object WikipediaEditsAnalyser extends App {
 
 
   /**
-    * Formats data as an ASCII table with proper borders and alignment.
+    * Formats data as an ASCII table using the layoutz library.
     *
     * @param title   The title to display at the top of the table
     * @param headers Column headers
     * @param data    Table data as rows of columns
-    * @return A formatted ASCII table as a string
+    * @return A formatted ASCII table as a string using layoutz
     */
   private def formatAsAsciiTable(title: String, headers: Array[String], data: Array[Array[String]]): String = {
-    // Calculate column widths (max width of each column)
-    val colWidths = headers.indices.map { i =>
-      val headerWidth = headers(i).length
-      val maxDataWidth = data.map(_(i).length).max
-      math.max(headerWidth, maxDataWidth) + 2 // +2 for padding
-    }.toArray
-
-    val totalWidth = colWidths.sum + colWidths.length + 1
-    val border = "+" + colWidths.map(w => "-" * w).mkString("+") + "+"
-
-    def formatRow(row: Array[String]): String = {
-      "| " + row.zip(colWidths).map { case (cell, width) =>
-        cell.padTo(width - 1, ' ') + " "
-      }.mkString("| ") + "|"
-    }
-
-    val tableBuilder = new StringBuilder
-    tableBuilder.append(border).append("\n")
-    tableBuilder.append("| ").append(title.padTo(totalWidth - 4, ' ')).append(" |").append("\n")
-    tableBuilder.append(border).append("\n")
-    tableBuilder.append(formatRow(headers)).append("\n")
-    tableBuilder.append(border).append("\n")
-    data.foreach(row => tableBuilder.append(formatRow(row)).append("\n"))
-    tableBuilder.append(border)
-
-    tableBuilder.toString
+    layout(
+      section(title)(
+        table(
+          headers = headers.toSeq,
+          rows = data.toSeq.map(_.toSeq)
+        )
+      )
+    ).render
   }
 
   private val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
@@ -458,7 +441,7 @@ object WikipediaEditsAnalyser extends App {
     .map(_ => query())
     .runWith(Sink.ignore)
 
-  private def aiClient() = {
+  private def aiClient(): Unit = {
     val assistant = createAssistant()
     startConversationWith(assistant)
   }
@@ -522,7 +505,7 @@ object WikipediaEditsAnalyser extends App {
   private def searchPersons(query: String): Future[List[Person]] = {
     logger.info(s"Searching for persons with query: $query")
 
-    val wildcard = "**";
+    val wildcard = "**"
     val searchQuery = if (query.equals(wildcard)) {
       """{
         "exists": {
@@ -563,28 +546,28 @@ object WikipediaEditsAnalyser extends App {
       }
   }
 
-  final case class QueryRequest(query: String)
+  private final case class QueryRequest(query: String)
 
-  final case class QueryResponse(answer: String)
+  private final case class QueryResponse(answer: String)
 
-  final case class PersonSearchRequest(query: String)
+  private final case class PersonSearchRequest(query: String)
 
-  final case class PersonSearchResponse(persons: List[Person])
+  private final case class PersonSearchResponse(persons: List[Person])
 
-  final case class ProcessingControlRequest(enabled: Boolean)
+  private final case class ProcessingControlRequest(enabled: Boolean)
 
-  final case class ProcessingControlResponse(enabled: Boolean, message: String)
+  private final case class ProcessingControlResponse(enabled: Boolean, message: String)
 
-  final case class SearchIndexUrlResponse(url: String)
+  private final case class SearchIndexUrlResponse(url: String)
 
   private def startConversationWith(assistant: Assistant): Unit = {
     def enableProcessing(): ProcessingControlResponse = {
       if (!isProcessingEnabled.get()) {
         isProcessingEnabled.set(true)
         logger.info("Processing enabled - resuming LLM calls and indexing")
-        ProcessingControlResponse(true, "Processing enabled - resuming LLM calls and indexing")
+        ProcessingControlResponse(enabled = true, "Processing enabled - resuming LLM calls and indexing")
       } else {
-        ProcessingControlResponse(true, "Processing already enabled")
+        ProcessingControlResponse(enabled = true, "Processing already enabled")
       }
     }
 
@@ -593,9 +576,9 @@ object WikipediaEditsAnalyser extends App {
         isProcessingEnabled.set(false)
         val msg = "Processing disabled - suspending LLM calls and indexing (flow and local NER continues)"
         logger.info(msg)
-        ProcessingControlResponse(false, msg)
+        ProcessingControlResponse(enabled = false, msg)
       } else {
-        ProcessingControlResponse(false, "Processing already disabled")
+        ProcessingControlResponse(enabled = false, "Processing already disabled")
       }
     }
 
@@ -702,7 +685,7 @@ object WikipediaEditsAnalyser extends App {
     Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
   }
 
-  // Note that the size of the collection can also be fetched via a GET request, eg
+  // Note that the size of the collection can also be fetched via a GET request, e.g.
   // http://localhost:57321/wikipediaedits/_count
   private def query(): Unit = {
     logger.info(s"About to execute scrolled read queries...")
