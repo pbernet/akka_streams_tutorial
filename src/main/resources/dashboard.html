@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ReverseProxy Monitor Dashboard</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .traffic-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .traffic-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .traffic-table th, .traffic-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .traffic-table th {
+            background-color: #34495e;
+            color: white;
+            font-weight: 500;
+        }
+
+        .status-ok {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .status-error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .connection-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .auto-refresh {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔄 ReverseProxy Monitor</h1>
+        <p>Real-time traffic monitoring and statistics</p>
+    </div>
+
+    <div id="connection-status" class="connection-status disconnected">
+        🔴 Disconnected from ReverseProxy
+    </div>
+
+    <div class="auto-refresh">
+        <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh every 2 seconds</label>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="total-requests">0</div>
+            <div class="stat-label">Total Requests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-responses">0</div>
+            <div class="stat-label">Total Responses</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="error-rate">0.0%</div>
+            <div class="stat-label">Error Rate</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="avg-response-time">0ms</div>
+            <div class="stat-label">Avg Response Time</div>
+        </div>
+    </div>
+
+    <div class="traffic-table">
+        <table>
+            <thead>
+            <tr>
+                <th>Time</th>
+                <th>Method</th>
+                <th>Path</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Correlation ID</th>
+            </tr>
+            </thead>
+            <tbody id="traffic-tbody">
+            <tr>
+                <td colspan="7">Loading traffic data...</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let ws = null;
+    let autoRefreshEnabled = true;
+
+    function formatTimestamp(timestamp) {
+        return new Date(timestamp).toLocaleTimeString();
+    }
+
+    function formatDuration(ms) {
+        return ms ? ms + 'ms' : '-';
+    }
+
+    function formatStatus(status) {
+        if (!status) return '-';
+        const className = status >= 400 ? 'status-error' : 'status-ok';
+        return `<span class="${className}">${status}</span>`;
+    }
+
+    function updateStats(stats) {
+        document.getElementById('total-requests').textContent = stats.totalRequests;
+        document.getElementById('total-responses').textContent = stats.totalResponses;
+        document.getElementById('error-rate').textContent = (stats.errorRate * 100).toFixed(1) + '%';
+        document.getElementById('avg-response-time').textContent = Math.round(stats.avgResponseTime) + 'ms';
+    }
+
+    function updateTrafficTable(traffic) {
+        const tbody = document.getElementById('traffic-tbody');
+        if (traffic.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7">No traffic data available</td></tr>';
+            return;
+        }
+
+        const rows = traffic.slice(-100).reverse().map(entry => {
+            const req = entry.request;
+            const resp = entry.response;
+            return `
+                    <tr>
+                        <td>${formatTimestamp(req.timestamp)}</td>
+                        <td>${req.method}</td>
+                        <td>${req.uri}</td>
+                        <td>${req.targetHost}</td>
+                        <td>${formatStatus(resp ? resp.status : null)}</td>
+                        <td>${formatDuration(entry.duration)}</td>
+                        <td>${req.correlationId}</td>
+                    </tr>
+                `;
+        }).join('');
+        tbody.innerHTML = rows;
+    }
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function () {
+            document.getElementById('connection-status').textContent = '🟢 Connected to ReverseProxy';
+            document.getElementById('connection-status').className = 'connection-status connected';
+        };
+
+        ws.onmessage = function (event) {
+            try {
+                const stats = JSON.parse(event.data);
+                updateStats(stats);
+            } catch (e) {
+                console.error('Error parsing WebSocket message:', e);
+            }
+        };
+
+        ws.onclose = function () {
+            document.getElementById('connection-status').textContent = '🔴 Disconnected from ReverseProxy';
+            document.getElementById('connection-status').className = 'connection-status disconnected';
+            // Attempt to reconnect after 3 seconds
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = function (error) {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    function loadTrafficData() {
+        fetch('/api/traffic')
+            .then(response => response.json())
+            .then(updateTrafficTable)
+            .catch(error => {
+                console.error('Error loading traffic data:', error);
+                document.getElementById('traffic-tbody').innerHTML =
+                    '<tr><td colspan="7">Error loading traffic data</td></tr>';
+            });
+    }
+
+    function loadStats() {
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(updateStats)
+            .catch(error => console.error('Error loading stats:', error));
+    }
+
+    // Auto-refresh toggle
+    document.getElementById('auto-refresh').addEventListener('change', function () {
+        autoRefreshEnabled = this.checked;
+    });
+
+    // Auto-refresh interval
+    setInterval(() => {
+        if (autoRefreshEnabled) {
+            loadTrafficData();
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                loadStats();
+            }
+        }
+    }, 2000);
+
+    // Initial load
+    connectWebSocket();
+    loadTrafficData();
+    loadStats();
+</script>
+</body>
+</html>

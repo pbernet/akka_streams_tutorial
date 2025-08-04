@@ -37,6 +37,7 @@ import scala.util.{Failure, Success}
   *  - CircuitBreaker per target server to avoid overload
   *  - HTTP Header `X-Correlation-ID` for tracing (only for Mode.local)
   *  - HTTP Header `X-Content-Hash` as an example of an on-the-fly processing scenario
+  *  - [[ReverseProxyMonitor]]
   *
   * Mode.local:
   * HTTP client(s) --> ReverseProxy --> local target server(s)
@@ -76,6 +77,8 @@ object ReverseProxy extends App {
 
   implicit val http: HttpExt = Http(system)
 
+  ReverseProxyMonitor.initializeWebUI(system)
+
   val circuitBreakers = new ConcurrentHashMap[String, CircuitBreaker]()
   val requestCounter = new AtomicInteger(0)
 
@@ -89,9 +92,9 @@ object ReverseProxy extends App {
       Target.weighted("http://127.0.0.1:9083", 3)
     ),
     Mode.remote -> Seq(
-      Target.weighted("https://httpstat.us:443", 1),
-      Target.weighted("https://httpstat.us:443", 2),
-      Target.weighted("https://httpstat.us:443", 3)
+      Target.weighted("https://httpbin.org:443", 1),
+      Target.weighted("https://httpbin.org:443", 2),
+      Target.weighted("https://httpbin.org:443", 3)
     )
   )
 
@@ -100,8 +103,14 @@ object ReverseProxy extends App {
 
   localTargetServers(maxConnections = 100) // 1-1024
   reverseProxy()
-  // Switch here to force ReverseProxy to forward requests to local/remote target server(s)
+  // Switch Mode to let ReverseProxy forward client requests to local/remote target server(s)
+  // Note that the remote servers can not interpret the X-Correlation-ID header
   clients(nbrOfClients = 10, requestsPerClient = 10, Mode.local)
+
+  sys.addShutdownHook {
+    ReverseProxyMonitor.shutdown()
+    system.terminate()
+  }
 
   // HTTP client(s)
   def clients(nbrOfClients: Int = 1, requestsPerClient: Int = 1, mode: Mode): Unit = {
@@ -118,7 +127,7 @@ object ReverseProxy extends App {
 
       val fixedPath = mode match {
         case Mode.local => ""
-        case Mode.remote => "random/200,201,500-504"
+        case Mode.remote => "status/200,201,501,502,503,504"
       }
 
       Source(1 to nbrOfRequests)
@@ -152,6 +161,9 @@ object ReverseProxy extends App {
       val host = request.header[Host].map(_.host.address()).getOrElse("N/A")
       val mode = Mode.values.find(_.toString == host).getOrElse(Mode.local)
       val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
+
+      val requestId = ReverseProxyMonitor.logRequest(request, host, id)
+      val startTime = System.currentTimeMillis()
 
       def headers(target: Target) = {
         val headersIn: Seq[HttpHeader] =
@@ -193,14 +205,16 @@ object ReverseProxy extends App {
             val index = requestCounter.incrementAndGet() % (if (seq.isEmpty) 1 else seq.size)
             val target = seq(index)
             logger.info(s"Forwarding request with id: $id to $mode target server: ${target.url}")
-            val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => new CircuitBreaker(
-              system.scheduler,
-              // A low value opens the circuit breaker for subsequent requests (until resetTimeout)
-              maxFailures = 2,
-              // Needs to be shorter than pekko-http 'request-timeout' (20s)
-              // If not, clients get 503 from pekko-http
-              callTimeout = 10.seconds,
-              resetTimeout = 10.seconds))
+            val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => {
+              new CircuitBreaker(
+                system.scheduler,
+                // A low value opens the circuit breaker for subsequent requests (until resetTimeout)
+                maxFailures = 2,
+                // Needs to be shorter than pekko-http 'request-timeout' (20s)
+                // If not, clients get 503 from pekko-http
+                callTimeout = 10.seconds,
+                resetTimeout = 10.seconds)
+            })
 
             //  Example of an on-the-fly processing scenario
             val hashFuture = request.entity.dataBytes
@@ -218,12 +232,28 @@ object ReverseProxy extends App {
               circuitBreaker.withCircuitBreaker(http.singleRequest(proxyReq))
             }
 
+          }.andThen {
+            case Success(response) =>
+              val responseTime = System.currentTimeMillis() - startTime
+              ReverseProxyMonitor.logResponse(requestId, response, responseTime, id)
+            case Failure(exception) =>
+              val responseTime = System.currentTimeMillis() - startTime
+              val errorResponse = exception match {
+                case _: CircuitBreakerOpenException => BadGateway(id, "Circuit breaker opened")
+                case _: TimeoutException => GatewayTimeout(id)
+                case e => BadGateway(id, e.getMessage)
+              }
+              ReverseProxyMonitor.logResponse(requestId, errorResponse, responseTime, id, Some(exception.getMessage))
           }.recover {
             case _: CircuitBreakerOpenException => BadGateway(id, "Circuit breaker opened")
             case _: TimeoutException => GatewayTimeout(id)
             case e => BadGateway(id, e.getMessage)
           }
-        case None => Future.successful(NotFound(id, host))
+        case None =>
+          val notFoundResponse = NotFound(id, host)
+          val responseTime = System.currentTimeMillis() - startTime
+          ReverseProxyMonitor.logResponse(requestId, notFoundResponse, responseTime, id, Some("Host not found"))
+          Future.successful(notFoundResponse)
       }
     }
     val futReverseProxy = Http().newServerAt(proxyHost, proxyPort).bind(handlerWithCircuitBreaker)
