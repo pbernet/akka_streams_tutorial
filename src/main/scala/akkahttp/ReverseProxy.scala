@@ -48,10 +48,10 @@ import scala.util.{Failure, Success}
   * Remarks:
   *  - The target server selection is via the "Host" HTTP header
   *  - Local/Remote target servers are designed to be flaky to show Retry/CircuitBreaker behavior
-  *    eg for Local adjust [[responseCodes]]
+  *    e.g. for Local adjust [[responseCodes]]
   *  - On top of the built-in client, you may also try other clients, see below
   *  - This PoC may not scale well, possible bottlenecks are:
-  *     - Combination of Retry/CircuitBreaker
+  *     - Combination of CircuitBreaker which wraps Retry
   *     - Round robin impl. with `requestCounter` means shared state
   *
   * Gatling client: [[ReverseProxySimulation]]
@@ -75,7 +75,7 @@ object ReverseProxy extends App {
 
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  implicit val http: HttpExt = Http(system)
+  val http: HttpExt = Http(system)
 
   ReverseProxyMonitor.initializeWebUI(system)
 
@@ -201,37 +201,46 @@ object ReverseProxy extends App {
       services.get(mode) match {
         case Some(rawSeq) =>
           val seq = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
-          Retry.retry[HttpResponse](times = 3) {
-            val index = requestCounter.incrementAndGet() % (if (seq.isEmpty) 1 else seq.size)
-            val target = seq(index)
-            logger.info(s"Forwarding request with id: $id to $mode target server: ${target.url}")
-            val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => {
-              new CircuitBreaker(
-                system.scheduler,
-                // A low value opens the circuit breaker for subsequent requests (until resetTimeout)
-                maxFailures = 2,
-                // Needs to be shorter than pekko-http 'request-timeout' (20s)
-                // If not, clients get 503 from pekko-http
-                callTimeout = 10.seconds,
-                resetTimeout = 10.seconds)
-            })
+          val index = requestCounter.incrementAndGet() % (if (seq.isEmpty) 1 else seq.size)
+          val target = seq(index)
+          logger.info(s"Forwarding request with id: $id to $mode target server: ${target.url}")
 
-            //  Example of an on-the-fly processing scenario
-            val hashFuture = request.entity.dataBytes
-              .via(computeHashFromPayloadAndPayloadLength)
-              .runWith(Sink.head)
-              .map { accumulator =>
-                RawHeader("X-Content-Hash", Hex.toHexString(accumulator.digest.digest()))
-              }
+          val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => {
+            val cb = new CircuitBreaker(
+              system.scheduler,
+              // Account for retry attempts
+              // A lower value opens the circuit breaker for subsequent requests (until resetTimeout)
+              maxFailures = 5,
+              // Needs to be shorter than pekko-http 'request-timeout' (20s)
+              // If not, clients get 503 from pekko-http
+              callTimeout = 15.seconds,
+              resetTimeout = 10.seconds)
+            // For yet unknown reasons these callbacks are not executed
+            cb.onOpen { () => logger.info(s"CircuitBreaker OPENED for ${target.url}") }
+            cb.onClose { () => logger.info(s"CircuitBreaker CLOSED for ${target.url}") }
+            cb.onHalfOpen { () => logger.info(s"CircuitBreaker HALF-OPEN for ${target.url}") }
+            cb
+          })
 
-
-            hashFuture.flatMap { hashHeader =>
-              val proxyReq = request
-                .withUri(uri(target))
-                .withHeaders(headers(target) :+ hashHeader)
-              circuitBreaker.withCircuitBreaker(http.singleRequest(proxyReq))
+          //  Example of an on-the-fly processing scenario
+          val hashFuture = request.entity.dataBytes
+            .via(computeHashFromPayloadAndPayloadLength)
+            .runWith(Sink.head)
+            .map { accumulator =>
+              RawHeader("X-Content-Hash", Hex.toHexString(accumulator.digest.digest()))
             }
 
+          hashFuture.flatMap { hashHeader =>
+            val proxyReq = request
+              .withUri(uri(target))
+              .withHeaders(headers(target) :+ hashHeader)
+
+            // CircuitBreaker wraps the retry logic
+            circuitBreaker.withCircuitBreaker {
+              Retry.retry[HttpResponse](times = 3) {
+                http.singleRequest(proxyReq)
+              }
+            }
           }.andThen {
             case Success(response) =>
               val responseTime = System.currentTimeMillis() - startTime
@@ -349,7 +358,13 @@ object Retry {
           case Success(httpResponse: HttpResponse) if httpResponse.status.intValue() >= 500 =>
             val id = httpResponse.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
             logger.info(s"ReverseProxy got 5xx server error for id: $id. Retries left: ${times - 1}")
-            retryPromise[T](times - 1, promise, Some(new RuntimeException(s"Received: ${httpResponse.status.intValue()} from target server")), f)
+            val exception = new RuntimeException(s"Received: ${httpResponse.status.intValue()} from target server")
+            if (times == 1) {
+              // Last retry failed - propagate as failure to CircuitBreaker
+              promise.tryFailure(exception)
+            } else {
+              retryPromise[T](times - 1, promise, Some(exception), f)
+            }
           case Success(t) => promise.trySuccess(t)
           case Failure(e) => retryPromise[T](times - 1, promise, Some(e), f)
         }
