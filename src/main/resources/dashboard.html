@@ -26,8 +26,7 @@
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 15px; 
         }
 
         .stat-card {
@@ -100,15 +99,74 @@
             border: 1px solid #f5c6cb;
         }
 
-        .auto-refresh {
-            margin: 10px 0;
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .refresh-link {
+            color: white;
+            text-decoration: none;
+        }
+
+        .cb-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .cb-item {
+            border: 1px solid #ecf0f1;
+            border-radius: 6px;
+            padding: 15px;
+            background: #fafafa;
+        }
+
+        .cb-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .cb-target {
+            font-weight: bold;
+        }
+
+        .cb-status {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .cb-status.closed {
+            color: #27ae60;
+        }
+
+        .cb-status.opened {
+            color: #e74c3c;
+        }
+
+        .cb-status.half-opened {
+            color: #f39c12;
+        }
+
+        .cb-metrics {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .cb-metrics span {
+            margin-right: 15px;
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>🔄 ReverseProxy Monitor</h1>
+        <h1><a href="#" onclick="location.reload(); return false;" class="refresh-link">🔄</a> ReverseProxy Monitor</h1>
         <p>Real-time traffic monitoring and statistics</p>
     </div>
 
@@ -116,37 +174,43 @@
         🔴 Disconnected from ReverseProxy
     </div>
 
-    <div class="auto-refresh">
-        <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh every 2 seconds</label>
+    <div class="section">
+        <h3>🔧 Circuit Breakers</h3>
+        <div class="cb-grid" id="cb-grid">
+            <p>Loading circuit breaker status...</p>
+        </div>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value" id="total-requests">0</div>
-            <div class="stat-label">Total Requests</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="total-responses">0</div>
-            <div class="stat-label">Total Responses</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="error-rate">0.0%</div>
-            <div class="stat-label">Error Rate</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="avg-response-time">0ms</div>
-            <div class="stat-label">Avg Response Time</div>
+    <div class="section">
+        <h3>📊 Statistics (max last 1000 requests)</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="total-requests">0</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-responses">0</div>
+                <div class="stat-label">Total Responses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="error-rate">0.0%</div>
+                <div class="stat-label">Error Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-response-time">0ms</div>
+                <div class="stat-label">Avg Response Time</div>
+            </div>
         </div>
     </div>
 
     <div class="traffic-table">
+        <h3>🚦 Traffic data (last 100 requests)</h3>
         <table>
             <thead>
             <tr>
                 <th>Time</th>
                 <th>Method</th>
-                <th>Path</th>
-                <th>Target</th>
+                <th>Target URL</th>
                 <th>Status</th>
                 <th>Duration</th>
                 <th>Correlation ID</th>
@@ -163,14 +227,13 @@
 
 <script>
     let ws = null;
-    let autoRefreshEnabled = true;
 
     function formatTimestamp(timestamp) {
         return new Date(timestamp).toLocaleTimeString();
     }
 
     function formatDuration(ms) {
-        return ms ? ms + 'ms' : '-';
+        return ms ? ms + ' ms' : '-';
     }
 
     function formatStatus(status) {
@@ -184,6 +247,36 @@
         document.getElementById('total-responses').textContent = stats.totalResponses;
         document.getElementById('error-rate').textContent = (stats.errorRate * 100).toFixed(1) + '%';
         document.getElementById('avg-response-time').textContent = Math.round(stats.avgResponseTime) + 'ms';
+        updateCircuitBreakers(stats.circuitBreakers);
+    }
+
+    function updateCircuitBreakers(circuitBreakers) {
+        const container = document.getElementById('cb-grid');
+
+        if (circuitBreakers.length === 0) {
+            container.innerHTML = '<p>No circuit breakers configured</p>';
+            return;
+        }
+
+        const items = circuitBreakers.map(cb => {
+            const lastFailure = cb.lastFailure
+                ? new Date(cb.lastFailure).toLocaleString()
+                : '-';
+
+            return `
+                    <div class="cb-item">
+                        <div class="cb-header">
+                            <span class="cb-target">${cb.target}</span>
+                            <span class="cb-status ${cb.state.toLowerCase()}">${cb.state}</span>
+                        </div>
+                        <div class="cb-metrics">
+                            <span>Last Failure: ${lastFailure}</span>
+                        </div>
+                    </div>
+                `;
+        }).join('');
+
+        container.innerHTML = items;
     }
 
     function updateTrafficTable(traffic) {
@@ -193,15 +286,14 @@
             return;
         }
 
-        const rows = traffic.slice(-100).reverse().map(entry => {
+        const rows = traffic.reverse().map(entry => {
             const req = entry.request;
             const resp = entry.response;
             return `
                     <tr>
                         <td>${formatTimestamp(req.timestamp)}</td>
                         <td>${req.method}</td>
-                        <td>${req.uri}</td>
-                        <td>${req.targetHost}</td>
+                        <td>${req.targetUrl}</td>
                         <td>${formatStatus(resp ? resp.status : null)}</td>
                         <td>${formatDuration(entry.duration)}</td>
                         <td>${req.correlationId}</td>
@@ -261,19 +353,13 @@
             .catch(error => console.error('Error loading stats:', error));
     }
 
-    // Auto-refresh toggle
-    document.getElementById('auto-refresh').addEventListener('change', function () {
-        autoRefreshEnabled = this.checked;
-    });
 
     // Auto-refresh interval
     setInterval(() => {
-        if (autoRefreshEnabled) {
             loadTrafficData();
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 loadStats();
             }
-        }
     }, 2000);
 
     // Initial load

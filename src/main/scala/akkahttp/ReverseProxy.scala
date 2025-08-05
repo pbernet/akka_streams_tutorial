@@ -20,8 +20,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ConcurrentHashMap, ThreadLocalRandom}
 import scala.collection.parallel.CollectionConverters.ImmutableIterableIsParallelizable
 import scala.concurrent.*
 import scala.concurrent.duration.DurationInt
@@ -47,12 +47,11 @@ import scala.util.{Failure, Success}
   *
   * Remarks:
   *  - The target server selection is via the "Host" HTTP header
-  *  - Local/Remote target servers are designed to be flaky to show Retry/CircuitBreaker behavior
-  *    e.g. for Local adjust [[responseCodes]]
+  *  - Local/Remote target servers are designed to be faulty to show Retry/CircuitBreaker behavior
+  *    e.g. for mode Local adjust [[responseCodes]]
   *  - On top of the built-in client, you may also try other clients, see below
-  *  - This PoC may not scale well, possible bottlenecks are:
-  *     - Combination of CircuitBreaker which wraps Retry
-  *     - Round robin impl. with `requestCounter` means shared state
+  *  - This PoC may not scale well, because the 'round robin' implementation
+  *    with `requestCounter` means shared state
   *
   * Gatling client: [[ReverseProxySimulation]]
   *
@@ -77,8 +76,6 @@ object ReverseProxy extends App {
 
   val http: HttpExt = Http(system)
 
-  ReverseProxyMonitor.initializeWebUI(system)
-
   val circuitBreakers = new ConcurrentHashMap[String, CircuitBreaker]()
   val requestCounter = new AtomicInteger(0)
 
@@ -98,14 +95,19 @@ object ReverseProxy extends App {
     )
   )
 
-  // For Mode.local: Adjust to provoke more retries on ReverseProxy
-  val responseCodes = List(200, 200, 200, 200, 200, 200, 200, 200, 500, 503)
+  // For Mode.local: Add more failure response codes to provoke more retries on ReverseProxy
+  // and thus provoke the CircuitBreaker to open
+  //val responseCodes = List(200, 200, 200, 200, 200, 200, 200, 200, 500, 503)
+  val responseCodes = List(200, 200, 500, 500, 500, 500, 503, 503, 503, 503)
 
   localTargetServers(maxConnections = 100) // 1-1024
   reverseProxy()
-  // Switch Mode to let ReverseProxy forward client requests to local/remote target server(s)
+
+  // Switch mode to let ReverseProxy forward client requests to local/remote target server(s)
   // Note that the remote servers can not interpret the X-Correlation-ID header
-  clients(nbrOfClients = 10, requestsPerClient = 10, Mode.local)
+  val mode = Mode.remote
+  clients(nbrOfClients = 10, requestsPerClient = 10, mode)
+  ReverseProxyMonitor.initializeWebUI(system, services(mode))
 
   sys.addShutdownHook {
     ReverseProxyMonitor.shutdown()
@@ -131,7 +133,7 @@ object ReverseProxy extends App {
       }
 
       Source(1 to nbrOfRequests)
-        .throttle(1, 1.second, 10, ThrottleMode.shaping)
+        .throttle(1, 2.seconds, 10, ThrottleMode.shaping)
         .wireTap(each => logger.info(s"Client: $clientId about to send request with id: $clientId-$each..."))
         .mapAsync(1)(each => http.singleRequest(HttpRequest(uri = s"http://$proxyHost:$proxyPort/$fixedPath")
           .withHeaders(Seq(RawHeader("Host", targetHost.toString), RawHeader("X-Correlation-ID", s"$clientId-$each")))))
@@ -162,7 +164,6 @@ object ReverseProxy extends App {
       val mode = Mode.values.find(_.toString == host).getOrElse(Mode.local)
       val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
 
-      val requestId = ReverseProxyMonitor.logRequest(request, host, id)
       val startTime = System.currentTimeMillis()
 
       def headers(target: Target) = {
@@ -205,20 +206,19 @@ object ReverseProxy extends App {
           val target = seq(index)
           logger.info(s"Forwarding request with id: $id to $mode target server: ${target.url}")
 
+          val requestId = ReverseProxyMonitor.logRequest(request, target.url, id)
+
           val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => {
             val cb = new CircuitBreaker(
               system.scheduler,
-              // Account for retry attempts
-              // A lower value opens the circuit breaker for subsequent requests (until resetTimeout)
               maxFailures = 5,
               // Needs to be shorter than pekko-http 'request-timeout' (20s)
               // If not, clients get 503 from pekko-http
-              callTimeout = 15.seconds,
-              resetTimeout = 10.seconds)
-            // For yet unknown reasons these callbacks are not executed
-            cb.onOpen { () => logger.info(s"CircuitBreaker OPENED for ${target.url}") }
-            cb.onClose { () => logger.info(s"CircuitBreaker CLOSED for ${target.url}") }
-            cb.onHalfOpen { () => logger.info(s"CircuitBreaker HALF-OPEN for ${target.url}") }
+              callTimeout = 5.seconds,
+              resetTimeout = 5.seconds)
+            cb.onOpen(ReverseProxyMonitor.logCircuitBreakerEvent(target.url, "OPENED"))
+            cb.onClose(ReverseProxyMonitor.logCircuitBreakerEvent(target.url, "CLOSED"))
+            cb.onHalfOpen(ReverseProxyMonitor.logCircuitBreakerEvent(target.url, "HALF-OPENED"))
             cb
           })
 
@@ -248,17 +248,18 @@ object ReverseProxy extends App {
             case Failure(exception) =>
               val responseTime = System.currentTimeMillis() - startTime
               val errorResponse = exception match {
-                case _: CircuitBreakerOpenException => BadGateway(id, "Circuit breaker opened")
+                case e: CircuitBreakerOpenException => BadGateway(id, e.getMessage)
                 case _: TimeoutException => GatewayTimeout(id)
                 case e => BadGateway(id, e.getMessage)
               }
               ReverseProxyMonitor.logResponse(requestId, errorResponse, responseTime, id, Some(exception.getMessage))
           }.recover {
-            case _: CircuitBreakerOpenException => BadGateway(id, "Circuit breaker opened")
+            case e: CircuitBreakerOpenException => BadGateway(id, e.getMessage)
             case _: TimeoutException => GatewayTimeout(id)
             case e => BadGateway(id, e.getMessage)
           }
         case None =>
+          val requestId = ReverseProxyMonitor.logRequest(request, host, id)
           val notFoundResponse = NotFound(id, host)
           val responseTime = System.currentTimeMillis() - startTime
           ReverseProxyMonitor.logResponse(requestId, notFoundResponse, responseTime, id, Some("Host not found"))
@@ -281,7 +282,7 @@ object ReverseProxy extends App {
     val echoRoute: Route =
       extractRequest { request =>
         complete {
-          Thread.sleep(500)
+          Thread.sleep(ThreadLocalRandom.current.nextInt(1, 20) * 100)
           val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
 
           val randomResponseCode = responseCodes(new scala.util.Random().nextInt(responseCodes.length))

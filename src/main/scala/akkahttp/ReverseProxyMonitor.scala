@@ -14,7 +14,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Paths
 import java.time.Instant
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -40,7 +40,7 @@ object ReverseProxyMonitor {
                                   uri: String,
                                   headers: Map[String, String],
                                   clientHost: String,
-                                  targetHost: String,
+                                  targetUrl: String,
                                   correlationId: String
                                 )
 
@@ -62,8 +62,7 @@ object ReverseProxyMonitor {
 
   private case class CircuitBreakerStatus(
                                            target: String,
-                                           state: String, // "CLOSED", "OPEN", "HALF_OPEN"
-                                           failureCount: Int,
+                                           state: String,
                                            lastFailure: Option[Long]
                                          )
 
@@ -72,17 +71,21 @@ object ReverseProxyMonitor {
                                  totalResponses: Long,
                                  errorRate: Double,
                                  avgResponseTime: Double,
+                                 circuitBreakers: List[CircuitBreakerStatus]
                                )
 
   // In-memory storage for recent traffic (in production, consider using a proper time-series DB)
   private val trafficHistory = new ConcurrentLinkedQueue[TrafficEntry]()
   private val maxHistorySize = 1000
 
+  // Circuit breaker states storage
+  private val circuitBreakerStates = new ConcurrentHashMap[String, CircuitBreakerStatus]()
+
   // WebSocket broadcast hub for real-time updates
   private var broadcastKillSwitch: SharedKillSwitch = _
   private var eventSource: Source[String, NotUsed] = _
 
-  def initializeWebUI(system: ActorSystem, port: Int = 9000): Future[Http.ServerBinding] = {
+  def initializeWebUI(system: ActorSystem, targets: Seq[ReverseProxy.Target], port: Int = 9000): Future[Http.ServerBinding] = {
     implicit val actorSystem: ActorSystem = system
     implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
@@ -98,6 +101,10 @@ object ReverseProxyMonitor {
 
     val route = createRoutes()
     val binding = Http().newServerAt("localhost", port).bind(route)
+
+    targets.foreach { target =>
+      logCircuitBreakerEvent(target.url, "CLOSED")
+    }
 
     binding.onComplete {
       case Success(b) =>
@@ -116,7 +123,7 @@ object ReverseProxyMonitor {
   }
 
 
-  def logRequest(request: HttpRequest, targetHost: String, correlationId: String): String = {
+  def logRequest(request: HttpRequest, targetUrl: String, correlationId: String): String = {
     val requestId = java.util.UUID.randomUUID().toString
     val requestInfo = RequestInfo(
       id = requestId,
@@ -126,13 +133,13 @@ object ReverseProxyMonitor {
       headers = request.headers.map(h => h.name() -> h.value()).toMap,
       clientHost = request.attribute(AttributeKeys.remoteAddress)
         .map(_.toString).getOrElse("unknown"),
-      targetHost = targetHost,
+      targetUrl = targetUrl,
       correlationId = correlationId
     )
 
     val entry = TrafficEntry(requestInfo)
     addToHistory(entry)
-    logger.debug(s"Logged request: $correlationId -> $targetHost")
+    logger.debug(s"Logged request: $correlationId -> $targetUrl")
     requestId
   }
 
@@ -151,6 +158,17 @@ object ReverseProxyMonitor {
     updateHistoryWithResponse(requestId, responseInfo, responseTimeMs)
     logger.debug(s"Logged response: $correlationId -> ${response.status.intValue()} (${responseTimeMs}ms)")
   }
+
+  def logCircuitBreakerEvent(target: String, state: String): Unit = {
+    val circuitBreakerStatus = CircuitBreakerStatus(
+      target = target,
+      state = state,
+      lastFailure = if (state.equals("OPENED")) Some(Instant.now().toEpochMilli) else None
+    )
+    circuitBreakerStates.put(target, circuitBreakerStatus)
+    logger.info(s"Circuit breaker for: $target changed to: $state")
+  }
+
 
   private def addToHistory(entry: TrafficEntry): Unit = {
     trafficHistory.offer(entry)
@@ -185,8 +203,11 @@ object ReverseProxyMonitor {
       totalRequests = totalRequests,
       totalResponses = totalResponses,
       errorRate = errorRate,
-      avgResponseTime = avgResponseTime
+      avgResponseTime = avgResponseTime,
+      circuitBreakers = circuitBreakerStates.values().asScala.toList
     )
+
+
   }
 
   private def createRoutes(): Route = {
