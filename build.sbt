@@ -24,7 +24,7 @@ val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.8"
 
 // https://github.com/langchain4j/langchain4j/issues/2955
-val langchain4jVersion = "1.2.0"
+val langchain4jVersion = "1.3.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
