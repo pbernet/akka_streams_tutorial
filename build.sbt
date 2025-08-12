@@ -126,7 +126,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "clickhouse" % testContainersVersion,
 
   "com.clickhouse" % "clickhouse-jdbc" % "0.7.2",
-  "com.crobox.clickhouse" %% "client" % "1.2.6",
+  "com.crobox.clickhouse" %% "client" % "1.2.12",
 
   "org.opensearch" % "opensearch-testcontainers" % "2.1.2",
   "com.github.dasniko" % "testcontainers-keycloak" % "3.8.0",
