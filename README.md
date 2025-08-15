@@ -1,6 +1,6 @@
-[![Sourcegraph](https://img.shields.io/badge/search-this%20repo-blue)](https://sourcegraph.com/github.com/pbernet/akka_streams_tutorial "Sourcegraph")
-[![NotebookLM](https://img.shields.io/badge/listen%20to-this%20repo-blue)](https://notebooklm.google.com/notebook/15ab2fde-4d85-40ed-a7cf-a6fc83223680/audio "NotebookLM")
 [![GolpoAI](https://img.shields.io/badge/watch-intro-blue)](https://video.golpoai.com/share/53934a0a-8971-43b6-93cc-217f6663bf28 "GolpoAI")
+[![NotebookLM](https://img.shields.io/badge/listen%20to-this%20repo-blue)](https://notebooklm.google.com/notebook/15ab2fde-4d85-40ed-a7cf-a6fc83223680/audio "NotebookLM")
+[![Sourcegraph](https://img.shields.io/badge/search-this%20repo-blue)](https://sourcegraph.com/github.com/pbernet/akka_streams_tutorial "Sourcegraph")
 [![Build Status](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml/badge.svg)](https://github.com/pbernet/akka_streams_tutorial/actions/workflows/ci.yml)
 [![Scala Steward](https://img.shields.io/badge/Scala_Steward-helping-blue.svg?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAQCAMAAAARSr4IAAAAVFBMVEUAAACHjojlOy5NWlrKzcYRKjGFjIbp293YycuLa3pYY2LSqql4f3pCUFTgSjNodYRmcXUsPD/NTTbjRS+2jomhgnzNc223cGvZS0HaSD0XLjbaSjElhIr+AAAAAXRSTlMAQObYZgAAAHlJREFUCNdNyosOwyAIhWHAQS1Vt7a77/3fcxxdmv0xwmckutAR1nkm4ggbyEcg/wWmlGLDAA3oL50xi6fk5ffZ3E2E3QfZDCcCN2YtbEWZt+Drc6u6rlqv7Uk0LdKqqr5rk2UCRXOk0vmQKGfc94nOJyQjouF9H/wCc9gECEYfONoAAAAASUVORK5CYII=)](https://scala-steward.org)
 
@@ -26,13 +26,16 @@ and [Pekko HTTP](https://pekko.apache.org/docs/pekko-http/current/) tutorials, b
 
 "It's working!" a colleague used to shout across the office when yet another proof of concept was running its first few
 hundred meters along the happy path, aware that the real work started right there. This repo aims to provide you with
-exactly this feeling by offering a collection of runnable examples.
+exactly this feeling by offering a collection of runnable examples in Scala and Java.
 
 ## Getting Started
 
 ### Prerequisites
 
-Java 17 or higher (recommended: [GraalVM](https://www.graalvm.org/downloads))
+[Install Java 17 or higher](https://adoptium.net/temurin/releases) (
+recommended: [GraalVM](https://www.graalvm.org/downloads))
+
+Install [sbt](https://www.scala-sbt.org/download) and [Docker](https://www.docker.com/get-started/)
 
 ### Installation
 
@@ -49,7 +52,7 @@ behaviour.
 
 ## Examples Overview
 
-Some larger examples:
+Featured examples with complex workflows:
 * [Element deduplication](#element-deduplication)
 * [Windturbine example](#windturbine-example)
 * [Apache Kafka WordCount](#apache-kafka-wordcount)
@@ -66,10 +69,10 @@ operators in action.
 The `*Echo` example series implement round trips eg [HttpFileEcho](src/main/scala/akkahttp/HttpFileEcho.scala)
   and [WebsocketEcho](src/main/scala/akkahttp/WebsocketEcho.scala)
 
-Using [testcontainers](https://www.testcontainers.org) allows running realistic scenarios with just one click:
+Using [testcontainers](https://www.testcontainers.org) allows running realistic integration test scenarios with just one
+click:
 
 * [OIDCKeycloak](src/main/scala/akkahttp/oidc/OIDCKeycloak.scala)
-* [SSEtoElasticsearch](src/main/scala/alpakka/sse_to_elasticsearch/SSEtoElasticsearch.scala)
 * [ClickhousedbIT](src/test/scala/alpakka/clickhousedb/ClickhousedbIT.java)
 * [InfluxdbIT](src/test/scala/alpakka/influxdb/InfluxdbIT.java)
 * [SlickIT](src/test/scala/alpakka/slick/SlickIT.java)
@@ -139,10 +142,10 @@ Colin Breck explains these concepts and more in the 2017 Reactive Summit talk [
 Islands in the Stream: Integrating Akka Streams and Akka Actors
 ](https://www.youtube.com/watch?v=qaiwalDyayA&list=PLKKQHTLcxDVayICsjpaPeno6aAPMCCZIz&index=4)
 
-| Class                     | Description     |
-| -------------------       |-----------------|
-| [SimulateWindTurbines](src/main/scala/sample/stream_actor/SimulateWindTurbines.scala)| Starts n clients which feed measurements to the server|
-| [WindTurbineServer](src/main/scala/sample/stream_actor/WindTurbineServer.scala)| Start server which a accumulates measurements|
+| Class                                                                                 | Description                                            |
+|---------------------------------------------------------------------------------------|--------------------------------------------------------|
+| [SimulateWindTurbines](src/main/scala/sample/stream_actor/SimulateWindTurbines.scala) | Starts n clients which feed measurements to the server |
+| [WindTurbineServer](src/main/scala/sample/stream_actor/WindTurbineServer.scala)       | Start server which collects measurements               |
 
  The clients communicate via websockets with the `WindTurbineServer`. After a restart of `SimulateWindTurbines` the clients are able to resume. 
  Shutting down the `WindTurbineServer` results in reporting to the clients that the server is not reachable.

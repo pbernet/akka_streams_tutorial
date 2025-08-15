@@ -17,9 +17,9 @@ import scala.util.{Failure, Success}
   * Workflow:
   *  - Load all blocks from the .srt source file with [[SrtParser]]
   *  - Group blocks to scenes (= all blocks within a session window), depending on `maxGapSeconds`
-  *  - Translate all blocks of a scene in one prompt (one line per block) via the API
+  *  - Translate all blocks of a scene in one prompt (one line per block) via the LLM API
   *  - Continuously write translated blocks to target file
-  *    *
+  *
   * Usage:
   *  - Wire Params, eg sourceFilePath
   *  - Decide, whether to use context info to streamline translation
@@ -37,13 +37,13 @@ object SubtitleTranslator extends App {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   // Params
-  private val sourceFilePath = "EN_Killers.Of.The.Flower.Moon.srt"
-  private val targetFilePath = "DE_Killers.Of.The.Flower.Moon.srt"
+  private val sourceFilePath = "EN_challenges.srt"
+  private val targetFilePath = "DE_challenges.srt"
   private val targetLanguage = "German"
-  private val movieTitle = "Killers of the Flower Moon"
-  private val movieReleaseYear = 2023
+  private val movieTitle = "Bob Marley - One Love"
+  private val movieReleaseYear = 2024
 
-  private val useContext = true
+  private val useContext = false
   private val defaultModel = if (useContext) OpenAICompletions.withContext(movieTitle, movieReleaseYear) else new OpenAICompletions()
   private val fallbackModel = if (useContext) AnthropicCompletions.withContext(movieTitle, movieReleaseYear) else new AnthropicCompletions()
 

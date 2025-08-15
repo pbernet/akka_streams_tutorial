@@ -45,8 +45,7 @@ object SessionWindow extends App {
     Event(1, "A"),
     Event(7, "B"), Event(8, "C"),
     Event(15, "D"), Event(16, "E"), Event(18, "F"),
-    Event(25, "G"), Event(26, "H"), Event(26, "I"), Event(28, "J"),
-    Event(32, "K"),
+    Event(25, "G"), Event(26, "H"), Event(26, "I"), Event(28, "J"), Event(32, "K"),
     Event(42, "L"), Event(43, "M")
   ))
 

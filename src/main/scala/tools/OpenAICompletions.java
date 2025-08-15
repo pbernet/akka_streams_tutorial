@@ -84,7 +84,7 @@ public class OpenAICompletions {
         ImmutablePair<String, Integer> result = new OpenAICompletions().runCompletions(prompt);
         CompletionsUtil.logCompletionResult(result.getLeft(), result.getRight(), "Translation");
 
-        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext("The Hangover", 2009).runCompletions(prompt);
+        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext("Bob Marley - One Love", 2024).runCompletions(prompt);
         CompletionsUtil.logCompletionResult(resultWithContext.getLeft(), resultWithContext.getRight(), "Translation with context");
     }
 
