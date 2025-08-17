@@ -14,7 +14,7 @@ val pekkoConnectorKafkaVersion = "1.1.0"
 val kafkaVersion = "3.9.0"
 val activemqVersion = "5.18.5" // We are stuck with 5.x
 val artemisVersion = "2.39.0"
-val testContainersVersion = "1.20.4"
+val testContainersVersion = "1.21.3"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.10.1"
@@ -139,8 +139,8 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
   "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
-  "org.postgresql" % "postgresql" % "42.7.4",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "16.6.0" % Test pomOnly(),
+  "org.postgresql" % "postgresql" % "42.7.7",
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.1.0" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,

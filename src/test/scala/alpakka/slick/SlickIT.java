@@ -47,7 +47,7 @@ public class SlickIT {
             .withNetworkAliases("postgres");
 
     @Container
-    public static ToxiproxyContainer toxiproxy = new ToxiproxyContainer("ghcr.io/shopify/toxiproxy:2.5.0")
+    public static ToxiproxyContainer toxiproxy = new ToxiproxyContainer("ghcr.io/shopify/toxiproxy:2.12.0")
             .withNetwork(network);
 
     @BeforeAll
@@ -58,7 +58,6 @@ public class SlickIT {
         // ToxiProxyContainer reserves 31 ports, starting at 8666
         final Proxy proxy = toxiproxyClient.createProxy("postgres", "0.0.0.0:8666", "postgres:5432");
 
-        // TODO Add more toxics
         proxy.toxics()
                 .latency("latency", ToxicDirection.DOWNSTREAM, 3)
                 .setJitter(2);
