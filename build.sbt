@@ -130,7 +130,7 @@ libraryDependencies ++= Seq(
 
   "org.opensearch" % "opensearch-testcontainers" % "2.1.2",
   "com.github.dasniko" % "testcontainers-keycloak" % "3.8.0",
-  "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
+  "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.11",
   "org.testcontainers" % "junit-jupiter" % testContainersVersion % Test,
   "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2" % Test,
   "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2" % Test,
