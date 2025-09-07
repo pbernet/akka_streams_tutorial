@@ -150,13 +150,15 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
+  "dev.langchain4j" % "langchain4j-ollama" % langchain4jVersion,
+
 
   // LangChain4j PgVector extension
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.2.0-beta8",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.4.0-beta10",
 
   // LangChain4j embedding models
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.2.0-beta8",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.2.0-beta8",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.4.0-beta10",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.4.0-beta10",
 
   // Beautiful CLI output formatting
   "xyz.matthieucourt" %% "layoutz" % "0.1.0",

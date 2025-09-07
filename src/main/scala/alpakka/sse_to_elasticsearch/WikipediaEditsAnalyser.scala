@@ -6,6 +6,7 @@ import dev.langchain4j.data.message.UserMessage
 import dev.langchain4j.data.segment.TextSegment
 import dev.langchain4j.memory.chat.MessageWindowChatMemory
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel
+import dev.langchain4j.model.ollama.OllamaChatModel
 import dev.langchain4j.model.openai.OpenAiChatModel
 import dev.langchain4j.model.openai.OpenAiChatModelName.GPT_4_O_MINI
 import dev.langchain4j.rag.DefaultRetrievalAugmentor
@@ -58,14 +59,14 @@ import scala.util.{Failure, Success}
   * Consume Wikipedia edits via SSE (like in [[alpakka.sse.SSEClientWikipediaEdits]]),
   * fetch the extract via Wikipedia API,
   * do local and remote NER processing for persons in EN
-  * and then write the results to either:
-  *  - Elasticsearch version 7.x server
-  *  - Opensearch version 2.x server
-  *    Also transform the content as embeddings to a local [[InMemoryEmbeddingStore]]
-  *    to be able to RAG chat with them via a local [[Assistant]]
+  * and then write the results to an Opensearch version 2.x server
+  * Also transform the content as embeddings to a local [[InMemoryEmbeddingStore]]
+  * to be able to RAG chat with them via a local [[Assistant]]
   *
   * Remarks:
-  *  - We use [[spray.json]] because of the elasticsearch pekko connector
+  *  - Local means: Requests on local machine (local LLM via Docker ollama or via Java nlp lib)
+  *  - Remote means: Requests to a remote OpenAI LLM accessed with API-Key
+  *  - We use [[spray.json]] because of the Elasticsearch pekko connector
   *
   * Doc:
   * https://pekko.apache.org/docs/pekko-connectors/current/elasticsearch.html
@@ -89,12 +90,16 @@ object WikipediaEditsAnalyser extends App {
       Supervision.Restart
   }
 
+  // Set to false for now, because local Ollama is still experimental
+  private val useLocalOllamaNER: Boolean = false
+
+  // Switch off at runtime via UI to save costs
+  private val isRemoteProcessingEnabled = new AtomicBoolean(true)
+
   // 2.x model from https://opennlp.apache.org/models.html
   private val tokenModel = new TokenizerModel(new FileInputStream(Paths.get("src/main/resources/opennlp-en-ud-ewt-tokens-1.2-2.5.0.bin").toFile))
   // 1.5 model from https://opennlp.sourceforge.net/models-1.5
   private val personModel = new TokenNameFinderModel(new FileInputStream(Paths.get("src/main/resources/en-ner-person.bin").toFile))
-
-  private val isProcessingEnabled = new AtomicBoolean(true)
 
   private val embeddingStore = new InMemoryEmbeddingStore[TextSegment]()
   private val embeddingModel = new BgeSmallEnV15QuantizedEmbeddingModel()
@@ -131,25 +136,21 @@ object WikipediaEditsAnalyser extends App {
 
   final case class Person(name: String)
 
-  //  private val dockerImageName = DockerImageName
-  //    .parse("docker.elastic.co/elasticsearch/elasticsearch-oss")
-  //    .withTag("7.10.2")
-  //  private val elasticsearchContainer = new ElasticsearchContainer(dockerImageName)
-  //  elasticsearchContainer.start()
+  val ollamaContainer = new OllamaContainer()
+  ollamaContainer.start()
+
   private val dockerImageNameOS = DockerImageName
     .parse("opensearchproject/opensearch")
-    .withTag("2.18.0")
+    .withTag("2.19.3")
   private val searchContainer = new OpensearchContainer(dockerImageNameOS)
   searchContainer.start()
 
   val address = searchContainer.getHttpHostAddress
-  //val connectionSettings = ElasticsearchConnectionSettings(s"http://$address")
   val connectionSettings = OpensearchConnectionSettings(s"$address")
     .withCredentials("user", "password")
 
-  // This index will be created in Elasticsearch on the fly
+  // For simplicity: This index will be created in Opensearch on the fly by the first entry
   private val indexName = "wikipediaedits"
-  //private val searchParams = ElasticsearchParams.V7(indexName)
   private val searchParams = OpensearchParams.V1(indexName)
   private val matchAllQuery = """{"match_all": {}}"""
 
@@ -223,11 +224,6 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def fetchContent(ctx: Ctx): Future[Ctx] = {
-    if (!isProcessingEnabled.get()) {
-      logger.debug(s"[${ctx.traceId}] Processing disabled - skipping content fetch")
-      return Future.successful(ctx)
-    }
-
     logger.info(s"[${ctx.traceId}] About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
 
@@ -239,40 +235,49 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def findPersons(ctx: Ctx): Future[Ctx] = {
-    findPersonsLocalNER(ctx).flatMap { localResult =>
-      findPersonsRemoteNER(localResult).map { remoteResult =>
-        val localPersons = localResult.personsFoundLocal
-        val remotePersons = remoteResult.personsFoundRemote
-        val allPersons = (localPersons ++ remotePersons).distinct
+    val localNERFuture = if (useLocalOllamaNER) {
+      logger.debug(s"[${ctx.traceId}] Using Local Ollama NER")
+      findPersonsLocalOllamaNER(ctx)
+    } else {
+      logger.debug(s"[${ctx.traceId}] Using Local Java NLP NER")
+      findPersonsLocalNER(ctx)
+    }
+    localNERFuture.flatMap(localResult => findPersonsRemoteNER(localResult))
+  }
 
-        if (allPersons.nonEmpty) {
-          val localOnly = localPersons.diff(remotePersons)
-          val remoteOnly = remotePersons.diff(localPersons)
-          val both = localPersons.intersect(remotePersons)
+  private def logNERResults(ctx: Ctx): Ctx = {
+    val localPersons = ctx.personsFoundLocal
+    val remotePersons = ctx.personsFoundRemote
+    val allPersons = (localPersons ++ remotePersons).distinct
 
-          val title = s"NER results for '${ctx.change.title}'"
-          val headers = Array("Category", "Count", "Names")
-          val rowsListToDisplay = scala.collection.mutable.ListBuffer[Array[String]]()
+    if (allPersons.nonEmpty) {
+      val localOnly = localPersons.diff(remotePersons)
+      val remoteOnly = remotePersons.diff(localPersons)
+      val both = localPersons.intersect(remotePersons)
 
-          rowsListToDisplay += Array("Total Persons", allPersons.size.toString,
-            if (allPersons.nonEmpty) allPersons.mkString(", ") else "none")
-          if (localOnly.nonEmpty) {
-            rowsListToDisplay += Array("Local NER only", localOnly.size.toString, localOnly.mkString(", "))
-          }
-          if (remoteOnly.nonEmpty) {
-            rowsListToDisplay += Array("Remote NER only", remoteOnly.size.toString, remoteOnly.mkString(", "))
-          }
-          if (both.nonEmpty) {
-            rowsListToDisplay += Array("Found by both", both.size.toString, both.mkString(", "))
-          }
-          val table = formatAsAsciiTable(title, headers, rowsListToDisplay.toArray)
-          logger.info(s"[${ctx.traceId}]\n$table")
+      val title = s"NER results for '${ctx.change.title}'"
+      val headers = Array("Category", "Count", "Names")
+      val rowsListToDisplay = scala.collection.mutable.ListBuffer[Array[String]]()
 
-          ctx.copy(personsFoundLocal = allPersons, personsFoundRemote = remotePersons)
-        } else {
-          ctx
-        }
+      rowsListToDisplay += Array("Total Persons", allPersons.size.toString,
+        if (allPersons.nonEmpty) allPersons.mkString(", ") else "none")
+      if (localOnly.nonEmpty) {
+        val nerTypeLabel = if (useLocalOllamaNER) "Local Ollama NER only" else "Local Java NLP NER only"
+        rowsListToDisplay += Array(nerTypeLabel, localOnly.size.toString, localOnly.mkString(", "))
       }
+      if (remoteOnly.nonEmpty) {
+        rowsListToDisplay += Array("Remote NER only", remoteOnly.size.toString, remoteOnly.mkString(", "))
+      }
+      if (both.nonEmpty) {
+        val bothLabel = if (useLocalOllamaNER) "Found by Ollama & Remote" else "Found by Java NLP & Remote"
+        rowsListToDisplay += Array(bothLabel, both.size.toString, both.mkString(", "))
+      }
+      val table = formatAsAsciiTable(title, headers, rowsListToDisplay.toArray)
+      logger.info(s"[${ctx.traceId}]\n$table")
+
+      ctx
+    } else {
+      ctx
     }
   }
 
@@ -311,9 +316,9 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def findPersonsRemoteNER(ctx: Ctx): Future[Ctx] = {
-    if (!isProcessingEnabled.get()) {
-      logger.debug(s"[${ctx.traceId}] Processing disabled - skipping remote NER")
-      return Future.successful(ctx)
+    if (!isRemoteProcessingEnabled.get()) {
+      logger.debug(s"[${ctx.traceId}] Remote processing disabled - skipping remote NER")
+      return Future(ctx)
     }
 
     logger.info(s"[${ctx.traceId}] Remote NER: About to find person names in: ${ctx.change.title}")
@@ -377,7 +382,7 @@ object WikipediaEditsAnalyser extends App {
       if (personsFoundList.isEmpty) {
         Future(ctx)
       } else {
-        logger.debug(s"[${ctx.traceId}] Remote NER found persons: $personsFoundList from content: $content")
+        logger.info(s"[${ctx.traceId}] Remote NER found persons: $personsFoundList from content: $content")
         Future(ctx.copy(personsFoundRemote = personsFoundList))
       }
     } catch {
@@ -387,6 +392,62 @@ object WikipediaEditsAnalyser extends App {
     }
   }
 
+  private def findPersonsLocalOllamaNER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"[${ctx.traceId}] Local Ollama NER: About to find person names in: ${ctx.change.title}")
+    val content = ctx.content
+
+    if (content.isEmpty) {
+      return Future(ctx)
+    }
+
+    val model = OllamaChatModel.builder
+      .baseUrl(ollamaContainer.getBaseUrl)
+      .modelName("llama3.2:1b")
+      .temperature(0.1)
+      .build()
+
+    val promptPersons =
+      """Extract all names of persons from this text:
+        |{{content}}
+        |
+        |Rules:
+        |- Only extract persons: Full names of individuals mentioned in the text                                                                                             -
+        |- Do not extract places: Any geographical locations including countries, cities, regions, landmarks, or specific addresses
+        |- Do not extract organizations: Names of companies, institutions, government bodies, or any other formal groups
+        |- Return extracted persons as list: one name per line, no leading bullet points/hyphens/numbers
+        |- If the list of extracted persons is empty just return: "NONE" without extra text
+        |- Instead of There are no names of persons in this text, just return "NONE"
+        """.stripMargin
+
+    val message = UserMessage.from(promptPersons.replace("{{content}}", content))
+
+    try {
+      val response = model.chat(message)
+      val personsFoundText = response.aiMessage().text().trim()
+
+      val personsFoundList = if (personsFoundText.isEmpty || personsFoundText.contains("NONE") || personsFoundText.contains("no names")) {
+        List.empty[String]
+      } else {
+        val rawNames = personsFoundText.split("\n")
+          .map(_.trim)
+          .filter(_.nonEmpty)
+          .filter(!_.equalsIgnoreCase("NONE"))
+          .toList
+        sanitizePersonNames(rawNames)
+      }
+
+      if (personsFoundList.isEmpty) {
+        Future(ctx)
+      } else {
+        logger.info(s"[${ctx.traceId}] Local Ollama NER found persons: $personsFoundList from content: $content")
+        Future(ctx.copy(personsFoundLocal = personsFoundList))
+      }
+    } catch {
+      case e: Exception =>
+        logger.error(s"[${ctx.traceId}] Error during local Ollama LLM call: ${e.getMessage}", e)
+        Future(ctx)
+    }
+  }
 
   /**
     * Formats data as an ASCII table using the layoutz library.
@@ -412,34 +473,40 @@ object WikipediaEditsAnalyser extends App {
     .map(change => Ctx(change))
     .mapAsync(3)(ctx => fetchContent(ctx))
     .mapAsync(3)(ctx => findPersons(ctx))
-    .filter(ctx => ctx.personsFoundLocal.nonEmpty)
+    .map(ctx => logNERResults(ctx))
 
   private val embeddingStoreSink = Flow[Ctx]
-    .filter(ctx => ctx.content.nonEmpty && isProcessingEnabled.get())
+    .filter(ctx => ctx.content.nonEmpty)
     .map(ctx => addToEmbeddingStore(ctx.content))
     .to(Sink.ignore)
 
 
-  logger.info(s"Elasticsearch/Opensearch container listening on: ${searchContainer.getHttpHostAddress}")
+  logger.info(s"Opensearch container listening on: ${searchContainer.getHttpHostAddress}")
+  logger.info(s"NER Configuration - Using Local Ollama NER: $useLocalOllamaNER")
+  if (useLocalOllamaNER) {
+    logger.info(s"Local Ollama container base URL: ${ollamaContainer.getBaseUrl}")
+  } else {
+    logger.info("Using local Java NLP models for NER extraction")
+  }
   logger.info("About to start processing flow...")
 
   restartSource
     .via(parserFlow)
     .via(nerProcessingFlow)
     .alsoTo(embeddingStoreSink)
-    .filter(_ => isProcessingEnabled.get()) // Only index when processing is enabled
     .map(ctx => createIndexMessage(dateTimeFormatted(ctx.change.timestamp), ctx))
     .wireTap(each => logger.debug(s"Add to index: $each"))
     .withAttributes(ActorAttributes.supervisionStrategy(decider))
     .runWith(elasticsearchSink)
 
-  // Wait for the index to populate
-  Thread.sleep(10.seconds.toMillis)
+  // Wait for the index "wikipediaedits" to populate
+  Thread.sleep(20.seconds.toMillis)
   aiClient()
 
   Source.tick(1.seconds, 10.seconds, ())
     .map(_ => query())
     .runWith(Sink.ignore)
+
 
   private def aiClient(): Unit = {
     val assistant = createAssistant()
@@ -483,12 +550,12 @@ object WikipediaEditsAnalyser extends App {
                 case Right(esResponse) =>
                   Future.successful(IndexCountResponse(esResponse.count))
                 case Left(error) =>
-                  Future.failed(new RuntimeException(s"Failed to parse Elasticsearch response: $error"))
+                  Future.failed(new RuntimeException(s"Failed to parse Opensearch response: $error"))
               }
             }
           case _ =>
             response.discardEntityBytes()
-            Future.failed(new RuntimeException(s"Elasticsearch request failed with status: ${response.status}"))
+            Future.failed(new RuntimeException(s"Opensearch request failed with status: ${response.status}"))
         }
       }
       .recover {
@@ -562,23 +629,23 @@ object WikipediaEditsAnalyser extends App {
 
   private def startConversationWith(assistant: Assistant): Unit = {
     def enableProcessing(): ProcessingControlResponse = {
-      if (!isProcessingEnabled.get()) {
-        isProcessingEnabled.set(true)
-        logger.info("Processing enabled - resuming LLM calls and indexing")
-        ProcessingControlResponse(enabled = true, "Processing enabled - resuming LLM calls and indexing")
+      if (!isRemoteProcessingEnabled.get()) {
+        isRemoteProcessingEnabled.set(true)
+        logger.info("Remote processing enabled - resuming remote LLM calls and indexing")
+        ProcessingControlResponse(enabled = true, "Remote processing enabled - resuming remote LLM calls and indexing")
       } else {
-        ProcessingControlResponse(enabled = true, "Processing already enabled")
+        ProcessingControlResponse(enabled = true, "Remote processing already enabled")
       }
     }
 
     def disableProcessing(): ProcessingControlResponse = {
-      if (isProcessingEnabled.get()) {
-        isProcessingEnabled.set(false)
-        val msg = "Processing disabled - suspending LLM calls and indexing (flow and local NER continues)"
+      if (isRemoteProcessingEnabled.get()) {
+        isRemoteProcessingEnabled.set(false)
+        val msg = "Remote processing disabled - suspending remote LLM calls and indexing (local NER continues)"
         logger.info(msg)
         ProcessingControlResponse(enabled = false, msg)
       } else {
-        ProcessingControlResponse(enabled = false, "Processing already disabled")
+        ProcessingControlResponse(enabled = false, "Remote processing already disabled")
       }
     }
 
@@ -648,8 +715,8 @@ object WikipediaEditsAnalyser extends App {
                 }
               },
               get {
-                val response = ProcessingControlResponse(isProcessingEnabled.get(),
-                  if (isProcessingEnabled.get()) "Processing enabled" else "Processing disabled (local NER active)")
+                val response = ProcessingControlResponse(isRemoteProcessingEnabled.get(),
+                  if (isRemoteProcessingEnabled.get()) "Remote processing enabled" else "Remote processing disabled (only local NER active)")
                 complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
               }
             )
