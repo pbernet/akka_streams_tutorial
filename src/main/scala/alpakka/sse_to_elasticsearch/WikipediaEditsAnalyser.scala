@@ -5,6 +5,7 @@ import dev.langchain4j.data.document.splitter.DocumentSplitters
 import dev.langchain4j.data.message.UserMessage
 import dev.langchain4j.data.segment.TextSegment
 import dev.langchain4j.memory.chat.MessageWindowChatMemory
+import dev.langchain4j.model.chat.request.ResponseFormat
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel
 import dev.langchain4j.model.ollama.OllamaChatModel
 import dev.langchain4j.model.openai.OpenAiChatModel
@@ -47,10 +48,10 @@ import spray.json.RootJsonFormat
 import java.io.FileInputStream
 import java.net.URLEncoder
 import java.nio.file.Paths
-import java.time.{Instant, ZoneId}
+import java.time.{Duration, Instant, ZoneId}
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.concurrent.duration.DurationInt
 import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -331,6 +332,8 @@ object WikipediaEditsAnalyser extends App {
     val model = OpenAiChatModel.builder()
       .apiKey(OPENAI_API_KEY)
       .modelName(GPT_4_O_MINI)
+      .temperature(0)
+      .timeout(Duration.ofSeconds(30))
       .build()
 
     val promptPersons =
@@ -403,7 +406,9 @@ object WikipediaEditsAnalyser extends App {
     val model = OllamaChatModel.builder
       .baseUrl(ollamaContainer.getBaseUrl)
       .modelName("llama3.2:1b")
-      .temperature(0.1)
+      .temperature(0)
+      .responseFormat(ResponseFormat.JSON)
+      .timeout(Duration.ofSeconds(30))
       .build()
 
     val promptPersons =
@@ -411,12 +416,11 @@ object WikipediaEditsAnalyser extends App {
         |{{content}}
         |
         |Rules:
-        |- Only extract persons: Full names of individuals mentioned in the text                                                                                             -
-        |- Do not extract places: Any geographical locations including countries, cities, regions, landmarks, or specific addresses
-        |- Do not extract organizations: Names of companies, institutions, government bodies, or any other formal groups
-        |- Return extracted persons as list: one name per line, no leading bullet points/hyphens/numbers
-        |- If the list of extracted persons is empty just return: "NONE" without extra text
-        |- Instead of There are no names of persons in this text, just return "NONE"
+        |- Only extract persons: Full names of individuals mentioned in the text
+        |- Do NOT extract places: Geographical locations including countries, cities, regions, landmarks, or specific addresses
+        |- Do NOT extract organizations: Names of companies, institutions, government bodies, or any other formal groups
+        |- Return output as JSON with exactly this structure: {"names": ["name1", "name2", ...]}
+        |- If no persons are found, return: {"names": []}
         """.stripMargin
 
     val message = UserMessage.from(promptPersons.replace("{{content}}", content))
@@ -425,16 +429,7 @@ object WikipediaEditsAnalyser extends App {
       val response = model.chat(message)
       val personsFoundText = response.aiMessage().text().trim()
 
-      val personsFoundList = if (personsFoundText.isEmpty || personsFoundText.contains("NONE") || personsFoundText.contains("no names")) {
-        List.empty[String]
-      } else {
-        val rawNames = personsFoundText.split("\n")
-          .map(_.trim)
-          .filter(_.nonEmpty)
-          .filter(!_.equalsIgnoreCase("NONE"))
-          .toList
-        sanitizePersonNames(rawNames)
-      }
+      val personsFoundList = parseJSONResponse(personsFoundText)
 
       if (personsFoundList.isEmpty) {
         Future(ctx)
@@ -447,6 +442,25 @@ object WikipediaEditsAnalyser extends App {
         logger.error(s"[${ctx.traceId}] Error during local Ollama LLM call: ${e.getMessage}", e)
         Future(ctx)
     }
+  }
+
+  private def parseJSONResponse(personsFoundText: String) = {
+    val personsFoundList = if (personsFoundText.isEmpty) {
+      List.empty[String]
+    } else {
+      import io.circe.parser.*
+      parse(personsFoundText) match {
+        case Right(json) =>
+          json.hcursor.downField("names").as[List[String]] match {
+            case Right(names) => sanitizePersonNames(names)
+            case Left(_) =>
+              List.empty[String]
+          }
+        case Left(_) =>
+          List.empty[String]
+      }
+    }
+    personsFoundList
   }
 
   /**
