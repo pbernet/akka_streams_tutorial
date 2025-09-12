@@ -27,10 +27,16 @@ public class Hl7TcpClientClassic {
     private static final int PORT_NUMBER = 6160;
 
     public static void main(String[] args) {
-        IntStream.range(0, 100).forEach(each -> processMessages());
+        IntStream.range(0, 100).forEach(each -> {
+            try {
+                processMessages();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
-    private static void processMessages() {
+    private static void processMessages() throws IOException {
         Connection connectionWithServer = null;
         try {
             FileReader reader = new FileReader("src/main/resources/ADT_ORM_Hl7Messages.txt");

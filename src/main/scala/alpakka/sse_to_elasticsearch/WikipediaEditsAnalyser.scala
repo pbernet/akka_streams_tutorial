@@ -292,7 +292,7 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def findPersonsLocalNER(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"[${ctx.traceId}] Local NER: About to find person names in: ${ctx.change.title}")
+    logger.info(s"[${ctx.traceId}] Local Java NLP NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     // We need a new instance, because TokenizerME is not thread safe
@@ -311,7 +311,7 @@ object WikipediaEditsAnalyser extends App {
     } else {
       val personsFoundCleaned = sanitizePersonNames(personsFound)
 
-      logger.debug(s"[${ctx.traceId}] Local NER found persons: $personsFoundCleaned from content: $content")
+      logger.info(s"[${ctx.traceId}] Local Java NLP NER found persons: $personsFoundCleaned from content: $content")
       Future(ctx.copy(personsFoundLocal = personsFoundCleaned))
     }
   }

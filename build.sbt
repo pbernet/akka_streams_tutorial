@@ -6,8 +6,8 @@ version := "1.0"
 
 scalaVersion := "2.13.16"
 
-val pekkoVersion = "1.1.5"
-val pekkoHTTPVersion = "1.1.0"
+val pekkoVersion = "1.2.0"
+val pekkoHTTPVersion = "1.2.0"
 val pekkoConnectorVersion = "1.1.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
@@ -17,14 +17,13 @@ val artemisVersion = "2.39.0"
 val testContainersVersion = "1.21.3"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
-val sttpVersion = "3.10.1"
+val sttpVersion = "3.11.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.13.5"
-val circeVersion = "0.14.8"
+val circeVersion = "0.14.14"
 
-// https://github.com/langchain4j/langchain4j/issues/2955
-val langchain4jVersion = "1.2.0"
+val langchain4jVersion = "1.4.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -58,7 +57,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk18on" % "1.80",
+  "org.bouncycastle" % "bcprov-jdk18on" % "1.81",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -93,27 +92,27 @@ libraryDependencies ++= Seq(
   "com.influxdb" % "flux-dsl" % influxdbVersion,
   "org.influxdb" % "influxdb-java" % "2.24",
 
-  "ca.uhn.hapi" % "hapi-base" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
-  "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
+  "ca.uhn.hapi" % "hapi-base" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v23" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v24" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v25" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-structures-v281" % "2.6.0",
 
   "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
 
-  "org.apache.httpcomponents.client5" % "httpclient5" % "5.4",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.3",
-  "commons-io" % "commons-io" % "2.16.1",
-  "org.apache.commons" % "commons-lang3" % "3.12.0",
+  "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
+  "commons-io" % "commons-io" % "2.20.0",
+  "org.apache.commons" % "commons-lang3" % "3.18.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "4.1.2", // 5.x for Scala 3
 
   "org.apache.camel" % "camel-core" % "3.20.2",
   "org.apache.camel" % "camel-reactive-streams" % "3.20.2",
-  "io.projectreactor" % "reactor-core" % "3.5.4",
-  "io.reactivex.rxjava3" % "rxjava" % "3.1.6",
+  "io.projectreactor" % "reactor-core" % "3.7.11",
+  "io.reactivex.rxjava3" % "rxjava" % "3.1.11",
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
-  "ch.qos.logback" % "logback-classic" % "1.4.12",
+  "ch.qos.logback" % "logback-classic" % "1.5.18",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -161,7 +160,7 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.4.0-beta10",
 
   // Beautiful CLI output formatting
-  "xyz.matthieucourt" %% "layoutz" % "0.1.0",
+  "xyz.matthieucourt" %% "layoutz" % "0.3.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
