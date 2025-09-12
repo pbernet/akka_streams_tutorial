@@ -63,7 +63,7 @@ object ReverseProxyMonitor {
   private case class CircuitBreakerStatus(
                                            target: String,
                                            state: String,
-                                           lastFailure: Option[Long]
+                                           closedSince: Option[Long]
                                          )
 
   private case class ProxyStats(
@@ -116,7 +116,7 @@ object ReverseProxyMonitor {
     binding
   }
 
-  def browserClient() = {
+  def browserClient(): AnyVal = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://127.0.0.1:9000").!
     else if (os.startsWith("windows")) Seq("cmd", "/c", s"start http://127.0.0.1:9000").!
@@ -163,7 +163,7 @@ object ReverseProxyMonitor {
     val circuitBreakerStatus = CircuitBreakerStatus(
       target = target,
       state = state,
-      lastFailure = if (state.equals("OPENED")) Some(Instant.now().toEpochMilli) else None
+      closedSince = if (state.equals("CLOSED")) Some(Instant.now().toEpochMilli) else None
     )
     circuitBreakerStates.put(target, circuitBreakerStatus)
     logger.info(s"Circuit breaker for: $target changed to: $state")
@@ -206,8 +206,6 @@ object ReverseProxyMonitor {
       avgResponseTime = avgResponseTime,
       circuitBreakers = circuitBreakerStates.values().asScala.toList
     )
-
-
   }
 
   private def createRoutes(): Route = {
@@ -217,8 +215,7 @@ object ReverseProxyMonitor {
       path("traffic") {
         get {
           complete {
-            val recent = trafficHistory.asScala.takeRight(100).toList
-            recent.asJson.noSpaces
+            trafficHistory.asScala.takeRight(100).toList.asJson.noSpaces
           }
         }
       } ~

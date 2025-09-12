@@ -259,8 +259,8 @@
         }
 
         const items = circuitBreakers.map(cb => {
-            const lastFailure = cb.lastFailure
-                ? new Date(cb.lastFailure).toLocaleString()
+            const closedSince = cb.closedSince
+                ? new Date(cb.closedSince).toLocaleString()
                 : '-';
 
             return `
@@ -270,7 +270,7 @@
                             <span class="cb-status ${cb.state.toLowerCase()}">${cb.state}</span>
                         </div>
                         <div class="cb-metrics">
-                            <span>Last Failure: ${lastFailure}</span>
+                            <span>Closed since: ${closedSince}</span>
                         </div>
                     </div>
                 `;

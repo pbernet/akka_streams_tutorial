@@ -37,9 +37,9 @@ import scala.util.{Failure, Success}
   *  - CircuitBreaker per target server to avoid overload
   *  - HTTP Header `X-Correlation-ID` for tracing (only for Mode.local)
   *  - HTTP Header `X-Content-Hash` as an example of an on-the-fly processing scenario
-  *  - [[ReverseProxyMonitor]]
+  *  - Visualize traffic with [[ReverseProxyMonitor]]
   *
-  * Mode.local:
+  * Mode.local (default):
   * HTTP client(s) --> ReverseProxy --> local target server(s)
   *
   * Mode.remote:
@@ -51,7 +51,7 @@ import scala.util.{Failure, Success}
   *    e.g. for mode Local adjust [[responseCodes]]
   *  - On top of the built-in client, you may also try other clients, see below
   *  - This PoC may not scale well, because the 'round robin' implementation
-  *    with `requestCounter` means shared state
+  *    with [[requestCounter]] means shared state
   *
   * Gatling client: [[ReverseProxySimulation]]
   *
@@ -105,8 +105,8 @@ object ReverseProxy extends App {
 
   // Switch mode to let ReverseProxy forward client requests to local/remote target server(s)
   // Note that the remote servers can not interpret the X-Correlation-ID header
-  val mode = Mode.remote
-  clients(nbrOfClients = 10, requestsPerClient = 10, mode)
+  val mode = Mode.local
+  clients(nbrOfClients = 10, requestsPerClient = 100, mode)
   ReverseProxyMonitor.initializeWebUI(system, services(mode))
 
   sys.addShutdownHook {
