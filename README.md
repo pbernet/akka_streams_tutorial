@@ -178,7 +178,7 @@ test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophyS
 
 ## Analyse Wikipedia edits live stream ##
 
-Find out whose Wikipedia articles were changed in (near) real time by tapping into
+Find out whose Wikipedia articles were changed in (near) real time by consuming
 the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
 The class [WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/WikipediaEditsAnalyser.scala) implements
 the following workflow:

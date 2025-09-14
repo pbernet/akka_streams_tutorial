@@ -92,7 +92,7 @@ object WikipediaEditsAnalyser extends App {
   }
 
   // Set to false for now, because local Ollama is still experimental
-  private val useLocalOllamaNER: Boolean = false
+  private val useLocalOllamaNER: Boolean = true
 
   // Switch off at runtime via UI to save costs
   private val isRemoteProcessingEnabled = new AtomicBoolean(true)
@@ -224,23 +224,84 @@ object WikipediaEditsAnalyser extends App {
     }
   }
 
+  // Case classes to represent the Wikipedia API response structure
+  case class WikipediaPage(
+                            pageid: Option[Long],
+                            ns: Option[Int],
+                            title: Option[String],
+                            extract: Option[String]
+                          )
+
+  case class WikipediaQuery(
+                             pages: Map[String, WikipediaPage]
+                           )
+
+  case class WikipediaApiResponse(
+                                   batchcomplete: Option[String],
+                                   query: Option[WikipediaQuery]
+                                 )
+
+  // Circe decoders for Wikipedia API response
+  implicit val wikipediaPageDecoder: Decoder[WikipediaPage] =
+    Decoder.forProduct4("pageid", "ns", "title", "extract")(WikipediaPage.apply)
+
+  implicit val wikipediaQueryDecoder: Decoder[WikipediaQuery] =
+    Decoder.forProduct1("pages")(WikipediaQuery.apply)
+
+  implicit val wikipediaApiResponseDecoder: Decoder[WikipediaApiResponse] =
+    Decoder.forProduct2("batchcomplete", "query")(WikipediaApiResponse.apply)
+
   private def fetchContent(ctx: Ctx): Future[Ctx] = {
     logger.info(s"[${ctx.traceId}] About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
     val encodedTitle = URLEncoder.encode(ctx.change.title, "UTF-8")
 
     val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
+
     Http().singleRequest(HttpRequest(uri = requestURL))
       .flatMap(_.entity.toStrict(2.seconds))
-      .map(_.data.utf8String.split("\"extract\":").reverse.head)
-      .map(content => ctx.copy(content = content))
+      .map(_.data.utf8String)
+      .map { jsonString =>
+        logger.debug(s"[${ctx.traceId}] Raw Wikipedia API response: $jsonString")
+        parse(jsonString) match {
+          case Right(json) =>
+            json.as[WikipediaApiResponse] match {
+              case Right(apiResponse) =>
+                val extractOpt = for {
+                  query <- apiResponse.query
+                  // Get the first page from the pages map (there should only be one for a single title request)
+                  (_, page) <- query.pages.headOption
+                  extract <- page.extract
+                } yield extract
+
+                extractOpt match {
+                  case Some(extract) =>
+                    logger.info(s"[${ctx.traceId}] Successfully extracted content: ${extract.take(100)}...")
+                    ctx.copy(content = extract)
+                  case None =>
+                    logger.warn(s"[${ctx.traceId}] No extract found for title: ${ctx.change.title}")
+                    ctx.copy(content = "")
+                }
+
+              case Left(decodingError) =>
+                logger.error(s"[${ctx.traceId}] Failed to decode Wikipedia API response: $decodingError")
+                ctx.copy(content = "")
+            }
+          case Left(parsingError) =>
+            logger.error(s"[${ctx.traceId}] Failed to parse Wikipedia API JSON: $parsingError")
+            ctx.copy(content = "")
+        }
+      }
+      .recover {
+        case ex: Exception =>
+          logger.error(s"[${ctx.traceId}] Error fetching content from Wikipedia API: ${ex.getMessage}", ex)
+          ctx.copy(content = "")
+      }
   }
 
   private def findPersons(ctx: Ctx): Future[Ctx] = {
     val localNERFuture = if (useLocalOllamaNER) {
-      logger.debug(s"[${ctx.traceId}] Using Local Ollama NER")
       findPersonsLocalOllamaNER(ctx)
     } else {
-      logger.debug(s"[${ctx.traceId}] Using Local Java NLP NER")
       findPersonsLocalNER(ctx)
     }
     localNERFuture.flatMap(localResult => findPersonsRemoteNER(localResult))
@@ -407,20 +468,32 @@ object WikipediaEditsAnalyser extends App {
       .baseUrl(ollamaContainer.getBaseUrl)
       .modelName("llama3.2:1b")
       .temperature(0)
+      .topP(0.1)
       .responseFormat(ResponseFormat.JSON)
       .timeout(Duration.ofSeconds(30))
       .build()
 
     val promptPersons =
-      """Extract all names of persons from this text:
+      """You are a precise name extraction tool. Extract ONLY actual person names that are LITERALLY PRESENT in this text:
         |{{content}}
         |
         |Rules:
-        |- Only extract persons: Full names of individuals mentioned in the text
         |- Do NOT extract places: Geographical locations including countries, cities, regions, landmarks, or specific addresses
         |- Do NOT extract organizations: Names of companies, institutions, government bodies, or any other formal groups
+        |- If unsure whether something is a person name, exclude it
         |- Return output as JSON with exactly this structure: {"names": ["name1", "name2", ...]}
-        |- If no persons are found, return: {"names": []}
+        |- If no persons are found in text, return exactly: {"names": []}
+        |
+        |Examples:
+        |Text: "John Smith visited the library yesterday."
+        |Response: {"names": ["John Smith"]}
+        |
+        |Text: "The weather is sunny today in California."
+        |Response: {"names": []}
+        |
+        |Text: "This category is for articles with short descriptions defined on Wikipedia by {{short description}}"
+        |Response: {"names": []}
+        |
         """.stripMargin
 
     val message = UserMessage.from(promptPersons.replace("{{content}}", content))
@@ -428,14 +501,26 @@ object WikipediaEditsAnalyser extends App {
     try {
       val response = model.chat(message)
       val personsFoundText = response.aiMessage().text().trim()
-
       val personsFoundList = parseJSONResponse(personsFoundText)
 
       if (personsFoundList.isEmpty) {
         Future(ctx)
       } else {
-        logger.info(s"[${ctx.traceId}] Local Ollama NER found persons: $personsFoundList from content: $content")
-        Future(ctx.copy(personsFoundLocal = personsFoundList))
+        val verifiedPersons = personsFoundList.filter { personName =>
+          val isPresent = content.toLowerCase.contains(personName.toLowerCase)
+          if (!isPresent) {
+            logger.debug(s"[${ctx.traceId}] Skipping: $personName - not found in content")
+          }
+          isPresent
+        }
+
+        if (verifiedPersons.isEmpty) {
+          logger.debug(s"[${ctx.traceId}] No verified persons found after content validation")
+          Future(ctx)
+        } else {
+          logger.info(s"[${ctx.traceId}] Local Ollama NER found persons: $verifiedPersons from content: $content")
+          Future(ctx.copy(personsFoundLocal = verifiedPersons))
+        }
       }
     } catch {
       case e: Exception =>
