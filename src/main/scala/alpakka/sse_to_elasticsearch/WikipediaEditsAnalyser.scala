@@ -92,7 +92,7 @@ object WikipediaEditsAnalyser extends App {
   }
 
   // Set to false for now, because local Ollama is still experimental
-  private val useLocalOllamaNER: Boolean = true
+  private val useLocalOllamaNER: Boolean = false
 
   // Switch off at runtime via UI to save costs
   private val isRemoteProcessingEnabled = new AtomicBoolean(true)
@@ -674,8 +674,20 @@ object WikipediaEditsAnalyser extends App {
     val wildcard = "**"
     val searchQuery = if (query.equals(wildcard)) {
       """{
-        "exists": {
-          "field": "personsFoundLocal"
+        "bool": {
+          "should": [
+            {
+              "exists": {
+                "field": "personsFoundLocal"
+              }
+            },
+            {
+              "exists": {
+                "field": "personsFoundRemote"
+              }
+            }
+          ],
+          "minimum_should_match": 1
         }
     }"""
     } else {
