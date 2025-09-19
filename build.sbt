@@ -138,7 +138,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
   "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
-  "org.postgresql" % "postgresql" % "42.7.7",
+  "org.postgresql" % "postgresql" % "42.7.8",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.1.0" % Test,
 
