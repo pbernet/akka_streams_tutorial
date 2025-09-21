@@ -101,7 +101,7 @@ libraryDependencies ++= Seq(
   "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
 
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.6",
   "commons-io" % "commons-io" % "2.20.0",
   "org.apache.commons" % "commons-lang3" % "3.18.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "4.1.2", // 5.x for Scala 3
