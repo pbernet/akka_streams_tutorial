@@ -4,7 +4,7 @@ name := "pekko-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.16"
+scalaVersion := "2.13.17"
 
 val pekkoVersion = "1.2.0"
 val pekkoHTTPVersion = "1.2.0"
