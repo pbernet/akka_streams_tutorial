@@ -6,9 +6,9 @@ version := "1.0"
 
 scalaVersion := "2.13.16"
 
-val pekkoVersion = "1.2.0"
+val pekkoVersion = "1.2.1"
 val pekkoHTTPVersion = "1.2.0"
-val pekkoConnectorVersion = "1.1.0"
+val pekkoConnectorVersion = "1.2.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
 val kafkaVersion = "3.9.0"
@@ -23,7 +23,7 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.4.0"
+val langchain4jVersion = "1.7.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -92,11 +92,11 @@ libraryDependencies ++= Seq(
   "com.influxdb" % "flux-dsl" % influxdbVersion,
   "org.influxdb" % "influxdb-java" % "2.24",
 
-  "ca.uhn.hapi" % "hapi-base" % "2.6.0",
-  "ca.uhn.hapi" % "hapi-structures-v23" % "2.6.0",
-  "ca.uhn.hapi" % "hapi-structures-v24" % "2.6.0",
-  "ca.uhn.hapi" % "hapi-structures-v25" % "2.6.0",
-  "ca.uhn.hapi" % "hapi-structures-v281" % "2.6.0",
+  "ca.uhn.hapi" % "hapi-base" % "2.3",
+  "ca.uhn.hapi" % "hapi-structures-v23" % "2.3",
+  "ca.uhn.hapi" % "hapi-structures-v24" % "2.3",
+  "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
+  "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
   "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
 

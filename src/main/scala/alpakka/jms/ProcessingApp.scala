@@ -3,8 +3,8 @@ package alpakka.jms
 import com.typesafe.config.Config
 import org.apache.activemq.ActiveMQConnectionFactory
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream._
-import org.apache.pekko.stream.connectors.jms._
+import org.apache.pekko.stream.*
+import org.apache.pekko.stream.connectors.jms.*
 import org.apache.pekko.stream.connectors.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsProducer}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.{Done, NotUsed}
@@ -13,7 +13,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.util.concurrent.ThreadLocalRandom
 import javax.jms.{ConnectionFactory, Message, TextMessage}
 import scala.collection.immutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -21,13 +21,13 @@ import scala.util.{Failure, Success}
 /**
   * An Alpakka JMS client which consumes text messages from either:
   *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
-  *  - Preferred:    Embedded Artemis JMS Broker [[JMSServerArtemis]], started from IDE
+  *  - Experimental: Embedded Artemis JMS Broker [[alpakka.env.JMSServerArtemis]], started from IDE
   *  - Experimental: Embedded ActiveMQ JMS Broker [[alpakka.env.jms.JMSServerActiveMQ]], started from IDE
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
   * Features:
-  *  - non deliverable messages are acknowledged and written to an error queue (so that processing resumes)
+  *  - non deliverable messages are acknowledged and written to [[ProcessingApp.errorQueue]] (so that processing resumes)
   *  - Failures in this client may be simulated by throwing random java.lang.RuntimeException: BOOM
   *    see [[ProcessingApp.simulateFaultyDeliveryToExternalSystem]]
   *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
@@ -68,8 +68,8 @@ object ProcessingApp {
   // Seems to work together with the new connection and send retry settings on the connector
   val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "artemis", "failover:tcp://127.0.0.1:21616")
 
-  val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
-  val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
+  private val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
+  private val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
     JmsConsumerSettings(consumerConfig, connectionFactory)
       .withQueue("test-queue")
       .withSessionCount(5)
@@ -81,9 +81,9 @@ object ProcessingApp {
       .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge) //Default
   )
 
-  val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
-  val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
-  val errorQueue = Source
+  private val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
+  private val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
+  private val errorQueue = Source
     .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
     .toMat(errorQueueSink)(Keep.left)
     .run()
@@ -133,7 +133,7 @@ object ProcessingApp {
     }
   }
 
-  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl) = {
+  private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl): Unit = {
     val queue = jmsConsumerControl.connectorState.toMat(Sink.queue())(Keep.right).run()
 
     val browseSource: Source[Message, NotUsed] = JmsConsumer.browse(
@@ -156,7 +156,7 @@ object ProcessingApp {
   }
 
 
-  def logWhen(done: Future[Done]) = {
+  def logWhen(done: Future[Done]): Unit = {
     done.onComplete {
       case Success(_) =>
         logger.info("Message successfully written to error queue")
