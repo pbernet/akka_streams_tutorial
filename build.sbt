@@ -4,10 +4,10 @@ name := "pekko-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.16"
+scalaVersion := "2.13.17"
 
 val pekkoVersion = "1.2.1"
-val pekkoHTTPVersion = "1.2.0"
+val pekkoHTTPVersion = "1.3.0"
 val pekkoConnectorVersion = "1.2.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
@@ -23,7 +23,7 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.13.5"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.7.1"
+val langchain4jVersion = "1.8.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -153,11 +153,11 @@ libraryDependencies ++= Seq(
 
 
   // LangChain4j PgVector extension
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.4.0-beta10",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.8.0-beta15",
 
   // LangChain4j embedding models
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.4.0-beta10",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.4.0-beta10",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.8.0-beta15",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.8.0-beta15",
 
   // Beautiful CLI output formatting
   "xyz.matthieucourt" %% "layoutz" % "0.3.0",
