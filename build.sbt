@@ -160,7 +160,7 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.8.0-beta15",
 
   // Beautiful CLI output formatting
-  "xyz.matthieucourt" %% "layoutz" % "0.3.0",
+  "xyz.matthieucourt" %% "layoutz" % "0.4.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
