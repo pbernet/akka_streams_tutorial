@@ -10,6 +10,7 @@ import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
+import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 
@@ -38,6 +39,7 @@ object FileServer extends App {
 
   def server(address: String, port: Int): Unit = {
     val resourceFileName = "payload.zip"
+    val payloadFile = new File(Paths.get("src/main/resources", resourceFileName).toAbsolutePath.toString)
 
     val cache: Cache[String, String] =
       Scaffeine()
@@ -61,8 +63,7 @@ object FileServer extends App {
         path("download" / Segment) { id =>
           logger.info(s"TRACE_ID: $id Server received download request")
           get {
-            // for testing: use the same file, independent of the TRACE_ID
-            getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+            getFromFile(payloadFile, MediaTypes.`application/zip`)
           }
         } ~ path("downloadflaky" / Segment) { id =>
           logger.info(s"TRACE_ID: $id Server received flaky download request")
@@ -72,9 +73,9 @@ object FileServer extends App {
             } else if (id.toInt % 5 == 0) { // 5, 15, 25
               // Causes TimeoutException on client if sleep time > 5 sec
               randomSleeper()
-              getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+              getFromFile(payloadFile, MediaTypes.`application/zip`)
             } else {
-              getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+              getFromFile(payloadFile, MediaTypes.`application/zip`)
             }
           }
         } ~ path("downloadni" / Segment) { id =>
@@ -88,7 +89,7 @@ object FileServer extends App {
             cache.put(id, "downloading") // to simulate blocking on concurrent requests
             get {
               randomSleeper()
-              val response = getFromFile(new File(getClass.getResource(s"/$resourceFileName").toURI), MediaTypes.`application/zip`)
+              val response = getFromFile(payloadFile, MediaTypes.`application/zip`)
               cache.put(id, "downloaded")
               response
             }

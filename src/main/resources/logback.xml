@@ -32,6 +32,8 @@
     <logger name="akka" level="DEBUG"/>
     <!-- Turn down Docker noise -->
     <logger name="com.github.dockerjava" level="INFO"/>
+    <!-- Turn down http client noise -->
+    <logger name="org.apache.hc.client5.http.wire" level="INFO"/>
 
     <!-- Turn up Eclipse Paho logging in MqttPahoEcho
     <logger name="org.eclipse.paho" level="DEBUG"/>  -->
