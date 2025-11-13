@@ -1,23 +1,22 @@
 package alpakka.jms
 
 import com.typesafe.config.Config
-import org.apache.activemq.ActiveMQConnectionFactory
+import jakarta.jms.ConnectionFactory
+import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.ThrottleMode
-import org.apache.pekko.stream.connectors.jms._
-import org.apache.pekko.stream.connectors.jms.scaladsl.JmsProducer
+import org.apache.pekko.stream.connectors.jakartams.*
+import org.apache.pekko.stream.connectors.jakartams.scaladsl.JmsProducer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
-import javax.jms.ConnectionFactory
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /**
   * Works together with [[ProcessingApp]]
-  * Shows how to use ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector,
-  * together with the failover meccano provided by ActiveMQ/Artemis libs
+  * Shows how to use ConnectionRetrySettings/SendRetrySettings of the Alpakka JMS connector
   *
   */
 object JMSTextMessageProducerClient {
@@ -37,8 +36,9 @@ object JMSTextMessageProducerClient {
     .withMaxBackoff(500.millis)
     .withMaxRetries(10)
 
-  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
-  val connectionFactory = new ActiveMQConnectionFactory("artemis", "artemis", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory = new ActiveMQConnectionFactory("tcp://127.0.0.1:21616")
+  connectionFactory.setUser("artemis")
+  connectionFactory.setPassword("artemis")
 
   def main(args: Array[String]): Unit = {
     jmsTextMessageProducerClient(connectionFactory)

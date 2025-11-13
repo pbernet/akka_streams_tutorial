@@ -12,15 +12,14 @@ val pekkoConnectorVersion = "1.2.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
 val kafkaVersion = "3.9.0"
-val activemqVersion = "5.18.5" // We are stuck with 5.x
-val artemisVersion = "2.39.0"
+val artemisVersion = "2.44.0"
 val testContainersVersion = "1.21.3"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.11.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
-val gatlingVersion = "3.13.5"
+val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
 val langchain4jVersion = "1.8.0"
@@ -47,13 +46,12 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.client3" %% "core" % sttpVersion,
   "com.softwaremill.sttp.client3" %% "pekko-http-backend" % sttpVersion,
 
-  "org.apache.activemq" % "activemq-client" % activemqVersion,
-  "org.apache.activemq" % "activemq-broker" % activemqVersion,
-  "org.apache.activemq" % "activemq-kahadb-store" % activemqVersion,
-  "org.apache.pekko" %% "pekko-connectors-jms" % pekkoConnectorVersion,
-  "javax.jms" % "jms" % "1.1",
+  "org.apache.pekko" %% "pekko-connectors-jakartams" % pekkoConnectorVersion,
+  "jakarta.jms" % "jakarta.jms-api" % "3.1.0",
   "jakarta.xml.bind" % "jakarta.xml.bind-api" % "4.0.2",
-  "org.apache.activemq" % "artemis-jms-server" % artemisVersion,
+  "jakarta.annotation" % "jakarta.annotation-api" % "3.0.0",
+  "org.apache.activemq" % "artemis-jakarta-server" % artemisVersion,
+  "org.apache.activemq" % "artemis-jakarta-client" % artemisVersion,
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
@@ -79,14 +77,12 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-s3" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-dynamodb" % pekkoConnectorVersion,
 
-
   "org.apache.pekko" %% "pekko-connectors-kinesis" % pekkoConnectorVersion,
   "software.amazon.awssdk" % "kinesis" % awsClientVersion,
   "software.amazon.awssdk" % "apache-client" % awsClientVersion,
 
   "org.apache.pekko" %% "pekko-connectors-sqs" % pekkoConnectorVersion,
   "software.amazon.awssdk" % "sqs" % awsClientVersion,
-
 
   "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
   "com.influxdb" % "flux-dsl" % influxdbVersion,
@@ -99,7 +95,6 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
   "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
-
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
   "commons-io" % "commons-io" % "2.20.0",
@@ -113,6 +108,7 @@ libraryDependencies ++= Seq(
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
   "ch.qos.logback" % "logback-classic" % "1.5.18",
+  "com.crobox.clickhouse" %% "client" % "1.2.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
@@ -124,9 +120,6 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "localstack" % testContainersVersion,
   "org.testcontainers" % "clickhouse" % testContainersVersion,
 
-  "com.clickhouse" % "clickhouse-jdbc" % "0.7.2",
-  "com.crobox.clickhouse" %% "client" % "1.2.6",
-
   "org.opensearch" % "opensearch-testcontainers" % "2.1.2",
   "com.github.dasniko" % "testcontainers-keycloak" % "3.8.0",
   "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.7",
@@ -136,7 +129,6 @@ libraryDependencies ++= Seq(
 
   "org.keycloak" % "keycloak-core" % keycloakVersion,
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
-  "org.jboss.spec.javax.ws.rs" % "jboss-jaxrs-api_2.1_spec" % "2.0.2.Final",
 
   "org.postgresql" % "postgresql" % "42.7.7",
   "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0" % Test pomOnly(),
@@ -151,7 +143,6 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-ollama" % langchain4jVersion,
 
-
   // LangChain4j PgVector extension
   "dev.langchain4j" % "langchain4j-pgvector" % "1.8.0-beta15",
 
@@ -159,8 +150,8 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.8.0-beta15",
   "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.8.0-beta15",
 
-  // Beautiful CLI output formatting
-  "xyz.matthieucourt" %% "layoutz" % "0.3.0",
+  // CLI output formatting
+  "xyz.matthieucourt" %% "layoutz" % "0.5.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,

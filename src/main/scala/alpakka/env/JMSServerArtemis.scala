@@ -1,5 +1,6 @@
 package alpakka.env
 
+import jakarta.jms.{ConnectionFactory, Queue, Session, TextMessage}
 import org.apache.activemq.artemis.core.config.impl.SecurityConfiguration
 import org.apache.activemq.artemis.core.server.embedded.EmbeddedActiveMQ
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory
@@ -9,7 +10,6 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.LocalDateTime
 import java.util.Properties
-import javax.jms.{ConnectionFactory, Queue, Session, TextMessage}
 import javax.naming.{Context, InitialContext}
 
 /**
@@ -18,7 +18,7 @@ import javax.naming.{Context, InitialContext}
   * Config: resources/broker.xml
   *
   * Doc:
-  * https://activemq.apache.org/components/artemis/documentation/1.1.0/embedding-activemq.html
+  * https://activemq.apache.org/components/artemis/documentation/latest
   * https://github.com/apache/activemq-artemis/blob/main/examples/features/standard/embedded-simple/src/main/java/org/apache/activemq/artemis/jms/example/EmbeddedExample.java
   * https://github.com/apache/activemq-artemis/tree/master/examples/features/standard/embedded-simple
   *
@@ -27,19 +27,19 @@ object JMSServerArtemis extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val host: String = "127.0.0.1"
   val port = 21616
-  val serverUrl = s"tcp://$host:$port"
+  private val serverUrl = s"tcp://$host:$port"
 
   // Does not run with Java 23, this suggested workaround does not help
   // Doc: https://issues.apache.org/jira/browse/ARTEMIS-4975
   System.setProperty("java.security.manager", "allow")
 
-  val securityConfig = new SecurityConfiguration()
+  private val securityConfig = new SecurityConfiguration()
   securityConfig.addUser("artemis", "artemis")
   securityConfig.addRole("artemis", "guest")
   // Needed when run with broker_docker.xml
   securityConfig.addRole("artemis", "amq")
   securityConfig.setDefaultUser("artemis")
-  val securityManager = new ActiveMQJAASSecurityManager(classOf[InVMLoginModule].getName, securityConfig)
+  private val securityManager = new ActiveMQJAASSecurityManager(classOf[InVMLoginModule].getName, securityConfig)
 
   val broker = new EmbeddedActiveMQ()
   broker.setConfigResourcePath("broker.xml")

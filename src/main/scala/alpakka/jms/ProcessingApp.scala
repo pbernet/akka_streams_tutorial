@@ -1,17 +1,17 @@
 package alpakka.jms
 
 import com.typesafe.config.Config
-import org.apache.activemq.ActiveMQConnectionFactory
+import jakarta.jms.{ConnectionFactory, Message, TextMessage}
+import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.*
-import org.apache.pekko.stream.connectors.jms.*
-import org.apache.pekko.stream.connectors.jms.scaladsl.{JmsConsumer, JmsConsumerControl, JmsProducer}
+import org.apache.pekko.stream.connectors.jakartams.*
+import org.apache.pekko.stream.connectors.jakartams.scaladsl.{JmsConsumer, JmsConsumerControl, JmsProducer}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.concurrent.ThreadLocalRandom
-import javax.jms.{ConnectionFactory, Message, TextMessage}
 import scala.collection.immutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -22,7 +22,6 @@ import scala.util.{Failure, Success}
   * An Alpakka JMS client which consumes text messages from either:
   *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
   *  - Experimental: Embedded Artemis JMS Broker [[alpakka.env.JMSServerArtemis]], started from IDE
-  *  - Experimental: Embedded ActiveMQ JMS Broker [[alpakka.env.jms.JMSServerActiveMQ]], started from IDE
   *
   * Generate text messages with [[JMSTextMessageProducerClient]]
   *
@@ -31,6 +30,11 @@ import scala.util.{Failure, Success}
   *  - Failures in this client may be simulated by throwing random java.lang.RuntimeException: BOOM
   *    see [[ProcessingApp.simulateFaultyDeliveryToExternalSystem]]
   *  - for an example of ConnectionRetrySettings/SendRetrySettings see [[JMSTextMessageProducerClient]]
+  *
+  * Doc:
+  * https://pekko.apache.org/docs/pekko-connectors/current/jms/index.html#jms
+  * We are using the new "Jakarta MS connector"
+  *
   */
 object ProcessingApp {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -49,14 +53,8 @@ object ProcessingApp {
 
     val control: JmsConsumerControl = jmsConsumerSource
       .mapAsyncUnordered(10)(ackEnvelope => simulateFaultyDeliveryToExternalSystem(ackEnvelope))
-      .map {
-        ackEnvelope =>
-          // Ack this way ensures that messages are not replayed upon Broker restart
-          ackEnvelope.acknowledge()
-          ackEnvelope.message.acknowledge()
-          ackEnvelope.message
-      }
-      .wireTap(textMessage => logger.info(s"ACK Msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))
+      .map { ackEnvelope => ackEnvelope.message }
+      .wireTap(textMessage => logger.info(s"Auto ACK msg with TRACE_ID: ${textMessage.getIntProperty("TRACE_ID")}"))
       .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
       .toMat(Sink.ignore)(Keep.left)
       .run()
@@ -64,9 +62,9 @@ object ProcessingApp {
     pendingMessageWatcher(control)
   }
 
-  // The "failover:" part in the brokerURL instructs the ActiveMQ lib to reconnect on network failure
-  // Seems to work together with the new connection and send retry settings on the connector
-  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("artemis", "artemis", "failover:tcp://127.0.0.1:21616")
+  val connectionFactory: ConnectionFactory = new ActiveMQConnectionFactory("tcp://127.0.0.1:21616")
+  connectionFactory.asInstanceOf[ActiveMQConnectionFactory].setUser("artemis")
+  connectionFactory.asInstanceOf[ActiveMQConnectionFactory].setPassword("artemis")
 
   private val consumerConfig: Config = system.settings.config.getConfig(JmsConsumerSettings.configPath)
   private val jmsConsumerSource: Source[AckEnvelope, JmsConsumerControl] = JmsConsumer.ackSource(
@@ -78,7 +76,7 @@ object ProcessingApp {
       // Message-by-message acknowledgement can be achieved by setting bufferSize to 0, thus
       // disabling buffering. The outstanding messages before backpressure will then be the sessionCount.
       .withBufferSize(0)
-      .withAcknowledgeMode(AcknowledgeMode.ClientAcknowledge) //Default
+      .withAcknowledgeMode(AcknowledgeMode.AutoAcknowledge)
   )
 
   private val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
