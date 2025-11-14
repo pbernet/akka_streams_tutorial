@@ -13,7 +13,7 @@ val pekkoConnectorKafkaVersion = "1.1.0"
 
 val kafkaVersion = "3.9.0"
 val artemisVersion = "2.44.0"
-val testContainersVersion = "1.21.3"
+val testContainersVersion = "2.0.2"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.11.0"
