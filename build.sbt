@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.pekko" %% "pekko-connectors-jakartams" % pekkoConnectorVersion,
   "jakarta.jms" % "jakarta.jms-api" % "3.1.0",
-  "jakarta.xml.bind" % "jakarta.xml.bind-api" % "4.0.2",
+  "jakarta.xml.bind" % "jakarta.xml.bind-api" % "4.0.4",
   "jakarta.annotation" % "jakarta.annotation-api" % "3.0.0",
   "org.apache.activemq" % "artemis-jakarta-server" % artemisVersion,
   "org.apache.activemq" % "artemis-jakarta-client" % artemisVersion,
