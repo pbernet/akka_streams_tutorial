@@ -101,21 +101,19 @@ public class DownloaderRetry {
             } else if (rootCause instanceof SocketException
                     || rootCause instanceof InterruptedIOException
                     || exception instanceof SSLException) {
-                try {
-                    Thread.sleep(DELAY_TO_RETRY_SECONDS * 1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace(); // do nothing
-                }
+                // Don't sleep here; let getRetryInterval handle the delay
                 return true;
-            } else
+            } else {
                 return false;
+            }
         }
 
         @Override
         public boolean retryRequest(HttpResponse response, int execCount, HttpContext context) {
             int httpStatusCode = response.getCode();
-            if (httpStatusCode != HttpStatus.SC_SERVICE_UNAVAILABLE)
-                return false; // retry only on HTTP 503
+            if (httpStatusCode != HttpStatus.SC_SERVICE_UNAVAILABLE
+                    && httpStatusCode != HttpStatus.SC_INTERNAL_SERVER_ERROR)
+                return false; // retry only on HTTP 500 and 503
 
             if (execCount >= maxRetriesCount) {
                 logger.warn("File downloading failed after {} retries in {} minute(s)",
@@ -130,7 +128,10 @@ public class DownloaderRetry {
 
         @Override
         public TimeValue getRetryInterval(org.apache.hc.core5.http.HttpResponse response, int execCount, HttpContext context) {
-            return TimeValue.ofSeconds(DELAY_TO_RETRY_SECONDS);
+            // Exponential backoff: 2s, 4s, 8s
+            int initialDelaySeconds = 2;
+            long delaySeconds = initialDelaySeconds * (1L << (execCount - 1));
+            return TimeValue.ofSeconds(Math.min(delaySeconds, 10)); // cap at 10 seconds
         }
     }
 

@@ -28,7 +28,7 @@ import scala.util.control.NonFatal
   *  - On downstream error: the path needs to be kept longer in the cache
   *  - On restart: populate cache from local filesystem
   *
-  * Before running this class: start [[alpakka.env.FileServer]] to simulate non-idempotent responses
+  * Before running this class: start [[alpakka.env.FileServer]] to simulate non-idempotent (or flaky) responses
   * Monitor `localFileCache` dir with cmd:  watch ls -ltr
   *
   * Doc:
@@ -58,7 +58,7 @@ object LocalFileCacheCaffeine {
   FileUtils.forceMkdir(localFileCache.toFile)
   // Comment out to start with empty local file storage
   // Note that this may provoke "CACHE miss" cases, when we try to scavenge during recoverWith
-  //FileUtils.cleanDirectory(localFileCache.toFile)
+  // FileUtils.cleanDirectory(localFileCache.toFile)
 
 
   def deleteFromFileStore(key: Int, value: Path, cause: caffeine.cache.RemovalCause): Unit = {
@@ -90,6 +90,7 @@ object LocalFileCacheCaffeine {
       .mapAsyncUnordered(5) { message =>
         def processNext(message: Message): Message = {
           val key = message.id
+          // switch to /downloadflaky for "more confusion"
           val url = new URI("http://127.0.0.1:6001/downloadni/" + key.toString)
           val destinationFile = localFileCache.resolve(Paths.get(message.id.toString + ".zip"))
 

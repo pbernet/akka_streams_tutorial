@@ -4,7 +4,7 @@ import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.StatusCodes.*
-import org.apache.pekko.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCode, StatusCodes}
 import org.apache.pekko.http.scaladsl.server.Directives.{logRequestResult, path, *}
 import org.apache.pekko.http.scaladsl.server.{ExceptionHandler, Route}
 import org.slf4j.{Logger, LoggerFactory}
@@ -20,13 +20,14 @@ import scala.util.{Failure, Success}
   *
   * The client can request these types of response:
   *  - HTTP 200 response:        /download/[id]
-  *  - Flaky response:           /downloadflaky/[id]
   *  - Non-idempotent response:  /downloadni/[id]
   *    Allows only one download file request per id, answer with HTTP 404 on subsequent requests
+  *  - Flaky response:           /downloadflaky/[id]
+  *    Reply with additional random failures on requests with certain IDs
   *
   * Uses a cache to remember the "one download per id" behaviour
-  * Note that akka-http also supports server-side caching (by wrapping caffeine in caching directives):
-  * https://doc.akka.io/docs/akka-http/current/routing-dsl/directives/caching-directives/index.html
+  * Note that pekko-http would also support server-side caching (by wrapping caffeine in caching directives):
+  * https://pekko.apache.org/docs/pekko-http/current/common/caching.html
   */
 object FileServer extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -116,14 +117,10 @@ object FileServer extends App {
     Thread.sleep(sleepTime.toLong)
   }
 
-  def randomErrorHttpStatusCode = {
-    val statusCodes = Seq(StatusCodes.InternalServerError, StatusCodes.BadRequest, StatusCodes.ServiceUnavailable)
-    val start = 0
-    val end = statusCodes.size - 1
-    val rnd = new scala.util.Random
-    val finalRnd = start + rnd.nextInt((end - start) + 1)
-    val statusCode = statusCodes(finalRnd)
+  def randomErrorHttpStatusCode: StatusCode = {
+    val statusCodes = Seq(StatusCodes.NotFound, StatusCodes.InternalServerError, StatusCodes.ServiceUnavailable)
+    val statusCode = statusCodes(scala.util.Random.nextInt(statusCodes.size))
     logger.info(s" -> Complete with HTTP status code: $statusCode")
-    statusCodes(finalRnd)
+    statusCode
   }
 }
