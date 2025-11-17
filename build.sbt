@@ -98,7 +98,7 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
   "commons-io" % "commons-io" % "2.20.0",
-  "org.apache.commons" % "commons-lang3" % "3.18.0",
+  "org.apache.commons" % "commons-lang3" % "3.20.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "4.1.2", // 5.x for Scala 3
 
   "org.apache.camel" % "camel-core" % "3.20.2",
