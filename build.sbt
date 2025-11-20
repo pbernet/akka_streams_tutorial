@@ -6,7 +6,7 @@ version := "1.0"
 
 scalaVersion := "2.13.17"
 
-val pekkoVersion = "1.2.1"
+val pekkoVersion = "1.3.0"
 val pekkoHTTPVersion = "1.3.0"
 val pekkoConnectorVersion = "1.2.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
@@ -94,7 +94,7 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.5",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.6.1",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
   "commons-io" % "commons-io" % "2.20.0",
