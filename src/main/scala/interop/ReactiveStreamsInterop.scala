@@ -23,9 +23,13 @@ import scala.concurrent.duration.DurationInt
   *  - RxJava
   *  - pekko-streams
   *
+  * Remarks:
+  *  - SEDA (Staged Event-Driven Architecture)  provides asynchronous in-memory messaging within a single CamelContext
+  *
   * Doc:
   * https://doc.akka.io/docs/akka/current/stream/reactive-streams-interop.html
-  * https://camel.apache.org/components/3.18.x/reactive-streams-component.html
+  * https://camel.apache.org/components/4.14.x/reactive-streams-component.html
+  * https://camel.apache.org/components/4.14.x/seda-component.html
   * https://projectreactor.io/docs/core/release/reference/
   * https://github.com/ReactiveX/RxJava
   */
@@ -40,8 +44,8 @@ object ReactiveStreamsInterop extends App {
   val rsCamel: CamelReactiveStreamsService = CamelReactiveStreams.get(camel)
   camel.start()
 
-  // Consumer endpoint with Camel
-  val publisher: Publisher[String] = rsCamel.from("vm:words", classOf[String])
+  // Producer/Publisher from Camel SEDA queue using Reactive Streams
+  val publisher: Publisher[String] = rsCamel.from("seda:words", classOf[String])
 
   // Slow consumer with Reactor 3
   Flux.from(publisher)
@@ -64,15 +68,14 @@ object ReactiveStreamsInterop extends App {
     .wireTap(each => logger.info(s"Consumed with pekko-streams: $each"))
     .runWith(Sink.ignore)
 
-  // Sender endpoint with Camel
-  val template: FluentProducerTemplate = camel.createFluentProducerTemplate
+  val producerTemplate: FluentProducerTemplate = camel.createFluentProducerTemplate
 
   Source(1 to 10)
     .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
     .mapAsync(1) { i =>
-      template
+      producerTemplate
         .withBody(s"Camel$i")
-        .to("vm:words")
+        .to("seda:words")
         .send
       Future(i)
     }.runWith(Sink.ignore)
