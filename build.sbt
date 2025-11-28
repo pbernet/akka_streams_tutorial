@@ -22,7 +22,7 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.9.0"
+val langchain4jVersion = "1.9.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
