@@ -4,7 +4,7 @@ name := "pekko-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.17"
+scalaVersion := "2.13.18"
 
 val pekkoVersion = "1.3.0"
 val pekkoHTTPVersion = "1.3.0"
@@ -22,7 +22,7 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.8.0"
+val langchain4jVersion = "1.9.0"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -65,7 +65,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.39.0",
+  "com.hierynomus" % "sshj" % "0.40.0",
   "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-elasticsearch" % pekkoConnectorVersion,
@@ -143,11 +143,11 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
 
   // LangChain4j PgVector extension
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.8.0-beta15",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.9.0-beta16",
 
   // LangChain4j embedding models
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.8.0-beta15",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.8.0-beta15",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.9.0-beta16",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.9.0-beta16",
 
   // CLI output formatting
   "xyz.matthieucourt" %% "layoutz" % "0.5.0",
@@ -181,14 +181,3 @@ enablePlugins(GatlingPlugin)
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
-
-// For Scalafix basic stuff to work
-libraryDependencies +=
-  "ch.epfl.scala" %% "scalafix-core" % _root_.scalafix.sbt.BuildInfo.scalafixVersion % ScalafixConfig
-
-inThisBuild(
-  List(
-    semanticdbEnabled := true,
-    semanticdbVersion := scalafixSemanticdb.revision
-  )
-)
