@@ -5,9 +5,7 @@ import dev.langchain4j.data.document.splitter.DocumentSplitters
 import dev.langchain4j.data.message.UserMessage
 import dev.langchain4j.data.segment.TextSegment
 import dev.langchain4j.memory.chat.MessageWindowChatMemory
-import dev.langchain4j.model.chat.request.ResponseFormat
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel
-import dev.langchain4j.model.ollama.OllamaChatModel
 import dev.langchain4j.model.openai.OpenAiChatModel
 import dev.langchain4j.model.openai.OpenAiChatModelName.GPT_4_O_MINI
 import dev.langchain4j.rag.DefaultRetrievalAugmentor
@@ -65,7 +63,7 @@ import scala.util.{Failure, Success}
   * to be able to RAG chat with them via a local [[Assistant]]
   *
   * Remarks:
-  *  - Local means: Requests on local machine (local LLM via Docker ollama or via Java nlp lib)
+  *  - Local means: Requests on local machine (Java NLP NER or GLiNER local Docker)
   *  - Remote means: Requests to a remote OpenAI LLM accessed with API-Key
   *  - We use [[spray.json]] because of the Elasticsearch pekko connector
   *
@@ -91,8 +89,9 @@ object WikipediaEditsAnalyser extends App {
       Supervision.Restart
   }
 
-  // Set to false for now, because local Ollama is still experimental
-  private val useLocalOllamaNER: Boolean = false
+  // Set to true to use local GLiNER service instead of local Java NLP NER
+  // Prerequisite: Start service gliner-ner in docker-compose.yml
+  private val useLocalGLiNER: Boolean = false
 
   // Switch off at runtime via UI to save costs
   private val isRemoteProcessingEnabled = new AtomicBoolean(true)
@@ -137,8 +136,17 @@ object WikipediaEditsAnalyser extends App {
 
   final case class Person(name: String)
 
-  val ollamaContainer = new OllamaContainer()
-  ollamaContainer.start()
+  // GLiNER API models
+  case class GLiNERExtractionRequest(text: String, threshold: Double = 0.5)
+
+  case class PersonEntity(text: String, start: Int, end: Int, score: Double)
+
+  case class GLiNERExtractionResponse(persons: List[PersonEntity], processing_time_ms: Double, text_length: Int)
+
+  // Circe encoders/decoders for GLiNER models
+  implicit val personEntityDecoder: Decoder[PersonEntity] = deriveDecoder[PersonEntity]
+  implicit val glinerResponseDecoder: Decoder[GLiNERExtractionResponse] = deriveDecoder[GLiNERExtractionResponse]
+  implicit val glinerRequestEncoder: Encoder[GLiNERExtractionRequest] = deriveEncoder[GLiNERExtractionRequest]
 
   private val dockerImageNameOS = DockerImageName
     .parse("opensearchproject/opensearch")
@@ -299,8 +307,8 @@ object WikipediaEditsAnalyser extends App {
   }
 
   private def findPersons(ctx: Ctx): Future[Ctx] = {
-    val localNERFuture = if (useLocalOllamaNER) {
-      findPersonsLocalOllamaNER(ctx)
+    val localNERFuture = if (useLocalGLiNER) {
+      findPersonsLocalGLiNER(ctx)
     } else {
       findPersonsLocalNER(ctx)
     }
@@ -324,14 +332,14 @@ object WikipediaEditsAnalyser extends App {
       rowsListToDisplay += Array("Total Persons", allPersons.size.toString,
         if (allPersons.nonEmpty) allPersons.mkString(", ") else "none")
       if (localOnly.nonEmpty) {
-        val nerTypeLabel = if (useLocalOllamaNER) "Local Ollama NER only" else "Local Java NLP NER only"
+        val nerTypeLabel = if (useLocalGLiNER) "Local GLiNER NER only" else "Local Java NLP NER only"
         rowsListToDisplay += Array(nerTypeLabel, localOnly.size.toString, localOnly.mkString(", "))
       }
       if (remoteOnly.nonEmpty) {
         rowsListToDisplay += Array("Remote NER only", remoteOnly.size.toString, remoteOnly.mkString(", "))
       }
       if (both.nonEmpty) {
-        val bothLabel = if (useLocalOllamaNER) "Found by Ollama & Remote" else "Found by Java NLP & Remote"
+        val bothLabel = if (useLocalGLiNER) "Found by GLiNER & Remote" else "Found by Java NLP & Remote"
         rowsListToDisplay += Array(bothLabel, both.size.toString, both.mkString(", "))
       }
       val table = formatAsAsciiTable(title, headers, rowsListToDisplay.toArray)
@@ -395,6 +403,7 @@ object WikipediaEditsAnalyser extends App {
       .modelName(GPT_4_O_MINI)
       .temperature(0)
       .timeout(Duration.ofSeconds(30))
+      .logRequests(true)
       .build()
 
     val promptPersons =
@@ -456,96 +465,66 @@ object WikipediaEditsAnalyser extends App {
     }
   }
 
-  private def findPersonsLocalOllamaNER(ctx: Ctx): Future[Ctx] = {
-    logger.info(s"[${ctx.traceId}] Local Ollama NER: About to find person names in: ${ctx.change.title}")
+  private def findPersonsLocalGLiNER(ctx: Ctx): Future[Ctx] = {
+    logger.info(s"[${ctx.traceId}] Local GLiNER NER: About to find person names in: ${ctx.change.title}")
     val content = ctx.content
 
     if (content.isEmpty) {
       return Future(ctx)
     }
 
-    val model = OllamaChatModel.builder
-      .baseUrl(ollamaContainer.getBaseUrl)
-      .modelName("llama3.2:1b")
-      .temperature(0)
-      .topP(0.1)
-      .responseFormat(ResponseFormat.JSON)
-      .timeout(Duration.ofSeconds(30))
-      .build()
+    val glinerServiceUrl = "http://localhost:8085/extract-persons"
+    val request = GLiNERExtractionRequest(text = content)
+    val requestJson = request.asJson.noSpaces
 
-    val promptPersons =
-      """You are a precise name extraction tool. Extract ONLY actual person names that are LITERALLY PRESENT in this text:
-        |{{content}}
-        |
-        |Rules:
-        |- Do NOT extract places: Geographical locations including countries, cities, regions, landmarks, or specific addresses
-        |- Do NOT extract organizations: Names of companies, institutions, government bodies, or any other formal groups
-        |- If unsure whether something is a person name, exclude it
-        |- Return output as JSON with exactly this structure: {"names": ["name1", "name2", ...]}
-        |- If no persons are found in text, return exactly: {"names": []}
-        |
-        |Examples:
-        |Text: "John Smith visited the library yesterday."
-        |Response: {"names": ["John Smith"]}
-        |
-        |Text: "The weather is sunny today in California."
-        |Response: {"names": []}
-        |
-        |Text: "This category is for articles with short descriptions defined on Wikipedia by {{short description}}"
-        |Response: {"names": []}
-        |
-        """.stripMargin
+    val httpRequest = HttpRequest(
+      method = HttpMethods.POST,
+      uri = glinerServiceUrl,
+      entity = HttpEntity(ContentTypes.`application/json`, requestJson)
+    )
 
-    val message = UserMessage.from(promptPersons.replace("{{content}}", content))
+    Http()
+      .singleRequest(httpRequest)
+      .flatMap { response =>
+        response.status match {
+          case StatusCodes.OK =>
+            Unmarshal(response.entity).to[String].map { jsonString =>
+              logger.debug(s"[${ctx.traceId}] GLiNER API response: $jsonString")
 
-    try {
-      val response = model.chat(message)
-      val personsFoundText = response.aiMessage().text().trim()
-      val personsFoundList = parseJSONResponse(personsFoundText)
+              parse(jsonString) match {
+                case Right(json) =>
+                  json.as[GLiNERExtractionResponse] match {
+                    case Right(glinerResponse) =>
+                      val personsFound = glinerResponse.persons.map(_.text).distinct
 
-      if (personsFoundList.isEmpty) {
-        Future(ctx)
-      } else {
-        val verifiedPersons = personsFoundList.filter { personName =>
-          val isPresent = content.toLowerCase.contains(personName.toLowerCase)
-          if (!isPresent) {
-            logger.debug(s"[${ctx.traceId}] Skipping: $personName - not found in content")
-          }
-          isPresent
-        }
-
-        if (verifiedPersons.isEmpty) {
-          logger.debug(s"[${ctx.traceId}] No verified persons found after content validation")
-          Future(ctx)
-        } else {
-          logger.info(s"[${ctx.traceId}] Local Ollama NER found persons: $verifiedPersons from content: $content")
-          Future(ctx.copy(personsFoundLocal = verifiedPersons))
+                      if (personsFound.isEmpty) {
+                        logger.debug(s"[${ctx.traceId}] GLiNER found no persons in content")
+                        ctx
+                      } else {
+                        val personsFoundCleaned = sanitizePersonNames(personsFound)
+                        logger.info(s"[${ctx.traceId}] Local GLiNER NER found persons: $personsFoundCleaned from content: ${content.take(100)}...")
+                        ctx.copy(personsFoundLocal = personsFoundCleaned)
+                      }
+                    case Left(decodingError) =>
+                      logger.error(s"[${ctx.traceId}] Failed to decode GLiNER response: $decodingError")
+                      ctx
+                  }
+                case Left(parsingError) =>
+                  logger.error(s"[${ctx.traceId}] Failed to parse GLiNER JSON response: $parsingError")
+                  ctx
+              }
+            }
+          case statusCode =>
+            response.discardEntityBytes()
+            logger.error(s"[${ctx.traceId}] GLiNER service returned error status: $statusCode")
+            Future.successful(ctx)
         }
       }
-    } catch {
-      case e: Exception =>
-        logger.error(s"[${ctx.traceId}] Error during local Ollama LLM call: ${e.getMessage}", e)
-        Future(ctx)
-    }
-  }
-
-  private def parseJSONResponse(personsFoundText: String) = {
-    val personsFoundList = if (personsFoundText.isEmpty) {
-      List.empty[String]
-    } else {
-      import io.circe.parser.*
-      parse(personsFoundText) match {
-        case Right(json) =>
-          json.hcursor.downField("names").as[List[String]] match {
-            case Right(names) => sanitizePersonNames(names)
-            case Left(_) =>
-              List.empty[String]
-          }
-        case Left(_) =>
-          List.empty[String]
+      .recover {
+        case ex: Exception =>
+          logger.error(s"[${ctx.traceId}] Error calling GLiNER service: ${ex.getMessage}", ex)
+          ctx
       }
-    }
-    personsFoundList
   }
 
   /**
@@ -581,9 +560,9 @@ object WikipediaEditsAnalyser extends App {
 
 
   logger.info(s"Opensearch container listening on: ${searchContainer.getHttpHostAddress}")
-  logger.info(s"NER Configuration - Using Local Ollama NER: $useLocalOllamaNER")
-  if (useLocalOllamaNER) {
-    logger.info(s"Local Ollama container base URL: ${ollamaContainer.getBaseUrl}")
+  logger.info(s"NER Configuration - Using Local GLiNER NER: $useLocalGLiNER")
+  if (useLocalGLiNER) {
+    logger.info("GLiNER service expected at: http://localhost:8085")
   } else {
     logger.info("Using local Java NLP models for NER extraction")
   }
@@ -615,7 +594,7 @@ object WikipediaEditsAnalyser extends App {
   private def createAssistant() = {
     val queryRouter = new DefaultQueryRouter(contentRetriever)
     val retrievalAugmentor = DefaultRetrievalAugmentor.builder.queryRouter(queryRouter).build
-    val model = OpenAiChatModel.builder.apiKey(OPENAI_API_KEY).modelName(GPT_4_O_MINI).build
+    val model = OpenAiChatModel.builder.apiKey(OPENAI_API_KEY).modelName(GPT_4_O_MINI).logRequests(true).build
 
     AiServices
       .builder(classOf[Assistant])

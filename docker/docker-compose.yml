@@ -124,5 +124,32 @@ services:
     networks:
       - runtime-net
 
+  # GLiNER NER service
+  gliner-ner:
+    build:
+      context: ./gliner-service
+      dockerfile: Dockerfile
+    hostname: gliner-ner
+    ports:
+      - "8085:8085"
+    environment:
+      - TRANSFORMERS_CACHE=/app/model_cache
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Cache downloaded GLiNER model to avoid re-downloading on restart
+      - gliner_model_cache:/app/model_cache
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8085/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - runtime-net
+
+volumes:
+  gliner_model_cache:
+
 networks:
   runtime-net:
