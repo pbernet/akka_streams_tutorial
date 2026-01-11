@@ -38,6 +38,16 @@
     <!-- Turn up Eclipse Paho logging in MqttPahoEcho
     <logger name="org.eclipse.paho" level="DEBUG"/>  -->
 
+    <!-- Turn up Langchain4J logging to LLM -->
+    <logger name="dev.langchain4j" level="DEBUG"/>
+    █
+    <logger name="dev.langchain4j.model.openai" level="DEBUG"/>
+
+    <!-- Turn up Langchain4J logging to LLM -->
+    <logger name="dev.langchain4j" level="DEBUG"/>
+    █
+    <logger name="dev.langchain4j.model.openai" level="DEBUG"/>
+
     <root level="INFO">
         <appender-ref ref="ASYNC"/>
         <appender-ref ref="STDOUT"/>

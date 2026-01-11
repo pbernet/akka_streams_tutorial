@@ -22,7 +22,9 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.9.0"
+val langchain4jVersion = "1.11.0"
+val mcpSdkVersion = "1.0.0"
+val doclingJavaVersion = "0.4.7"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -94,6 +96,9 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
+  "org.apache.tika" % "tika-core" % "3.2.3",
+  "org.apache.tika" % "tika-parsers-standard-package" % "3.2.3",
+  "org.apache.pdfbox" % "pdfbox" % "3.0.6",
   "org.apache.opennlp" % "opennlp-tools" % "2.5.6.1",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
@@ -142,13 +147,16 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
+  "dev.langchain4j" % "langchain4j-cohere" % "1.11.0-beta19",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.11.0-beta19",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.11.0-beta19",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.11.0-beta19",
 
-  // LangChain4j PgVector extension
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.9.0-beta16",
+  "io.modelcontextprotocol.sdk" % "mcp-core" % mcpSdkVersion,
+  "io.modelcontextprotocol.sdk" % "mcp-json-jackson2" % mcpSdkVersion,
 
-  // LangChain4j embedding models
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.9.0-beta16",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.9.0-beta16",
+  "ai.docling" % "docling-serve-api" % doclingJavaVersion,
+  "ai.docling" % "docling-serve-client" % doclingJavaVersion,
 
   // CLI output formatting
   "xyz.matthieucourt" %% "layoutz" % "0.5.0",

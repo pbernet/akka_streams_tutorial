@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Doc Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 10px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .status-indicator.loading {
+            background: #ff9800;
+        }
+
+        .config-section {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .config-header h3 {
+            color: #667eea;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .config-toggle {
+            color: #667eea;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+
+        .config-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .config-content {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .config-content.open {
+            display: block;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+            font-size: 13px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .value-display {
+            min-width: 50px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: #e8e8e8;
+            color: #333;
+            border: 1px solid #ccc;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: #d0d0d0;
+        }
+
+        .apply-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .apply-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+        }
+
+        .apply-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .config-status {
+            font-size: 12px;
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .config-status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .config-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .message.error {
+            align-self: center;
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef5350;
+        }
+
+        .message.system {
+            align-self: center;
+            background: #e3f2fd;
+            color: #1976d2;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        .message-content {
+            white-space: pre-wrap;
+        }
+
+        .sources-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #ddd;
+        }
+
+        .sources-header {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 0;
+            font-size: 0.9em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .sources-header:hover {
+            color: #4a5fd6;
+        }
+
+        .sources-header .toggle-icon {
+            transition: transform 0.3s;
+            font-size: 0.8em;
+        }
+
+        .sources-header .toggle-icon.open {
+            transform: rotate(90deg);
+        }
+
+        .sources-list {
+            display: none;
+            margin-top: 8px;
+        }
+
+        .sources-list.open {
+            display: block;
+        }
+
+        .source-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .source-file {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .source-score {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+
+        .source-meta {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 4px;
+        }
+
+        .source-preview {
+            color: #555;
+            font-style: italic;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .typing-indicator {
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: #f5f5f5;
+            border-radius: 12px;
+            display: none;
+        }
+
+        .typing-indicator.active {
+            display: block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        #query-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #query-input:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info-button {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .new-chat-button {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h3>📚 Local RAG doc chat - ask questions about your PDF documents</h3>
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="status-indicator"></div>
+                <span id="status-text">Checking status...</span>
+            </div>
+        </div>
+
+        <!-- Reranking Configuration Section -->
+        <div class="config-section">
+            <div class="config-header" onclick="toggleConfig()">
+                <h3>⚙️ Reranking Configuration</h3>
+                <span class="config-toggle" id="config-toggle">▼</span>
+            </div>
+            <div class="config-content" id="config-content">
+                <div class="control-group">
+                    <label for="minScoreSlider">Relevance Threshold (minScore)</label>
+                    <div class="slider-container">
+                        <input
+                                type="range"
+                                id="minScoreSlider"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value="0"
+                        >
+                        <span class="value-display" id="minScoreValue">-</span>
+                    </div>
+                    <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                        Low (0.3): Keep more results | Mid (0.5): Balanced | High (0.7): Strict
+                    </div>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" onclick="setPreset(0.3)">Permissive (0.3)</button>
+                        <button class="preset-btn" onclick="setPreset(0.4)">Lenient (0.4)</button>
+                        <button class="preset-btn" onclick="setPreset(0.5)">Balanced (0.5)</button>
+                        <button class="preset-btn" onclick="setPreset(0.6)">Strict (0.6)</button>
+                        <button class="preset-btn" onclick="setPreset(0.7)">Very Strict (0.7)</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label class="checkbox-label">
+                        <input
+                                type="checkbox"
+                                id="enableReranking"
+                        >
+                        <span>Enable Reranking</span>
+                    </label>
+                </div>
+
+                <button class="apply-btn" onclick="applyConfiguration()">Apply Configuration</button>
+                <div id="configStatus" class="config-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div style="display: flex; justify-content: flex-end; padding: 5px 10px;">
+            <button class="new-chat-button" onclick="clearChat()">🆕 New Chat</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message system">
+                Welcome! Ask me anything about your indexed documents.
+            </div>
+        </div>
+        <div class="typing-indicator" id="typing-indicator">
+            <span></span><span></span><span></span>
+        </div>
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <input
+                        type="text"
+                        id="query-input" 
+                        placeholder="Type your question here..."
+                        autocomplete="off"
+                >
+                <button id="send-button" onclick="sendQuery()">Send</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let isProcessing = false;
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function () {
+        checkStatus();
+
+        const input = document.getElementById('query-input');
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !isProcessing) {
+                sendQuery();
+            }
+        });
+
+        const slider = document.getElementById('minScoreSlider');
+        slider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('minScoreValue').textContent = value.toFixed(2);
+        });
+    });
+
+    function toggleConfig() {
+        const content = document.getElementById('config-content');
+        const toggle = document.getElementById('config-toggle');
+        content.classList.toggle('open');
+        toggle.classList.toggle('collapsed');
+    }
+
+    function setPreset(value) {
+        document.getElementById('minScoreSlider').value = value;
+        document.getElementById('minScoreValue').textContent = value.toFixed(2);
+    }
+
+    async function applyConfiguration() {
+        const minScore = parseFloat(document.getElementById('minScoreSlider').value);
+        const enabled = document.getElementById('enableReranking').checked;
+        const statusDiv = document.getElementById('configStatus');
+        const applyBtn = event.target;
+
+        try {
+            applyBtn.disabled = true;
+            applyBtn.textContent = 'Applying...';
+            statusDiv.className = 'config-status';
+
+            const response = await fetch('/rag/configure', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    minScore: minScore,
+                    enabled: enabled
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            statusDiv.className = 'config-status success';
+            statusDiv.textContent = `✅ Configuration applied: minScore=${minScore.toFixed(2)}, enabled=${enabled}`;
+
+            setTimeout(() => {
+                statusDiv.className = 'config-status';
+            }, 5000);
+        } catch (error) {
+            console.error('Error:', error);
+            statusDiv.className = 'config-status error';
+            statusDiv.textContent = `❌ Error: ${error.message}`;
+        } finally {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Apply Configuration';
+        }
+    }
+
+    let statusPollInterval = null;
+
+    async function checkStatus() {
+        try {
+            const response = await fetch('/rag/status');
+            const data = await response.json();
+
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+
+            if (data.ingesting) {
+                indicator.style.background = '#ff9800';
+                statusText.textContent = `Ingesting documents: ${data.documentsProcessed}/${data.documentsTotal}...`;
+                if (!statusPollInterval) {
+                    statusPollInterval = setInterval(checkStatus, 2000);
+                }
+            } else if (data.status === 'ready') {
+                indicator.style.background = '#4caf50';
+                statusText.textContent = `Ready • ${data.documentsIndexed} docs • ${data.totalChunks} chunks`;
+                if (statusPollInterval) {
+                    clearInterval(statusPollInterval);
+                    statusPollInterval = null;
+                }
+            } else {
+                indicator.style.background = '#ff9800';
+                statusText.textContent = 'No documents indexed';
+            }
+
+            // Sync reranker config controls from backend
+            if (data.rerankerMinScore !== undefined) {
+                document.getElementById('minScoreSlider').value = data.rerankerMinScore;
+                document.getElementById('minScoreValue').textContent = data.rerankerMinScore.toFixed(2);
+                document.getElementById('enableReranking').checked = data.rerankerEnabled;
+            }
+        } catch (error) {
+            console.error('Error checking status:', error);
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            indicator.style.background = '#f44336';
+            statusText.textContent = 'Connection error';
+        }
+    }
+
+
+    async function clearChat() {
+        try {
+            const response = await fetch('/rag/clear', {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Clear chat messages
+            const messagesContainer = document.getElementById('chat-messages');
+            messagesContainer.innerHTML = `
+                    <div class="message system">
+                        Welcome! Ask me anything about your indexed documents.
+                    </div>
+                `;
+
+            // Clear input field
+            document.getElementById('query-input').value = '';
+
+            // Reset typing indicator
+            document.getElementById('typing-indicator').classList.remove('active');
+
+            console.log('Chat cleared successfully');
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+            addMessage(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    async function sendQuery() {
+        if (isProcessing) return;
+
+        const input = document.getElementById('query-input');
+        const query = input.value.trim();
+
+        if (!query) return;
+
+        isProcessing = true;
+        const sendButton = document.getElementById('send-button');
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
+
+        // Add user message
+        addMessage(query, 'user');
+        input.value = '';
+
+        // Show typing indicator
+        const typingIndicator = document.getElementById('typing-indicator');
+        typingIndicator.classList.add('active');
+        scrollToBottom();
+
+        try {
+            const response = await fetch('/rag/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({query: query})
+            });
+
+            typingIndicator.classList.remove('active');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            addMessageWithSources(data.answer, data.sources);
+
+        } catch (error) {
+            typingIndicator.classList.remove('active');
+            console.error('Error:', error);
+            addMessage(`Error: ${error.message}`, 'error');
+        } finally {
+            isProcessing = false;
+            sendButton.disabled = false;
+            sendButton.textContent = 'Send';
+            input.focus();
+        }
+    }
+
+    function addMessage(text, type) {
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = text;
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    function addMessageWithSources(answer, sources) {
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant';
+
+        let html = `<div class="message-content">${escapeHtml(answer)}</div>`;
+
+        if (sources && sources.length > 0) {
+            const sourcesId = 'sources-' + Date.now();
+            html += `
+                    <div class="sources-section">
+                        <div class="sources-header" onclick="toggleSources('${sourcesId}', this)">
+                            <span>📎 Sources (${sources.length})</span>
+                            <span class="toggle-icon">▶</span>
+                        </div>
+                        <div class="sources-list" id="${sourcesId}">
+                            ${sources.map(src => `
+                                <div class="source-item">
+                                    <div class="source-header">
+                                        <span class="source-file">${src.reranked ? '⭐ ' : ''}📄 ${escapeHtml(src.fileName)}</span>
+                                        <span class="source-score">${(src.similarity * 100).toFixed(0)}% match</span>
+                                    </div>
+                                    <div class="source-meta">
+                                        ${src.author ? `Author: ${escapeHtml(src.author)} • ` : ''}${src.pageNumbers && src.pageNumbers.length > 0 ? `Page(s): ${src.pageNumbers.join(', ')}` : ''}
+                                    </div>
+                                    <div class="source-preview">"${escapeHtml(src.preview)}"</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+        }
+
+        messageDiv.innerHTML = html;
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    function toggleSources(id, headerEl) {
+        const list = document.getElementById(id);
+        const icon = headerEl.querySelector('.toggle-icon');
+        list.classList.toggle('open');
+        icon.classList.toggle('open');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function scrollToBottom() {
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+</script>
+</body>
+</html>

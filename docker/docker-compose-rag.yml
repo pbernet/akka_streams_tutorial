@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Docling document parsing service
+  # Note that this needs a lot of CPU/GPU power, config Docker accordingly
+  # Also: quay.io/docling-project/docling-serve-cpu
+  docling:
+    image: quay.io/docling-project/docling-serve
+    container_name: docling-server
+    ports:
+      - "5001:5001"
+    environment:
+      # Maximize threads for single-document low-latency processing
+      # Set to Docker CPU count minus ~2 for OS/uvicorn overhead (10 CPUs → 8 threads)
+      OMP_NUM_THREADS: 8
+      MKL_NUM_THREADS: 8
+
+      # 1 worker = all threads dedicated to single document for lowest latency
+      DOCLING_SERVE_ENG_LOC_NUM_WORKERS: 1
+      
+      DOCLING_SERVE_MAX_SYNC_WAIT: 900       # 15 minutes for sync (63MB PDFs can be slow)
+      DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT: 3600  # 60 minutes max for very large PDFs
+
+      # Set to 1 to avoid "Task Not Found" errors
+      UVICORN_WORKERS: 1
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # PostgreSQL + pgvector for vector storage and RAG
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: pgvector-rag
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ragdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgvector_data:
