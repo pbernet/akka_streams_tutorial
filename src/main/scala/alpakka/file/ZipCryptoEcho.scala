@@ -91,7 +91,7 @@ object ZipCryptoEcho extends App {
   //val chaCha20Nonce = generateNonce(ivLengthBytes)
   //val chaCha20Key = generateChaCha20Key()
 
-  val sourceFileName = "63MB.pdf"
+  val sourceFileName = "content/63MB.pdf"
   val sourceFilePath = s"src/main/resources/$sourceFileName"
   val encFileName = "testfile.encrypted"
   val decFileName = "testfile_decrypted.zip"

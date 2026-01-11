@@ -38,7 +38,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
 
   import system.dispatcher
 
-  val resourceFileName = "63MB.pdf"
+  val resourceFileName = "content/63MB.pdf"
   val (address, port) = ("127.0.0.1", 6000)
   server(address, port)
   roundtripClient(address, port)

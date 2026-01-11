@@ -20,7 +20,7 @@ object DuplicateStream extends App {
 
   import system.dispatcher
 
-  val sourceFileName = "63MB.pdf"
+  val sourceFileName = "content/63MB.pdf"
   val sourceFilePath = s"src/main/resources/$sourceFileName"
   val fileInputStream = new FileInputStream(sourceFilePath)
   val source: Source[ByteString, Any] =

@@ -36,7 +36,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   implicit val system: ActorSystem = ActorSystem("S3Echo")
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  private val resourceFileName = "63MB.pdf"
+  private val resourceFileName = "content/63MB.pdf"
   private val archiveFileName = "archive.zip"
 
   // Bucket name must be unique and may only contain certain characters
