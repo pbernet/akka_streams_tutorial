@@ -108,7 +108,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.12",
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
-  "ch.qos.logback" % "logback-classic" % "1.5.18",
+  "ch.qos.logback" % "logback-classic" % "1.5.32",
   "com.crobox.clickhouse" %% "client" % "1.2.6",
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
