@@ -99,7 +99,7 @@ libraryDependencies ++= Seq(
   "org.apache.tika" % "tika-core" % "3.2.3",
   "org.apache.tika" % "tika-parsers-standard-package" % "3.2.3",
   "org.apache.pdfbox" % "pdfbox" % "3.0.6",
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.6.1",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.7",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
   "commons-io" % "commons-io" % "2.20.0",
