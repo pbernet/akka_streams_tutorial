@@ -23,7 +23,7 @@ val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
 val langchain4jVersion = "1.11.0"
-val mcpSdkVersion = "1.0.0"
+val mcpSdkVersion = "1.1.0"
 val doclingJavaVersion = "0.4.7"
 
 libraryDependencies ++= Seq(
