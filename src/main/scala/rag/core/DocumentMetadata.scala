@@ -7,6 +7,5 @@ case class DocumentMetadata(
                              subject: Option[String] = None,
                              creationDate: Option[String] = None,
                              producerApp: Option[String] = None,
-                             pageCount: Option[Int] = None,
-                             wordCount: Option[Int] = None
+                             pageCount: Option[Int] = None
                            )

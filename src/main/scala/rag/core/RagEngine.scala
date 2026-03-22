@@ -433,7 +433,6 @@ class RagEngine(
               val document = Document.from(text)
               document.metadata().put("fileName", metadata.fileName)
               metadata.pageCount.foreach(p => document.metadata().put("pageCount", p.toString))
-              metadata.wordCount.foreach(w => document.metadata().put("wordCount", w.toString))
               metadata.title.foreach(t => document.metadata().put("title", t))
               metadata.author.foreach(a => document.metadata().put("author", a))
               metadata.subject.foreach(s => document.metadata().put("subject", s))
