@@ -93,6 +93,7 @@ public class InfluxdbIT {
     }
 
     // login with admin/adminadmin
+    // View more | Buckets | testbucket
     private static void browserClient() throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
         String influxURL = String.format("http://localhost:%s", influxDBContainer.getMappedPort(INFLUXDB_PORT));

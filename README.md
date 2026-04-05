@@ -13,9 +13,11 @@ and [Pekko HTTP](https://pekko.apache.org/docs/pekko-http/current/) tutorials, b
 > **Akka vs Pekko**  
 > As
 > of [umbrella release 22.10](https://akka.io/blog/news/2022/10/26/akka-22.10-released?_ga=2.17010235.306775319.1666799105-66127885.1666682793)
-> Lightbend has changed the licensing model. [Apache Pekko](https://github.com/apache/incubator-pekko) is the open
-> source
-> alternative. A BIG Thank you to the committed Pekko committers.
+> Akka has changed the licensing model and then for
+> the [2.7.x release back to Apache 2.0](https://github.com/akka/akka-core/releases/tag/v2.7.0).
+>
+> [Apache Pekko](https://github.com/apache/incubator-pekko) is the open
+> source alternative. A BIG Thank you to the committed Pekko committers.
 >
 > For now the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
 > contains the migration (with a few losses). Currently, this is the only maintained branch.
