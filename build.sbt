@@ -6,14 +6,14 @@ version := "1.0"
 
 scalaVersion := "2.13.18"
 
-val pekkoVersion = "1.3.0"
+val pekkoVersion = "1.5.0"
 val pekkoHTTPVersion = "1.3.0"
-val pekkoConnectorVersion = "1.2.0"
+val pekkoConnectorVersion = "1.3.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
 
-val kafkaVersion = "3.9.0"
+val kafkaVersion = "3.9.2"
 val artemisVersion = "2.44.0"
-val testContainersVersion = "1.21.3"
+val testContainersVersion = "1.21.4"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.11.0"
