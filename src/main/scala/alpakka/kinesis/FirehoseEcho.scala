@@ -25,14 +25,13 @@ import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 /**
   * Show the possibilities of a "Firehose pipeline"; eg
   * producerClientFirehose()
-  * --> Elasticsearch -> Check entries manually via browserClient()
-  * +-> S3            -> Check via countFilesBucket()
+  * +-> S3 -> Check via countFilesBucket()
   *
-  * Run via [[alpakka.firehose.FirehoseEchoIT]] against localStack docker container
-  * Possible to run against AWS, after a all the resources are setup via console
+  * Run via [[alpakka.firehose.FirehoseEchoIT]] against ministack docker container
+  * Possible to run against AWS, after all the resources are setup via console
   *
   * Doc:
-  * https://docs.localstack.cloud/user-guide/aws/kinesis-firehose
+  * https://ministack.org
   * https://doc.akka.io/docs/alpakka/current/kinesis.html
   */
 class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), accessKey: String = "accessKey", secretKey: String = "secretKey", region: String = "us-east-1") {
@@ -106,7 +105,7 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
 }
 
 object FirehoseEcho extends App {
-  // Use to connect to localStack with default params, eg when localStack image is run via Cockpit
+  // Use to connect to ministack with default params, eg when ministack image is run via Cockpit
   val echo = new FirehoseEcho()
   echo.run()
 }

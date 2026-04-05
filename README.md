@@ -88,7 +88,7 @@ Examples of integrating AWS services with Pekko Connectors:
 * [S3Echo](src/main/scala/alpakka/s3/S3Echo.scala)
 
 Run them via the corresponding IT test classes locally
-in [localstack](https://github.com/localstack/localstack)/[minio](https://github.com/minio/minio) or against your AWS
+in [ministack](https://github.com/Nahuel990/ministack)/[minio](https://github.com/minio/minio) or against your AWS
 account.
 
 ### Other example resources

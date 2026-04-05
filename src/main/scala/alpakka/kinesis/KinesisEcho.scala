@@ -30,7 +30,7 @@ import scala.util.{Failure, Success}
   * Run this class against your AWS account using hardcoded accessKey/secretKey
   * Prerequisite: Create a "provisioned data stream" with 1 shard on AWS console
   * or
-  * Run via [[alpakka.kinesis.KinesisEchoIT]] against localStack docker container
+  * Run via [[alpakka.kinesis.KinesisEchoIT]] against ministack docker container
   *
   * Remarks:
   *  - No computation on the server side, just echo routing
@@ -39,7 +39,7 @@ import scala.util.{Failure, Success}
   *  - Be warned that running against AWS (and thus setting up resources) can cost you money
   *
   * Doc:
-  * https://doc.akka.io/docs/alpakka/current/kinesis.html
+  * https://ministack.org
   */
 class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secretKey: String = "", region: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -52,8 +52,8 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
   val batchSize = 10
 
   implicit val awsKinesisClient: KinesisAsyncClient = {
-    if (new UrlValidator().isValid(urlWithMappedPort.toString)) {
-      logger.info("Running against localStack on local container...")
+    if (new UrlValidator(UrlValidator.ALLOW_LOCAL_URLS).isValid(urlWithMappedPort.toString)) {
+      logger.info("Running against ministack on local container...")
       val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
 
       KinesisAsyncClient

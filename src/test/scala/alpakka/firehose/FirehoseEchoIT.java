@@ -5,79 +5,91 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container.ExecResult;
-import org.testcontainers.containers.localstack.LocalStackContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.http.SdkHttpClient;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.firehose.FirehoseClient;
+import software.amazon.awssdk.services.firehose.model.CreateDeliveryStreamRequest;
+import software.amazon.awssdk.services.firehose.model.CreateDeliveryStreamResponse;
+import software.amazon.awssdk.services.firehose.model.S3DestinationConfiguration;
 
-import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testcontainers.containers.localstack.LocalStackContainer.Service.*;
 
 /**
- * Setup/run {@link alpakka.kinesis.FirehoseEcho} on localStack container
+ * Setup/run {@link alpakka.kinesis.FirehoseEcho} on ministack container
  * <p>
  * Doc:
- * https://docs.localstack.cloud/user-guide/aws/kinesis-firehose
- * https://testcontainers.com/modules/localstack
+ * https://github.com/nahuelnucera/ministack
  */
 @Testcontainers
 public class FirehoseEchoIT {
     private static final Logger LOGGER = LoggerFactory.getLogger(FirehoseEchoIT.class);
-    private static final int LOCALSTACK_PORT = 4566;
+
+    private static final String ACCESS_KEY = "test";
+    private static final String SECRET_KEY = "test";
+    private static final String REGION = "us-east-1";
+
+    private static URI endpoint;
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:2.2"))
-            // TODO Localstack v3 has "strict service loading", see:
-            // https://github.com/localstack/localstack/releases/tag/v3.0.0
-            // However, ELASTICSEARCH is not yet available via Testcontainers
-            // see: org.testcontainers.containers.localstack.Service
-            // Add ELASTICSEARCH once it is accessible via Testcontainers
-            .withServices(FIREHOSE, S3, KINESIS)
-            // Make sure that init_firehose.sh is executable and has linux line separator (LF)
-            .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_firehose.sh", 700), "/etc/localstack/init/ready.d/init_firehose.sh")
-            // When Elasticsearch is ready it spits out this line in the log. Takes up to 240 seconds on a 2012 vintage MacBook Pro...
-            .waitingFor(Wait.forLogMessage(".*Active license is now \\[BASIC\\]; Security is disabled.*", 1).withStartupTimeout(Duration.ofSeconds(240)));
+    public static GenericContainer<?> ministack = new GenericContainer<>(DockerImageName.parse("nahuelnucera/ministack:latest"))
+            .withExposedPorts(4566)
+            .waitingFor(new HttpWaitStrategy()
+                    .forPath("/_ministack/health")
+                    .forPort(4566)
+                    .withStartupTimeout(Duration.ofSeconds(60)));
 
     @BeforeAll
-    public static void beforeAll() throws InterruptedException, IOException {
-        LOGGER.info("LocalStack container started on host address: {}", localStack.getEndpoint());
+    public static void beforeAll() throws Exception {
+        endpoint = URI.create("http://" + ministack.getHost() + ":" + ministack.getMappedPort(4566));
+        LOGGER.info("MiniStack container started on endpoint: {}", endpoint);
 
-        ExecResult result = localStack.execInContainer("awslocal", "firehose", "list-delivery-streams");
-        LOGGER.debug("Result exit code: {}", result.getExitCode());
-        LOGGER.info("Check streams on container: {}", result.getStdout());
+        // Create S3 bucket via Java HttpClient (S3 SDK is not on the classpath)
+        HttpClient httpClient = HttpClient.newHttpClient();
+        HttpResponse<String> s3Response = httpClient.send(
+                HttpRequest.newBuilder()
+                        .uri(URI.create(endpoint + "/kinesis-activity-backup-local"))
+                        .PUT(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        LOGGER.info("S3 bucket creation (status: {}): {}", s3Response.statusCode(), s3Response.body());
 
-        ExecResult results3 = localStack.execInContainer("awslocal", "s3", "ls");
-        LOGGER.debug("Result exit code: {}", results3.getExitCode());
-        LOGGER.info("Check buckets on container: {}", results3.getStdout());
-    }
-
-    private static void browserClient() throws IOException {
-        String os = System.getProperty("os.name").toLowerCase();
-        String elasticsearchEndpoint = String.format("http://es-local.us-east-1.es.localhost.localstack.cloud:%s/_search", localStack.getMappedPort(LOCALSTACK_PORT));
-        if (os.equals("mac os x")) {
-            String[] cmd = {"open", elasticsearchEndpoint};
-            Runtime.getRuntime().exec(cmd);
-        } else if (os.startsWith("windows")) {
-            String[] cmd = {"cmd /c start", elasticsearchEndpoint};
-            Runtime.getRuntime().exec(cmd);
-        } else {
-            LOGGER.info("Please open a browser at: {}", elasticsearchEndpoint);
+        // Create Firehose delivery stream with S3-only destination via SDK
+        SdkHttpClient sdkHttpClient = ApacheHttpClient.builder().build();
+        try (FirehoseClient firehose = FirehoseClient.builder()
+                .endpointOverride(endpoint)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
+                .region(Region.of(REGION))
+                .httpClient(sdkHttpClient)
+                .build()) {
+            CreateDeliveryStreamResponse response = firehose.createDeliveryStream(CreateDeliveryStreamRequest.builder()
+                    .deliveryStreamName("activity-to-elasticsearch-local")
+                    .s3DestinationConfiguration(S3DestinationConfiguration.builder()
+                            .roleARN("arn:aws:iam::000000000000:role/Firehose-Reader-Role")
+                            .bucketARN("arn:aws:s3:::kinesis-activity-backup-local")
+                            .build())
+                    .build());
+            LOGGER.info("Firehose delivery stream created: {}", response.deliveryStreamARN());
         }
     }
 
     @Test
     public void testLocal() {
-        FirehoseEcho firehoseEcho = new FirehoseEcho(localStack.getEndpointOverride(FIREHOSE), localStack.getAccessKey(), localStack.getSecretKey(), localStack.getRegion());
+        FirehoseEcho firehoseEcho = new FirehoseEcho(endpoint, ACCESS_KEY, SECRET_KEY, REGION);
         assertThat(firehoseEcho.run()).isEqualTo(10);
-
-        // Comment out to manually check Elasticsearch entries
-        //browserClient();
-        //Thread.sleep(1500000);
     }
 }

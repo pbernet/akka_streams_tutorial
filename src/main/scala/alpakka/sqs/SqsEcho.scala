@@ -24,7 +24,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
   *
   * Run this class against your AWS account using hardcoded accessKey/secretKey
   * or
-  * Run via [[alpakka.sqs.SqsEchoIT]] against localStack docker container
+  * Run via [[alpakka.sqs.SqsEchoIT]] against ministack docker container
   *
   * Remarks:
   * - For convenience we use the async `awsSqsClient` to create/delete the queue
@@ -32,7 +32,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/sqs.html
-  * https://docs.localstack.cloud/user-guide/aws/sqs
+  * https://ministack.org
   */
 class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secretKey: String = "", region: String = "") {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -43,8 +43,8 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
   private var queueUrl = ""
 
   implicit val awsSqsClient: SqsAsyncClient =
-    if (new UrlValidator().isValid(urlWithMappedPort.toString)) {
-      logger.info("Running against localStack on local container...")
+    if (new UrlValidator(UrlValidator.ALLOW_LOCAL_URLS).isValid(urlWithMappedPort.toString)) {
+      logger.info("Running against ministack on local container...")
       val credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
 
       SqsAsyncClient

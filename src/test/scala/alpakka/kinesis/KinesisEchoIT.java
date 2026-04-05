@@ -5,13 +5,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container.ExecResult;
-import org.testcontainers.containers.localstack.LocalStackContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.SdkHttpClient;
@@ -20,88 +18,95 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.*;
 
-import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testcontainers.containers.localstack.LocalStackContainer.Service.KINESIS;
 
 /**
- * Setup/run {@link alpakka.kinesis.KinesisEcho} on localStack container
+ * Setup/run {@link alpakka.kinesis.KinesisEcho} on ministack container
  * Use the classic sync AWS KinesisClient to create/delete streams
  * <p>
  * Doc:
- * https://testcontainers.com/modules/localstack
- * https://docs.localstack.cloud/user-guide/aws/kinesis
- * https://stackoverflow.com/questions/76106522/automatically-create-a-kinesis-data-stream-in-localstack-as-part-of-docker-compo
+ * https://github.com/NahuelNu/ministack
+ * https://docs.aws.amazon.com/kinesis/latest/dev/introduction.html
  */
 @Testcontainers
 public class KinesisEchoIT {
+    // MiniStack does not support CBOR binary encoding used by the Kinesis SDK.
+    // Must be set before any AWS SDK class is loaded.
+    static {
+        System.setProperty("aws.cborEnabled", "false");
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(KinesisEchoIT.class);
 
     private static final String STREAM_NAME = "kinesisDataStreamProvisioned";
 
+    private static final String ACCESS_KEY = "test";
+    private static final String SECRET_KEY = "test";
+    private static final String REGION = "us-east-1";
+
     private static KinesisClient kinesisClient;
+    private static URI endpoint;
 
     @Container
-    public static LocalStackContainer localStack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.3"))
-            .withServices(KINESIS)
-            // Make sure that init_kinesis.sh is executable and has linux line separator (LF)
-            .withCopyFileToContainer(MountableFile.forClasspathResource("/localstack/init_kinesis.sh", 700), "/etc/localstack/init/ready.d/init_kinesis.sh")
-    // Also works but is deprecated; The suffix :1 is the shard count
-    // see: https://docs.localstack.cloud/user-guide/aws/kinesis
-    //.withEnv("KINESIS_INITIALIZE_STREAMS", STREAM_NAME + ":1");
-            .waitingFor(Wait.forLogMessage(".*Starting persist data loop.*", 1).withStartupTimeout(Duration.ofSeconds(30)));
+    public static GenericContainer<?> ministack = new GenericContainer<>(DockerImageName.parse("nahuelnucera/ministack:latest"))
+            .withExposedPorts(4566)
+            .waitingFor(new HttpWaitStrategy()
+                    .forPath("/_ministack/health")
+                    .forPort(4566)
+                    .withStartupTimeout(Duration.ofSeconds(60)));
 
     @BeforeAll
-    public static void beforeAll() throws InterruptedException, IOException {
-        LOGGER.info("LocalStack container started on host address: {}", localStack.getEndpoint());
-
-        ExecResult result = localStack.execInContainer("awslocal", "kinesis", "list-streams");
-        LOGGER.debug("Result exit code: {}", result.getExitCode());
-        LOGGER.info("Check streams on container: {}", result.getStdout());
+    public static void beforeAll() {
+        endpoint = URI.create("http://" + ministack.getHost() + ":" + ministack.getMappedPort(4566));
+        LOGGER.info("MiniStack container started on endpoint: {}", endpoint);
 
         SdkHttpClient httpClient = ApacheHttpClient.builder().maxConnections(10).build();
-        //SdkHttpClient httpClientLightweight = UrlConnectionHttpClient.builder().build();
 
         kinesisClient = KinesisClient
                 .builder()
-                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(localStack.getAccessKey(), localStack.getSecretKey())))
-                .region(Region.of(localStack.getRegion()))
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
+                .region(Region.of(REGION))
                 .httpClient(httpClient)
-                .endpointOverride(localStack.getEndpoint())
+                .endpointOverride(endpoint)
                 .build();
 
+        createMainStream(kinesisClient);
         createStream(kinesisClient);
         checkStreams(kinesisClient);
     }
 
     @AfterAll
-    public static void afterAll() throws InterruptedException, IOException {
+    public static void afterAll() throws InterruptedException {
         deleteStream(kinesisClient);
-
-        ExecResult result = localStack.execInContainer("awslocal", "kinesis", "list-streams");
-        LOGGER.debug("Result exit code: {}", result.getExitCode());
-        LOGGER.info("Check streams on container: {}", result.getStdout());
     }
 
-    // This creates the additional stream, it is visible on the localstack container (see afterAll)
-    // However, the subsequent checkStreams() call does not show this, maybe due to caching in SDK?
+    private static void createMainStream(KinesisClient kinesisClient) {
+        CreateStreamRequest createStreamRequest = CreateStreamRequest
+                .builder()
+                .streamName(STREAM_NAME)
+                .shardCount(1)
+                .build();
+
+        try {
+            CreateStreamResponse createStreamResponse = kinesisClient.createStream(createStreamRequest);
+            LOGGER.info("createStreamResponse for main stream: {}", createStreamResponse.responseMetadata().toString());
+        } catch (ResourceInUseException ex) {
+            LOGGER.info("Stream: {} already exists. Proceed...", STREAM_NAME);
+        }
+    }
+
+    // This creates the additional stream
     private static void createStream(KinesisClient kinesisClient) {
         CreateStreamRequest createStreamRequest = CreateStreamRequest
                 .builder()
                 .streamName("kinesisDataStreamProvisioned_CreatedByClientSDK")
                 .shardCount(1)
-                .streamModeDetails(StreamModeDetails
-                        .builder()
-                        .streamMode(StreamMode.PROVISIONED)
-                        .build())
                 .build();
 
         try {
-            // The ARN stream name is scoped by the AWS account and the Region.
-            // That is, two streams in two different accounts can have the same name,
-            // and two streams in the same account, but in two different Regions, can have the same name.
             CreateStreamResponse createStreamResponse = kinesisClient.createStream(createStreamRequest);
             LOGGER.info("createStreamResponse: {}", createStreamResponse.responseMetadata().toString());
         } catch (ResourceInUseException ex) {
@@ -112,7 +117,7 @@ public class KinesisEchoIT {
     private static void checkStreams(KinesisClient kinesisClient) {
         LOGGER.info("Check streams via SDK");
         if (kinesisClient.listStreams().streamNames().isEmpty()) {
-            LOGGER.info("No Kinesis data stream(s) setup for region: {}", localStack.getRegion());
+            LOGGER.info("No Kinesis data stream(s) setup for region: {}", REGION);
         } else {
             kinesisClient.listStreams().streamNames().forEach(each -> {
                 DescribeStreamSummaryRequest describeStreamSummaryRequest = DescribeStreamSummaryRequest.builder().streamName(STREAM_NAME).build();
@@ -136,7 +141,7 @@ public class KinesisEchoIT {
 
     @Test
     public void testLocal() {
-        KinesisEcho kinesisEcho = new KinesisEcho(localStack.getEndpointOverride(KINESIS), localStack.getAccessKey(), localStack.getSecretKey(), localStack.getRegion());
+        KinesisEcho kinesisEcho = new KinesisEcho(endpoint, ACCESS_KEY, SECRET_KEY, REGION);
         Integer result = kinesisEcho.run();
         assertThat(result).isEqualTo(10);
     }

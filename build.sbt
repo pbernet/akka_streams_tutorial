@@ -123,7 +123,7 @@ libraryDependencies ++= Seq(
   "org.testcontainers" % "postgresql" % testContainersVersion,
   "org.testcontainers" % "influxdb" % testContainersVersion,
   "org.testcontainers" % "toxiproxy" % testContainersVersion,
-  "org.testcontainers" % "localstack" % testContainersVersion,
+
   "org.testcontainers" % "clickhouse" % testContainersVersion,
 
   "org.opensearch" % "opensearch-testcontainers" % "2.1.2",
