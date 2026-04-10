@@ -22,7 +22,7 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.12.2"
+val langchain4jVersion = "1.13.0"
 val mcpSdkVersion = "1.1.0"
 val doclingJavaVersion = "0.5.0"
 
@@ -147,10 +147,10 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
-  "dev.langchain4j" % "langchain4j-cohere" % "1.11.0-beta19",
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.11.0-beta19",
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.11.0-beta19",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.11.0-beta19",
+  "dev.langchain4j" % "langchain4j-cohere" % "1.11.6-beta19",
+  "dev.langchain4j" % "langchain4j-pgvector" % "1.11.6-beta19",
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.11.6-beta19",
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.11.6-beta19",
 
   "io.modelcontextprotocol.sdk" % "mcp-core" % mcpSdkVersion,
   "io.modelcontextprotocol.sdk" % "mcp-json-jackson2" % mcpSdkVersion,

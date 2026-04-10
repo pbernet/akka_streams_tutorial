@@ -174,9 +174,9 @@ class RagEngine(
     * optional reranking, and LLM inference. Returns both the generated answer and the
     * source chunks used for context.
     *
-    * Source attribution is always captured from the LoggingContentAggregator,
-    * which wraps either a ReRankingContentAggregator (when reranking is enabled)
-    * or a DefaultContentAggregator (passthrough). Each source chunk is marked
+    * Source attribution is always captured from the [[LoggingContentAggregator]],
+    * which wraps either a [[ReRankingContentAggregator]] (when reranking is enabled)
+    * or a [[DefaultContentAggregator]] (passthrough). Each source chunk is marked
     * with reranked=true if it survived Cohere reranking.
     *
     * @param query The question to ask
@@ -400,7 +400,7 @@ class RagEngine(
   }
 
   private def processWithDocling(path: Path, fileName: String): DocumentInfo = {
-    DoclingChunkingService.chunkToTextSegments(path, useMarkdownTables = false) match {
+    DoclingChunkingService.chunkToTextSegments(path) match {
       case Success(segments) if segments.nonEmpty =>
         logger.info(s"Docling chunked: $fileName into: ${segments.size} chunks (skipping local DocumentSplitter)")
         segments.zipWithIndex.foreach { case (segment, idx) =>
@@ -411,7 +411,7 @@ class RagEngine(
         val embeddings = embeddingModel.embedAll(segments.asJava).content()
         embeddingStore.addAll(embeddings, segments.asJava)
 
-        logger.info(s"Indexed file: $fileName with: ${segments.size} Docling chunks")
+        logger.info(s"Indexed file: $fileName with: ${segments.size} chunks")
         DocumentInfo(fileName, segments.size)
 
       case Success(_) =>

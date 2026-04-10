@@ -61,16 +61,13 @@ object DoclingChunkingService {
 
 
   /**
-    * Chunk document using Docling HierarchicalChunker with custom options.
-    *
-    * Conversion options (OCR disabled, dlparse_v4 backend) are passed per-request
-    * via ConvertDocumentOptions for optimal performance on digital PDFs.
+    * Chunk document using Docling [[HierarchicalChunker]] with custom options.
     *
     * @param path              Path to the document file
     * @param useMarkdownTables Whether to preserve tables as markdown format
     * @return Try containing list of chunks or failure
     */
-  def chunkWithHierarchical(path: Path, useMarkdownTables: Boolean): Try[List[DoclingChunk]] = {
+  private def chunkWithHierarchical(path: Path, useMarkdownTables: Boolean): Try[List[DoclingChunk]] = {
     val fileName = path.getFileName.toString
     logger.info(s"Chunking document via Docling HierarchicalChunker: $fileName (markdownTables=$useMarkdownTables)")
 
@@ -139,25 +136,16 @@ object DoclingChunkingService {
   }
 
   /**
-    * Chunk document using Docling HierarchicalChunker with default options.
-    * Delegates to the full-options version with useMarkdownTables=true.
+    * Chunk document using Docling:
+    * - HierarchicalChunker
+    * - HybridChunker: Pass maxTokens to limit chunk size (200-300 is a good range)
     *
     * @param path Path to the document file
-    * @return Try containing list of TextSegments or failure
+    * @return Try containing list of [[TextSegments]] ready for embedding or failure
     */
   def chunkToTextSegments(path: Path): Try[List[TextSegment]] = {
-    chunkToTextSegments(path, useMarkdownTables = true)
-  }
-
-  /**
-    * Chunk document using Docling HierarchicalChunker and convert to TextSegments.
-    *
-    * @param path              Path to the document file
-    * @param useMarkdownTables Whether to preserve tables as markdown format
-    * @return Try containing list of TextSegments ready for embedding or failure
-    */
-  def chunkToTextSegments(path: Path, useMarkdownTables: Boolean): Try[List[TextSegment]] = {
-    chunkWithHierarchical(path, useMarkdownTables).map(_.map(_.toTextSegment))
+    chunkWithHybrid(path, 300).map(_.map(_.toTextSegment))
+    //chunkWithHierarchical(path, false).map(_.map(_.toTextSegment))
   }
 
   private def parseChunkResponse(response: ai.docling.serve.api.chunk.response.ChunkDocumentResponse): List[DoclingChunk] = {
