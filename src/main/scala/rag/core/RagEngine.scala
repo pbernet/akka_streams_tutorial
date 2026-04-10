@@ -57,7 +57,7 @@ trait ChatAssistant {
   */
 case class RerankerConfig(
                            enabled: Boolean = false,
-                           minScore: Double = 0.1,
+                           minScore: Double = 0.01,
                            modelName: String = "rerank-english-v3.0"
                          )
 

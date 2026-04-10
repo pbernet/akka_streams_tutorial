@@ -528,27 +528,27 @@
             </div>
             <div class="config-content" id="config-content">
                 <div class="control-group">
-                    <label for="minScoreSlider">Relevance Threshold (minScore)</label>
+                    <label for="minScoreSlider">Relevance Threshold (minScore) — log scale</label>
                     <div class="slider-container">
                         <input
                                 type="range"
                                 id="minScoreSlider"
                                 min="0"
-                                max="1"
-                                step="0.05"
+                                max="100"
+                                step="1"
                                 value="0"
                         >
                         <span class="value-display" id="minScoreValue">-</span>
                     </div>
                     <div style="font-size: 11px; color: #888; margin-top: 5px;">
-                        Low (0.3): Keep more results | Mid (0.5): Balanced | High (0.7): Strict
+                        0.001: Keep almost all | 0.01: Balanced | 0.05: Strict | 0.1+: Very strict
                     </div>
                     <div class="preset-buttons">
-                        <button class="preset-btn" onclick="setPreset(0.3)">Permissive (0.3)</button>
-                        <button class="preset-btn" onclick="setPreset(0.4)">Lenient (0.4)</button>
-                        <button class="preset-btn" onclick="setPreset(0.5)">Balanced (0.5)</button>
-                        <button class="preset-btn" onclick="setPreset(0.6)">Strict (0.6)</button>
-                        <button class="preset-btn" onclick="setPreset(0.7)">Very Strict (0.7)</button>
+                        <button class="preset-btn" onclick="setPreset(0.001)">Permissive (0.001)</button>
+                        <button class="preset-btn" onclick="setPreset(0.005)">Lenient (0.005)</button>
+                        <button class="preset-btn" onclick="setPreset(0.01)">Balanced (0.01)</button>
+                        <button class="preset-btn" onclick="setPreset(0.05)">Strict (0.05)</button>
+                        <button class="preset-btn" onclick="setPreset(0.1)">Very Strict (0.1)</button>
                     </div>
                 </div>
 
@@ -597,6 +597,7 @@
 
 <script>
     let isProcessing = false;
+    let configDirty = false;
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function () {
@@ -611,10 +612,36 @@
 
         const slider = document.getElementById('minScoreSlider');
         slider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            document.getElementById('minScoreValue').textContent = value.toFixed(2);
+            configDirty = true;
+            const minScore = sliderToMinScore(parseFloat(e.target.value));
+            document.getElementById('minScoreValue').textContent = formatMinScore(minScore);
+        });
+
+        document.getElementById('enableReranking').addEventListener('change', () => {
+            configDirty = true;
         });
     });
+
+    // Log-scale conversion: slider position [0..100] <-> minScore [0.001..0.2]
+    const MIN_SCORE_LOW = 0.001;
+    const MIN_SCORE_HIGH = 0.2;
+
+    function sliderToMinScore(pos) {
+        // pos 0..100 -> minScore 0.001..0.2 (logarithmic)
+        return MIN_SCORE_LOW * Math.pow(MIN_SCORE_HIGH / MIN_SCORE_LOW, pos / 100);
+    }
+
+    function minScoreToSlider(minScore) {
+        // minScore 0.001..0.2 -> pos 0..100
+        const clamped = Math.max(MIN_SCORE_LOW, Math.min(MIN_SCORE_HIGH, minScore));
+        return 100 * Math.log(clamped / MIN_SCORE_LOW) / Math.log(MIN_SCORE_HIGH / MIN_SCORE_LOW);
+    }
+
+    function formatMinScore(value) {
+        if (value < 0.01) return value.toFixed(4);
+        if (value < 0.1) return value.toFixed(3);
+        return value.toFixed(2);
+    }
 
     function toggleConfig() {
         const content = document.getElementById('config-content');
@@ -624,12 +651,12 @@
     }
 
     function setPreset(value) {
-        document.getElementById('minScoreSlider').value = value;
-        document.getElementById('minScoreValue').textContent = value.toFixed(2);
+        document.getElementById('minScoreSlider').value = minScoreToSlider(value);
+        document.getElementById('minScoreValue').textContent = formatMinScore(value);
     }
 
     async function applyConfiguration() {
-        const minScore = parseFloat(document.getElementById('minScoreSlider').value);
+        const minScore = sliderToMinScore(parseFloat(document.getElementById('minScoreSlider').value));
         const enabled = document.getElementById('enableReranking').checked;
         const statusDiv = document.getElementById('configStatus');
         const applyBtn = event.target;
@@ -653,8 +680,9 @@
             }
 
             const data = await response.json();
+            configDirty = false;
             statusDiv.className = 'config-status success';
-            statusDiv.textContent = `✅ Configuration applied: minScore=${minScore.toFixed(2)}, enabled=${enabled}`;
+            statusDiv.textContent = `✅ Configuration applied: minScore=${formatMinScore(minScore)}, enabled=${enabled}`;
 
             setTimeout(() => {
                 statusDiv.className = 'config-status';
@@ -697,10 +725,10 @@
                 statusText.textContent = 'No documents indexed';
             }
 
-            // Sync reranker config controls from backend
-            if (data.rerankerMinScore !== undefined) {
-                document.getElementById('minScoreSlider').value = data.rerankerMinScore;
-                document.getElementById('minScoreValue').textContent = data.rerankerMinScore.toFixed(2);
+            // Sync reranker config controls from backend (skip if user is editing)
+            if (data.rerankerMinScore !== undefined && !configDirty) {
+                document.getElementById('minScoreSlider').value = minScoreToSlider(data.rerankerMinScore);
+                document.getElementById('minScoreValue').textContent = formatMinScore(data.rerankerMinScore);
                 document.getElementById('enableReranking').checked = data.rerankerEnabled;
             }
         } catch (error) {
