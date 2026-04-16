@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         # https://github.com/coursier/setup-action
       - name: Set up JDK 17
-        uses: coursier/setup-action@v1
+        uses: coursier/setup-action@v3
         with:
           jvm: 17
           apps: sbtn
