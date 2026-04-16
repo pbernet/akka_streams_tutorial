@@ -8,8 +8,10 @@ import java.nio.file.Files
 
 class SrtParserSpec extends AnyFunSuite with Matchers {
 
+  private val sourceFilePath = "src/main/resources/EN_challenges.srt"
+
   test("parse valid srt file") {
-    val parser = new SrtParser("src/main/resources/EN_challenges.srt")
+    val parser = new SrtParser(sourceFilePath)
     val blocks = parser.runSync()
 
     blocks.nonEmpty shouldBe true
@@ -77,6 +79,50 @@ class SrtParserSpec extends AnyFunSuite with Matchers {
 
     assertThrows[java.time.format.DateTimeParseException] {
       parser.runSync()
+    }
+  }
+
+  test("timeShift forward shifts all timestamps by positive offset") {
+    val targetFile = Files.createTempFile("shifted_forward", ".srt")
+    targetFile.toFile.deleteOnExit()
+    val shiftBy = 5000L // 5 seconds forward
+
+    val parser = new SrtParser(sourceFilePath)
+    parser.timeShift(targetFile.toString, shiftBy)
+
+    val shiftedParser = new SrtParser(targetFile.toString)
+    val shiftedBlocks = shiftedParser.runSync()
+
+    val originalParser = new SrtParser(sourceFilePath)
+    val originalBlocks = originalParser.runSync()
+
+    shiftedBlocks.size shouldBe originalBlocks.size
+    shiftedBlocks.zip(originalBlocks).foreach { case (shifted, original) =>
+      shifted.start shouldBe original.start + shiftBy
+      shifted.end shouldBe original.end + shiftBy
+      shifted.lines shouldBe original.lines
+    }
+  }
+
+  test("timeShift backward shifts all timestamps by negative offset") {
+    val targetFile = Files.createTempFile("shifted_backward", ".srt")
+    targetFile.toFile.deleteOnExit()
+    val shiftBy = -1000L // 1 second backward
+
+    val parser = new SrtParser(sourceFilePath)
+    parser.timeShift(targetFile.toString, shiftBy)
+
+    val shiftedParser = new SrtParser(targetFile.toString)
+    val shiftedBlocks = shiftedParser.runSync()
+
+    val originalParser = new SrtParser(sourceFilePath)
+    val originalBlocks = originalParser.runSync()
+
+    shiftedBlocks.size shouldBe originalBlocks.size
+    shiftedBlocks.zip(originalBlocks).foreach { case (shifted, original) =>
+      shifted.start shouldBe Math.max(0, original.start + shiftBy)
+      shifted.end shouldBe Math.max(0, original.end + shiftBy)
+      shifted.lines shouldBe original.lines
     }
   }
 }

@@ -2,11 +2,12 @@ package tools
 
 import org.apache.commons.lang3.StringUtils
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.scaladsl.{Framing, Sink, Source, StreamConverters}
+import org.apache.pekko.stream.scaladsl.{FileIO, Framing, Sink, Source, StreamConverters}
 import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.FileInputStream
+import java.nio.file.Paths
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalTime}
 import scala.concurrent.duration.DurationInt
@@ -55,6 +56,24 @@ class SrtParser(sourceFilePath: String) {
     system.terminate()
     result
   }
+
+  /**
+    * Shift all timestamps by the given offset and write the result to targetFilePath.
+    *
+    * @param targetFilePath path of the output .srt file
+    * @param shiftBy        offset in milliseconds (positive = forward, negative = backward)
+    */
+  def timeShift(targetFilePath: String, shiftBy: Long): Unit = {
+    val ioResultFut = source
+      .map(block => block.copy(start = Math.max(0, block.start + shiftBy), end = Math.max(0, block.end + shiftBy)))
+      .zipWithIndex
+      .map { case (block, idx) => ByteString(block.formatOutBlock(idx + 1), "UTF-8") }
+      .runWith(FileIO.toPath(Paths.get(targetFilePath)))
+
+    val ioResult = Await.result(ioResultFut, 10.seconds)
+    system.terminate()
+    logger.info(s"Wrote: ${ioResult.count} bytes to: $targetFilePath")
+  }
 }
 
 object SrtParser extends App {
@@ -65,6 +84,11 @@ object SrtParser extends App {
   logger.info(s"Blocks: $result")
 
   def apply(sourceFilePath: String): SrtParser = new SrtParser(sourceFilePath)
+
+  def timeShift(sourceFilePath: String, targetFilePath: String, shiftBy: Long): Unit = {
+    val parser = new SrtParser(sourceFilePath)
+    parser.timeShift(targetFilePath, shiftBy)
+  }
 }
 
 case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
