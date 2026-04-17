@@ -24,7 +24,7 @@ val circeVersion = "0.14.14"
 
 val langchain4jVersion = "1.13.0"
 val mcpSdkVersion = "1.1.0"
-val doclingJavaVersion = "0.5.0"
+val doclingJavaVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
