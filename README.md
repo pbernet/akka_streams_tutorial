@@ -49,7 +49,8 @@ Install [sbt](https://www.scala-sbt.org/download) and [Docker](https://www.docke
 
 Each example class contains instructions on how to run it from the IDE. Most examples are throttled and provide a
 verbose log,
-by searching the log you see what is happening. Some examples deliberately throw `RuntimeException` eg to show recovery
+by searching the log you see what is happening. Some examples deliberately throw `RuntimeException` e.g. to show
+recovery
 behaviour.
 
 ## Examples Overview
@@ -68,7 +69,7 @@ stateless, the samples in
 package [sample.stream_shared_state](src/main/scala/sample/stream_shared_state) show some trickier stateful
 operators in action.
 
-The `*Echo` example series implement round trips eg [HttpFileEcho](src/main/scala/akkahttp/HttpFileEcho.scala)
+The `*Echo` example series implement round trips e.g. [HttpFileEcho](src/main/scala/akkahttp/HttpFileEcho.scala)
   and [WebsocketEcho](src/main/scala/akkahttp/WebsocketEcho.scala)
 
 Using [testcontainers](https://www.testcontainers.org) allows running realistic integration test scenarios with just one
@@ -186,19 +187,20 @@ The class [WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/W
 the following workflow:
 
 Use the `title` as identifier to fetch the `extract` from the Wikipedia API,
-eg
+e.g.
 for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
 
-Local NER processing on the `extract` / `content`
-using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html)
-yields `personsFoundLocal`, which are then added to the `wikipediaedits` Elasticsearch/Opensearch Index.
+NER processing on the `extract` / `content`
 
-Also, do remote NER processing on the `extract` / `content` using OpenAI `GPT_4_O_MINI` to obtain `personsFoundRemote`.
+* Local using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html) / GLiNER -> `personsFoundLocal`
+* Remote using OpenAI `GPT_4_O_MINI` -> `personsFoundRemote`
 
-All persons found (local and remote) can be viewed in the Index with a Browser, eg
+processed content is added to the `wikipediaedits` Opensearch Index.
+
+All persons found (local and remote) can be viewed in the Index with a Browser, e.g.
 `http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFoundLocal:*`
 
-All `content` is also transformed into embeddings using [LangChain4j](https://docs.langchain4j.dev)
+Also, all `content` is transformed into embeddings using [LangChain4j](https://docs.langchain4j.dev)
 `BgeSmallEnV15QuantizedEmbeddingModel` to a local
 `InMemoryEmbeddingStore` to be able to RAG chat against the `content` of the currently edited Wikipedia pages via a
 local AI Assistant `http://localhost:8080/assistant`
@@ -213,3 +215,28 @@ Pekko streams helps with:
 * Scene splitting to `session windows`. All blocks of a scene are grouped in one session and then translated in one API call
 * Throttling to not exceed the [OpenAI API rate limits](https://platform.openai.com/docs/guides/rate-limits?context=tier-free)
 * Continuous writing of translated blocks to the target file to avoid data loss on NW failure
+
+## Local RAG Chat with PDF docs ##
+
+[LocalRagApplication](src/main/scala/rag/app/LocalRagApplication.scala) launches a RAG
+system ([RagEngine](src/main/scala/rag/core/RagEngine.scala)) that indexes local
+PDF documents into a PostgreSQL/pgvector store and serves two interfaces:
+
+* **Web Chat UI** at `http://localhost:8090/rag` — interactive Q&A with source attribution and
+  optional [Cohere reranking](https://docs.cohere.com/docs/rerank-2)
+* **MCP Server** at `http://localhost:8091/mcp` — exposes the RAG chat
+  as [Model Context Protocol](https://modelcontextprotocol.io) tools to use with Claude, Amp, etc.
+
+Ingestion pipeline: Local PDF files → Docling HybridChunker → BGE-small-en embedding → pgvector
+
+Retrieval pipeline: Request → pgvector similarity search → optional Cohere reranking → OpenAI GPT-4o-mini answer
+generation
+
+Requires running local PostgreSQL Docker instance with pgvector and docling-serve (
+see [docker/docker-compose-rag.yml](docker/docker-compose-rag.yml))
+
+The default local PDF files are 3 downloaded publications form https://cartographicperspectives.org. Relevant requests
+are:
+
+* What is the definition of a map?
+* Is there an article about 9/11?

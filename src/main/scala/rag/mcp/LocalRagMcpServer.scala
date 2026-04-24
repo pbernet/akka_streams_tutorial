@@ -150,7 +150,7 @@ object LocalRagMcpServer {
                 val author = src.author.getOrElse("Unknown")
                 val title = src.title.map(t => s" - $t").getOrElse("")
                 val preview = src.chunkText.take(100).trim.replace("\n", " ")
-                f"${idx + 1}. ${src.fileName}$title (Author: $author, Pages: ${src.pageCount}, Relevance: ${src.similarity}%.2f)\n   Preview: $preview..."
+                f"${idx + 1}. ${src.fileName}$title (Author: $author, Pages: ${src.pageCount}, Relevance: ${src.score}%.2f)\n   Preview: $preview..."
               }
               s"\n\n## Sources Used\n${sourceLines.mkString("\n\n")}"
             } else {
@@ -220,7 +220,7 @@ object LocalRagMcpServer {
                   |    "fileName": "${src.fileName}",
                   |    "pageCount": ${src.pageCount},
                   |    "chunkIndex": ${src.chunkIndex},
-                  |    "similarity": ${f"${src.similarity}%.4f"},
+                  |    "score": ${f"${src.score}%.4f"},
                   |    "title": ${src.title.map(t => s""""$t"""").getOrElse("null")},
                   |    "author": ${src.author.map(a => s""""$a"""").getOrElse("null")},
                   |    "creationDate": ${src.creationDate.map(d => s""""$d"""").getOrElse("null")},

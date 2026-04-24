@@ -401,6 +401,20 @@
             font-style: italic;
             font-size: 0.9em;
             line-height: 1.4;
+            max-height: 3.6em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .page-link {
+            color: #667eea;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .page-link:hover {
+            color: #764ba2;
         }
 
         .typing-indicator {
@@ -507,6 +521,123 @@
             font-size: 13px;
         }
 
+        /* PDF Viewer Panel */
+        .pdf-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .pdf-overlay.open {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pdf-panel {
+            background: white;
+            width: 85%;
+            height: 90%;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .pdf-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .pdf-panel-header span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pdf-close-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .pdf-close-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .pdf-panel-body {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            background: #525659;
+            padding: 10px;
+        }
+
+        .pdf-panel-body canvas {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: block;
+        }
+
+        #pdf-highlight-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .pdf-highlight {
+            position: absolute;
+            background: rgba(255, 234, 0, 0.35);
+            border-radius: 2px;
+        }
+
+        .pdf-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pdf-nav button {
+            padding: 4px 12px;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+
+        .pdf-nav span {
+            font-size: 13px;
+            min-width: 80px;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
@@ -595,6 +726,32 @@
 
 </div>
 
+<!-- PDF Viewer Overlay -->
+<div class="pdf-overlay" id="pdf-overlay" onclick="if(event.target===this)closePdfViewer()">
+    <div class="pdf-panel">
+        <div class="pdf-panel-header">
+            <span id="pdf-viewer-title">PDF Viewer</span>
+            <div class="pdf-nav">
+                <button onclick="pdfGoToPage(pdfState.currentPage-1)">◀ Prev</button>
+                <span id="pdf-page-info"></span>
+                <button onclick="pdfGoToPage(pdfState.currentPage+1)">Next ▶</button>
+            </div>
+            <button class="pdf-close-btn" onclick="closePdfViewer()">✕</button>
+        </div>
+        <div class="pdf-panel-body" id="pdf-panel-body">
+            <div id="pdf-canvas-wrapper" style="position:relative;display:inline-block;">
+                <canvas id="pdf-canvas"></canvas>
+                <div id="pdf-highlight-layer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
 <script>
     let isProcessing = false;
     let configDirty = false;
@@ -853,10 +1010,10 @@
                                 <div class="source-item">
                                     <div class="source-header">
                                         <span class="source-file">${src.reranked ? '⭐ ' : ''}📄 ${escapeHtml(src.fileName)}</span>
-                                        <span class="source-score">${(src.similarity * 100).toFixed(0)}% match</span>
+                                        <span class="source-score">${(src.score * 100).toFixed(0)}% match</span>
                                     </div>
                                     <div class="source-meta">
-                                        ${src.author ? `Author: ${escapeHtml(src.author)} • ` : ''}${src.pageNumbers && src.pageNumbers.length > 0 ? `Page(s): ${src.pageNumbers.join(', ')}` : ''}
+                                        ${src.author ? `Author: ${escapeHtml(src.author)} • ` : ''}${src.pageNumbers && src.pageNumbers.length > 0 ? `Page(s): ${src.pageNumbers.map(p => `<a href="#" data-preview="${encodeURIComponent(src.preview)}" onclick="event.preventDefault();openPdfViewer('${escapeHtml(src.fileName)}',${p},this.dataset.preview)" class="page-link" title="Open PDF at page ${p}">${p}</a>`).join(', ')}` : ''}
                                     </div>
                                     <div class="source-preview">"${escapeHtml(src.preview)}"</div>
                                 </div>
@@ -887,6 +1044,164 @@
     function scrollToBottom() {
         const messagesContainer = document.getElementById('chat-messages');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    const pdfState = {doc: null, currentPage: 1, totalPages: 0, rendering: false, searchText: ''};
+
+    function normalizeText(text) {
+        return text.replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    async function openPdfViewer(fileName, page, encodedPreview) {
+        let preview = encodedPreview ? decodeURIComponent(encodedPreview) : '';
+        // Strip trailing "..." from truncated previews
+        if (preview.endsWith('...')) preview = preview.slice(0, -3);
+        pdfState.searchText = preview;
+
+        const url = `/rag/pdf/${encodeURIComponent(fileName)}`;
+        document.getElementById('pdf-viewer-title').textContent = `📄 ${fileName}`;
+        document.getElementById('pdf-overlay').classList.add('open');
+
+        try {
+            const doc = await pdfjsLib.getDocument(url).promise;
+            pdfState.doc = doc;
+            pdfState.totalPages = doc.numPages;
+            await pdfGoToPage(Math.min(page, doc.numPages));
+        } catch (err) {
+            console.error('Error loading PDF:', err);
+            document.getElementById('pdf-page-info').textContent = 'Load error';
+        }
+    }
+
+    async function pdfGoToPage(pageNum) {
+        if (!pdfState.doc || pdfState.rendering) return;
+        pageNum = Math.max(1, Math.min(pageNum, pdfState.totalPages));
+        pdfState.currentPage = pageNum;
+        pdfState.rendering = true;
+
+        document.getElementById('pdf-page-info').textContent = `${pageNum} / ${pdfState.totalPages}`;
+        document.getElementById('pdf-highlight-layer').innerHTML = '';
+
+        try {
+            const page = await pdfState.doc.getPage(pageNum);
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+            const scale = 1.5;
+            const viewport = page.getViewport({scale});
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({canvasContext: context, viewport}).promise;
+
+            if (pdfState.searchText) {
+                await highlightTextOnPage(page, viewport);
+            }
+        } catch (err) {
+            console.error('Error rendering page:', err);
+        } finally {
+            pdfState.rendering = false;
+        }
+    }
+
+    async function highlightTextOnPage(page, viewport) {
+        const textContent = await page.getTextContent();
+        const items = textContent.items;
+
+        // Build concatenated text with mapping back to items
+        let fullText = '';
+        const itemMap = []; // for each char in fullText, which item index + char offset
+
+        for (let i = 0; i < items.length; i++) {
+            const str = items[i].str;
+            for (let c = 0; c < str.length; c++) {
+                itemMap.push({itemIdx: i, charIdx: c});
+                fullText += str[c];
+            }
+            // Add space between items
+            itemMap.push(null);
+            fullText += ' ';
+        }
+
+        const normalizedFull = normalizeText(fullText);
+        const normalizedSearch = normalizeText(pdfState.searchText);
+        if (!normalizedSearch) return;
+
+        // Extract word n-grams (phrases of N consecutive words) from search text
+        const searchWords = normalizedSearch.split(/\s+/);
+        const NGRAM_SIZE = 4;
+        const phrases = [];
+        for (let i = 0; i <= searchWords.length - NGRAM_SIZE; i++) {
+            phrases.push(searchWords.slice(i, i + NGRAM_SIZE).join(' '));
+        }
+        // Fallback for very short search text
+        if (phrases.length === 0 && searchWords.length >= 2) {
+            phrases.push(searchWords.join(' '));
+        }
+
+        // Find all item indices that are part of any matching phrase
+        const highlightLayer = document.getElementById('pdf-highlight-layer');
+        const matchedItems = new Set();
+
+        for (const phrase of phrases) {
+            let searchFrom = 0;
+            while (true) {
+                const matchIdx = normalizedFull.indexOf(phrase, searchFrom);
+                if (matchIdx === -1) break;
+                const matchEnd = matchIdx + phrase.length;
+
+                // Map normalized positions back to original fullText positions
+                let normIdx = 0, origStart = -1, origEnd = -1;
+                const origLower = fullText.toLowerCase();
+                for (let i = 0; i < origLower.length && normIdx <= matchEnd; i++) {
+                    if (origLower[i] === ' ' && i > 0 && origLower[i - 1] === ' ') continue;
+                    if (normIdx === matchIdx) origStart = i;
+                    normIdx++;
+                    if (normIdx === matchEnd) {
+                        origEnd = i + 1;
+                        break;
+                    }
+                }
+
+                if (origStart !== -1 && origEnd !== -1) {
+                    for (let i = origStart; i < origEnd; i++) {
+                        const mapping = itemMap[i];
+                        if (mapping) matchedItems.add(mapping.itemIdx);
+                    }
+                }
+                searchFrom = matchIdx + 1;
+            }
+        }
+
+        if (matchedItems.size === 0) return;
+
+        for (const idx of matchedItems) {
+            const item = items[idx];
+            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+            const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+            const x = tx[4];
+            const y = tx[5] - fontHeight;
+            const width = item.width * viewport.scale;
+
+            const div = document.createElement('div');
+            div.className = 'pdf-highlight';
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            div.style.width = width + 'px';
+            div.style.height = (fontHeight + 2) + 'px';
+            highlightLayer.appendChild(div);
+        }
+
+        // Scroll first highlight into view
+        const firstHighlight = highlightLayer.querySelector('.pdf-highlight');
+        if (firstHighlight) {
+            firstHighlight.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    }
+
+    function closePdfViewer() {
+        document.getElementById('pdf-overlay').classList.remove('open');
+        document.getElementById('pdf-highlight-layer').innerHTML = '';
+        pdfState.doc = null;
+        pdfState.searchText = '';
     }
 </script>
 </body>

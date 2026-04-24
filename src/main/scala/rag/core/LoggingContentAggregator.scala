@@ -92,7 +92,7 @@ class LoggingContentAggregator(delegate: ContentAggregator, reranking: Boolean) 
         pageCount = pageCount,
         chunkIndex = idx,
         chunkText = text,
-        similarity = Try(Option(metadata.getString("similarity")).getOrElse("0.0").toDouble).getOrElse(0.0),
+        score = Try(Option(metadata.getString("score")).getOrElse("0.0").toDouble).getOrElse(0.0),
         title = title,
         author = author,
         creationDate = creationDate,

@@ -137,8 +137,8 @@ object DoclingChunkingService {
 
   /**
     * Chunk document using Docling:
-    * - HierarchicalChunker
     * - HybridChunker: Pass maxTokens to limit chunk size (200-300 is a good range)
+    * - HierarchicalChunker
     *
     * @param path Path to the document file
     * @return Try containing list of [[TextSegments]] ready for embedding or failure

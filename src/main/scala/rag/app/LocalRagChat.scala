@@ -78,8 +78,8 @@ object LocalRagChat {
                             SourceSummary(
                               fileName = src.fileName,
                               author = src.author,
-                              similarity = src.similarity,
-                              preview = src.chunkText.take(150).trim + (if (src.chunkText.length > 150) "..." else ""),
+                              score = src.score,
+                              preview = src.chunkText.take(500).trim + (if (src.chunkText.length > 500) "..." else ""),
                               pageNumbers = src.pageNumbers,
                               reranked = src.reranked
                             )
@@ -184,6 +184,17 @@ object LocalRagChat {
             get {
               val status = ragEngine.getStatus
               complete(HttpEntity(ContentTypes.`application/json`, status.asJson.noSpaces))
+            }
+          },
+          path("pdf" / Segment) { fileName =>
+            get {
+              val docsPath = sys.env.getOrElse("DOCUMENTS_PATH", "src/main/resources/content")
+              val pdfFile = Paths.get(docsPath).resolve(fileName).toFile
+              if (pdfFile.exists() && pdfFile.getName.toLowerCase.endsWith(".pdf")) {
+                getFromFile(pdfFile, MediaTypes.`application/pdf`)
+              } else {
+                complete(StatusCodes.NotFound -> s"""{"error": "PDF not found: $fileName"}""")
+              }
             }
           },
           pathEndOrSingleSlash {

@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory
 import scala.jdk.CollectionConverters.*
 
 /**
-  * ContentRetriever that injects each match's embedding similarity score into
-  * the TextSegment metadata under the key "similarity", so it survives through
+  * ContentRetriever that injects each match's embedding score into
+  * the TextSegment metadata under the key "score", so it survives through
   * ContentAggregator pipelines (including Cohere reranking) for source attribution.
   */
 class ScoringContentRetriever(
@@ -37,7 +37,7 @@ class ScoringContentRetriever(
 
     matches.map { match_ =>
       val segment = match_.embedded()
-      segment.metadata().put("similarity", match_.score().toString)
+      segment.metadata().put("score", match_.score().toString)
       Content.from(segment)
     }.asJava
   }

@@ -263,7 +263,7 @@ class RagEngine(
           pageCount = Try(Option(metadata.getString("pageCount")).getOrElse("0").toInt).getOrElse(0),
           chunkIndex = idx,
           chunkText = segment.text(),
-          similarity = match_.score(),
+          score = match_.score(),
           title = Option(metadata.getString("title")),
           author = Option(metadata.getString("author")),
           creationDate = Option(metadata.getString("creationDate")),

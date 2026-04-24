@@ -8,7 +8,7 @@ package rag.core
   * @param pageCount    Total number of pages in the source document
   * @param chunkIndex   Index of this chunk within the document (0-based)
   * @param chunkText    The actual text content of the chunk
-  * @param similarity   Relevance score from embedding search (0.0 to 1.0)
+  * @param score        Relevance score from embedding search (0.0 to 1.0)
   * @param title        Document title if available
   * @param author       Document author if available
   * @param creationDate Document creation date if available
@@ -21,7 +21,7 @@ case class SourceChunk(
                         pageCount: Int,
                         chunkIndex: Int,
                         chunkText: String,
-                        similarity: Double,
+                        score: Double,
                         title: Option[String] = None,
                         author: Option[String] = None,
                         creationDate: Option[String] = None,
@@ -65,7 +65,7 @@ case class RichChatResponse(
   *
   * @param fileName    Name of the source PDF
   * @param author      Document author if available
-  * @param similarity  Relevance score (0-1)
+  * @param score       Relevance score (0-1)
   * @param preview     First N characters of the chunk for preview
   * @param pageNumbers Page numbers this chunk spans (from Docling chunking); Nil for Tika-parsed documents
   * @param reranked    Whether this chunk survived Cohere reranking
@@ -73,7 +73,7 @@ case class RichChatResponse(
 case class SourceSummary(
                           fileName: String,
                           author: Option[String],
-                          similarity: Double,
+                          score: Double,
                           preview: String,
                           pageNumbers: List[Int] = Nil,
                           reranked: Boolean = false
