@@ -6,15 +6,10 @@ import rag.core.RagEngineProvider
 import rag.mcp.LocalRagMcpServer
 
 /**
-  * Unified launcher for both RAG Chat and MCP Server.
-  * Runs both servers in the same JVM to share the RagEngine singleton.
+  * Launcher for both RAG Chat and MCP Server
+  * Runs both servers in the same JVM to share the [[rag.core.RagEngine]] singleton
   *
-  * This ensures:
-  * - Only one RagEngine instance is created and initialized
-  * - Both HTTP servers share the same RAG engine, embeddings, and database connection
-  * - Efficient resource usage and consistent state across both interfaces
-  *
-  * Servers started:
+  * Endpoints:
   * - RAG Chat HTTP Server: http://localhost:8090/rag (Web UI + REST API)
   * - MCP Server: http://localhost:8091/mcp (Model Context Protocol for Claude Desktop, etc.)
   */

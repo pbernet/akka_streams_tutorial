@@ -62,6 +62,7 @@ Featured examples with complex workflows:
 * [HL7 V2 over TCP via Kafka to Websockets](#hl7-v2-over-tcp-via-kafka-to-websockets)
 * [Analyse Wikipedia edits live stream](#analyse-wikipedia-edits-live-stream)
 * [Movie subtitle translation via LLMs](#movie-subtitle-translation-via-llms)
+* [Local RAG chat with PDF docs](#local-rag-chat-with-pdf-docs)
 
 Many examples deal with shared state management. While most Pekko
 Streams [operators](https://pekko.apache.org/docs/pekko/current/stream/operators/index.html) are
@@ -216,27 +217,26 @@ Pekko streams helps with:
 * Throttling to not exceed the [OpenAI API rate limits](https://platform.openai.com/docs/guides/rate-limits?context=tier-free)
 * Continuous writing of translated blocks to the target file to avoid data loss on NW failure
 
-## Local RAG Chat with PDF docs ##
+## Local RAG chat with PDF docs ##
 
 [LocalRagApplication](src/main/scala/rag/app/LocalRagApplication.scala) launches a RAG
 system ([RagEngine](src/main/scala/rag/core/RagEngine.scala)) that indexes local
-PDF documents into a PostgreSQL/pgvector store and serves two interfaces:
+PDF documents into a PostgreSQL/pgvector store and serves two endpoints:
 
-* **Web Chat UI** at `http://localhost:8090/rag` — interactive Q&A with source attribution and
+* **Web Chat UI** at `http://localhost:8090/rag` - interactive Q&A with source attribution and
   optional [Cohere reranking](https://docs.cohere.com/docs/rerank-2)
-* **MCP Server** at `http://localhost:8091/mcp` — exposes the RAG chat
+* **MCP Server** at `http://localhost:8091/mcp` - RAG chat
   as [Model Context Protocol](https://modelcontextprotocol.io) tools to use with Claude, Amp, etc.
 
 Ingestion pipeline: Local PDF files → Docling HybridChunker → BGE-small-en embedding → pgvector
 
-Retrieval pipeline: Request → pgvector similarity search → optional Cohere reranking → OpenAI GPT-4o-mini answer
-generation
+Retrieval pipeline: Request → pgvector similarity search → optional Cohere reranking → LLM answer generation
 
-Requires running local PostgreSQL Docker instance with pgvector and docling-serve (
-see [docker/docker-compose-rag.yml](docker/docker-compose-rag.yml))
+Requires running local Docker instances PostgreSQL with pgvector and docling-serve (
+see [docker/docker-compose-rag.yml](docker/docker-compose-rag.yml)) as well as env vars `OPENAI_API_KEY`,
+`COHERE_API_KEY` (see [RagEngine](src/main/scala/rag/core/RagEngine.scala))
 
-The default local PDF files are 3 downloaded publications form https://cartographicperspectives.org. Relevant requests
-are:
+The default local PDF files are 3 downloaded publications form https://cartographicperspectives.org. Suitable prompts:
 
 * What is the definition of a map?
 * Is there an article about 9/11?

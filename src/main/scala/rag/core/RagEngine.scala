@@ -63,30 +63,24 @@ case class RerankerConfig(
 
 
 /**
-  * Core RAG Engine for document indexing and question answering.
+  * RAG Engine for document indexing and question answering.
   *
   * RagEngine manages document indexing, embedding storage,
   * semantic search with optional reranking, and LLM-powered question answering.
   * It uses PostgreSQL with pgvector for embedding storage
-  * Supported document formats: PDF, DOCX, DOC, TXT
+  * Supported document formats: PDF (DOCX, DOC, TXT)
   *
-  * Internal Retrieval Pipeline:
+  * Retrieval Pipeline:
   * 1. Query embedding generated using BGE-small-en-v1.5 (384-dim)
   * 2. Vector similarity search in pgvector
-  * 3. Optional Cohere reranking (if enabled) re-scores results by semantic relevance
-  * 4. Top-ranked chunks passed to OpenAI LLM with system prompt for RAG-grounded responses
+  * 3. Optional Cohere reranking: re-scores results by semantic relevance
+  * 4. Top-ranked chunks passed to LLM with system prompt for RAG-grounded responses
   * 5. Source attribution captured from pre-reranked retrieval results
-  *
-  * Configuration:
-  * Environment Variables:
-  * - DOCUMENTS_PATH: Override default documents directory (default: src/main/resources/content)
-  * - OPENAI_API_KEY: [required] OpenAI API key for chat model
-  * - COHERE_API_KEY: [required if reranking enabled] Cohere API key for semantic reranking
   *
   * Prerequisites:
   * - PostgreSQL with pgvector extension running (see docker-compose-rag.yml)
-  * - Content files are in DOCUMENTS_PATH
-  * - OPENAI_API_KEY environment variable must be set
+  * - Content files are in DOCUMENTS_PATH (default: src/main/resources/content)
+  * - Env vars: OPENAI_API_KEY, COHERE_API_KEY
   */
 class RagEngine(
                  documentsPath: String = sys.env.getOrElse("DOCUMENTS_PATH", "src/main/resources/content"),
@@ -580,10 +574,10 @@ class RagEngine(
 object RagEngine {
   private val SystemPrompt: String =
     """You are a knowledgeable assistant with access to a pdf document database.
-      |Answer questions using ONLY the provided context.
-      |If the answer cannot be found in the context, clearly state: "I don't have information about this."
+      |Answer questions using ONLY the provided context found in the pdf documents.
+      |If the answer cannot be found in the context, clearly state: "I don't find matching information about this in the provided docs."
       |However, when the retrieved context clearly relates to the question's topic or contains matching terms or names,
-      |ALWAYS summarize what you found. Example response for this case: "I don't have exact information about this, however based on the retrieved content..."
+      |ALWAYS summarize what you found. Example response for this case: "I don't find matching information about this in the provided docs, however based on the retrieved content..."
       |
       |Guidelines:
       |- Be concise and direct

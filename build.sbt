@@ -22,9 +22,10 @@ val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.13.0"
+val langchain4jVersion = "1.13.1"
+val langchain4jEmbeddingsVersion = "1.11.6-beta19"
 val mcpSdkVersion = "1.1.0"
-val doclingJavaVersion = "0.5.0"
+val doclingJavaVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
@@ -98,7 +99,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.tika" % "tika-core" % "3.2.3",
   "org.apache.tika" % "tika-parsers-standard-package" % "3.2.3",
-  "org.apache.pdfbox" % "pdfbox" % "3.0.6",
+  "org.apache.pdfbox" % "pdfbox" % "3.0.7",
   "org.apache.opennlp" % "opennlp-tools" % "2.5.6.1",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
@@ -147,10 +148,10 @@ libraryDependencies ++= Seq(
   "dev.langchain4j" % "langchain4j" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-open-ai" % langchain4jVersion,
   "dev.langchain4j" % "langchain4j-anthropic" % langchain4jVersion,
-  "dev.langchain4j" % "langchain4j-cohere" % "1.11.6-beta19",
-  "dev.langchain4j" % "langchain4j-pgvector" % "1.11.6-beta19",
-  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % "1.11.6-beta19",
-  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % "1.11.6-beta19",
+  "dev.langchain4j" % "langchain4j-cohere" % langchain4jEmbeddingsVersion,
+  "dev.langchain4j" % "langchain4j-pgvector" % langchain4jEmbeddingsVersion,
+  "dev.langchain4j" % "langchain4j-embeddings-bge-small-en-v15-q" % langchain4jEmbeddingsVersion,
+  "dev.langchain4j" % "langchain4j-embeddings-all-minilm-l6-v2-q" % langchain4jEmbeddingsVersion,
 
   "io.modelcontextprotocol.sdk" % "mcp-core" % mcpSdkVersion,
   "io.modelcontextprotocol.sdk" % "mcp-json-jackson2" % mcpSdkVersion,
@@ -159,7 +160,7 @@ libraryDependencies ++= Seq(
   "ai.docling" % "docling-serve-client" % doclingJavaVersion,
 
   // CLI output formatting
-  "xyz.matthieucourt" %% "layoutz" % "0.5.0",
+  "xyz.matthieucourt" %% "layoutz" % "0.7.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,

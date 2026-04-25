@@ -401,7 +401,7 @@
             font-style: italic;
             font-size: 0.9em;
             line-height: 1.4;
-            max-height: 3.6em;
+            max-height: 5.6em;
             overflow: hidden;
             text-overflow: ellipsis;
         }
@@ -659,7 +659,7 @@
             </div>
             <div class="config-content" id="config-content">
                 <div class="control-group">
-                    <label for="minScoreSlider">Relevance Threshold (minScore) — log scale</label>
+                    <label for="minScoreSlider">Relevance Threshold (minScore)</label>
                     <div class="slider-container">
                         <input
                                 type="range"
@@ -999,6 +999,7 @@
 
         if (sources && sources.length > 0) {
             const sourcesId = 'sources-' + Date.now();
+            const rerankingEnabled = document.getElementById('enableReranking').checked;
             html += `
                     <div class="sources-section">
                         <div class="sources-header" onclick="toggleSources('${sourcesId}', this)">
@@ -1009,13 +1010,20 @@
                             ${sources.map(src => `
                                 <div class="source-item">
                                     <div class="source-header">
-                                        <span class="source-file">${src.reranked ? '⭐ ' : ''}📄 ${escapeHtml(src.fileName)}</span>
-                                        <span class="source-score">${(src.score * 100).toFixed(0)}% match</span>
+                                        <span class="source-file">${src.reranked ? `<span${rerankingEnabled ? ' title="Selected by Cohere Reranker"' : ''}>⭐</span> ` : ''}<span${rerankingEnabled && !src.reranked ? ' title="Filtered by Cohere Reranker"' : ''}>📄 ${escapeHtml(src.fileName)}</span></span>
+                                        <span class="source-score" title="Embedding score">${(src.score * 100).toFixed(0)}% match</span>
                                     </div>
                                     <div class="source-meta">
                                         ${src.author ? `Author: ${escapeHtml(src.author)} • ` : ''}${src.pageNumbers && src.pageNumbers.length > 0 ? `Page(s): ${src.pageNumbers.map(p => `<a href="#" data-preview="${encodeURIComponent(src.preview)}" onclick="event.preventDefault();openPdfViewer('${escapeHtml(src.fileName)}',${p},this.dataset.preview)" class="page-link" title="Open PDF at page ${p}">${p}</a>`).join(', ')}` : ''}
                                     </div>
-                                    <div class="source-preview">"${escapeHtml(src.preview)}"</div>
+                                    <div class="source-preview">${(() => {
+                const idx = src.preview.indexOf('\n');
+                if (idx > 0) {
+                    return `<b>${escapeHtml(src.preview.substring(0, idx))}</b><br>${escapeHtml(src.preview.substring(idx + 1))}`;
+                } else {
+                    return escapeHtml(src.preview);
+                }
+            })()}</div>
                                 </div>
                             `).join('')}
                         </div>
