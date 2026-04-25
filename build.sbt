@@ -24,7 +24,7 @@ val circeVersion = "0.14.14"
 
 val langchain4jVersion = "1.13.1"
 val langchain4jEmbeddingsVersion = "1.11.6-beta19"
-val mcpSdkVersion = "1.1.0"
+val mcpSdkVersion = "1.1.2"
 val doclingJavaVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
