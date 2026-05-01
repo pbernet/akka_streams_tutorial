@@ -6,7 +6,7 @@ version := "1.0"
 
 scalaVersion := "2.13.18"
 
-val pekkoVersion = "1.5.0"
+val pekkoVersion = "1.6.0"
 val pekkoHTTPVersion = "1.3.0"
 val pekkoConnectorVersion = "1.3.0"
 val pekkoConnectorKafkaVersion = "1.1.0"
