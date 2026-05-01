@@ -182,6 +182,10 @@ test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophyS
 
 ## Analyse Wikipedia edits live stream ##
 
+> **Respect new Wikimedia API rate limits**  
+> As of beginning of 2026 there are new [rate limits](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)
+> See `WikipediaEditsAnalyser#nerProcessingFlow` how pekko-streams can handle this gracefully
+
 Find out whose Wikipedia articles were changed in (near) real time by consuming
 the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
 The class [WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/WikipediaEditsAnalyser.scala) implements

@@ -28,6 +28,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.`User-Agent`
 import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
 import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, onComplete, path, pathEndOrSingleSlash, pathPrefix, post}
 import org.apache.pekko.http.scaladsl.server.Route
@@ -36,7 +37,7 @@ import org.apache.pekko.stream.connectors.elasticsearch.*
 import org.apache.pekko.stream.connectors.elasticsearch.WriteMessage.createIndexMessage
 import org.apache.pekko.stream.connectors.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
 import org.apache.pekko.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import org.apache.pekko.stream.{ActorAttributes, RestartSettings, Supervision}
+import org.apache.pekko.stream.*
 import org.opensearch.testcontainers.OpensearchContainer
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.utility.DockerImageName
@@ -265,12 +266,28 @@ object WikipediaEditsAnalyser extends App {
 
     val requestURL = s"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=$encodedTitle"
 
-    Http().singleRequest(HttpRequest(uri = requestURL))
-      .flatMap(_.entity.toStrict(2.seconds))
-      .map(_.data.utf8String)
-      .map { jsonString =>
-        logger.debug(s"[${ctx.traceId}] Raw Wikipedia API response: $jsonString")
-        parse(jsonString) match {
+    val userAgent = `User-Agent`(
+      "WikipediaEditsAnalyser/1.0 (https://github.com/pbernet/akka_streams_tutorial)"
+    )
+
+    Http().singleRequest(HttpRequest(uri = requestURL, headers = List(userAgent)))
+      .flatMap { response =>
+        val status = response.status
+        val contentType = response.entity.contentType
+        response.entity.toStrict(2.seconds).map(strict => (status, contentType, strict.data.utf8String))
+      }
+      .map { case (status, contentType, body) =>
+        logger.debug(s"[${ctx.traceId}] Raw Wikipedia API response (status=$status, contentType=$contentType): $body")
+
+        val isJson = contentType.mediaType == MediaTypes.`application/json`
+        if (!status.isSuccess() || !isJson) {
+          logger.error(
+            s"[${ctx.traceId}] Unexpected Wikipedia API response for title: '${ctx.change.title}': " +
+              s"status=$status, contentType=$contentType, bodyPreview=${body.take(120).replaceAll("\\s+", " ")}"
+          )
+          ctx.copy(content = "")
+        } else {
+          parse(body) match {
           case Right(json) =>
             json.as[WikipediaApiResponse] match {
               case Right(apiResponse) =>
@@ -297,6 +314,7 @@ object WikipediaEditsAnalyser extends App {
           case Left(parsingError) =>
             logger.error(s"[${ctx.traceId}] Failed to parse Wikipedia API JSON: $parsingError")
             ctx.copy(content = "")
+          }
         }
       }
       .recover {
@@ -546,11 +564,46 @@ object WikipediaEditsAnalyser extends App {
     ).render
   }
 
+  // Title prefixes (namespaces) we don't want to fetch extracts for
+  private val excludedTitlePrefixes: Seq[String] = Seq(
+    "Category:", "Kategorie:", "Catégorie:", "Categoría:", "Categoria:",
+    "تصنيف:", "Категория:", "分类:", "分類:",
+    "File:", "Datei:", "Fichier:", "Archivo:", "ファイル:",
+    "Talk:", "User:", "User talk:", "Wikipedia:", "Help:",
+    "Template:", "Portal:", "Module:", "Draft:", "MediaWiki:", "Special:",
+    "Комментарии:"
+  )
+
+  // Wikidata-style identifiers like Q1450397, P31
+  private val wikidataIdRegex = "^[A-Z]\\d+$".r
+
+  private def isInterestingTitle(title: String): Boolean = {
+    if (title == null || title.isBlank) false
+    else if (excludedTitlePrefixes.exists(p => title.regionMatches(true, 0, p, 0, p.length))) false
+    else if (wikidataIdRegex.matches(title)) false
+    // Require at least one ASCII letter to keep the EN-focused pipeline meaningful
+    else if (!title.matches(".*[A-Za-z].*")) false
+    else true
+  }
+
+  private val titleFilterFlow: Flow[Change, Change, NotUsed] = Flow[Change]
+    .filter { change =>
+      val keep = isInterestingTitle(change.title)
+      if (!keep) logger.debug(s"[${change.traceId}] Dropping uninteresting title: ${change.title}")
+      keep
+    }
+
   private val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
     .filter(change => !change.isBot)
     .map(change => Ctx(change))
-    .mapAsync(3)(ctx => fetchContent(ctx))
-    .mapAsync(3)(ctx => findPersons(ctx))
+    // Decouple from the SSE source so bursts don't backpressure (and time out) the upstream
+    // On overflow: drop the OLDEST queued items - we prefer freshness for a live edits feed
+    .buffer(100, OverflowStrategy.dropHead)
+    // Respect Wikimedia API rate limits (max: 200 req / Min for clients with user agent set)
+    // https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits
+    .throttle(180, 1.minute, 1, ThrottleMode.Shaping)
+    .mapAsync(2)(ctx => fetchContent(ctx))
+    .mapAsync(2)(ctx => findPersons(ctx))
     .map(ctx => logNERResults(ctx))
 
   private val embeddingStoreSink = Flow[Ctx]
@@ -570,6 +623,7 @@ object WikipediaEditsAnalyser extends App {
 
   restartSource
     .via(parserFlow)
+    .via(titleFilterFlow)
     .via(nerProcessingFlow)
     .alsoTo(embeddingStoreSink)
     .map(ctx => createIndexMessage(dateTimeFormatted(ctx.change.timestamp), ctx))
