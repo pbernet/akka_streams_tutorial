@@ -33,11 +33,11 @@ import org.apache.pekko.http.scaladsl.model.sse.ServerSentEvent
 import org.apache.pekko.http.scaladsl.server.Directives.{as, complete, concat, entity, get, getFromFile, onComplete, path, pathEndOrSingleSlash, pathPrefix, post}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.*
 import org.apache.pekko.stream.connectors.elasticsearch.*
 import org.apache.pekko.stream.connectors.elasticsearch.WriteMessage.createIndexMessage
 import org.apache.pekko.stream.connectors.elasticsearch.scaladsl.{ElasticsearchSink, ElasticsearchSource}
 import org.apache.pekko.stream.scaladsl.{Flow, RestartSource, Sink, Source}
-import org.apache.pekko.stream.*
 import org.opensearch.testcontainers.OpensearchContainer
 import org.slf4j.{Logger, LoggerFactory}
 import org.testcontainers.utility.DockerImageName
@@ -116,11 +116,8 @@ object WikipediaEditsAnalyser extends App {
     def traceId: String = title.hashCode.abs.toString
   }
 
-  object Change extends ((Long, String, String, String, String, Boolean, Boolean, Int, Int) => Change) {
-    def apply(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0): Change =
-      new Change(timestamp, title, serverName, user, cmdType, isBot, isNamedBot, lengthNew, lengthOld)
-
-    implicit def formatChange: RootJsonFormat[Change] = jsonFormat9(Change.apply)
+  object Change {
+    implicit val formatChange: RootJsonFormat[Change] = jsonFormat9(Change.apply)
   }
 
   // Helps to carry the data through the stages, although this violates functional principles
@@ -128,11 +125,8 @@ object WikipediaEditsAnalyser extends App {
     def traceId: String = change.traceId
   }
 
-  private object Ctx extends ((Change, List[String], List[String], String) => Ctx) {
-    def apply(change: Change, personsFoundLocal: List[String] = List.empty, personsFoundRemote: List[String] = List.empty, content: String = ""): Ctx =
-      new Ctx(change, personsFoundLocal, personsFoundRemote, content)
-
-    implicit def formatCtx: RootJsonFormat[Ctx] = jsonFormat4(Ctx.apply)
+  private object Ctx {
+    implicit val formatCtx: RootJsonFormat[Ctx] = jsonFormat4(Ctx.apply)
   }
 
   final case class Person(name: String)
@@ -251,14 +245,9 @@ object WikipediaEditsAnalyser extends App {
                                  )
 
   // Circe decoders for Wikipedia API response
-  implicit val wikipediaPageDecoder: Decoder[WikipediaPage] =
-    Decoder.forProduct4("pageid", "ns", "title", "extract")(WikipediaPage.apply)
-
-  implicit val wikipediaQueryDecoder: Decoder[WikipediaQuery] =
-    Decoder.forProduct1("pages")(WikipediaQuery.apply)
-
-  implicit val wikipediaApiResponseDecoder: Decoder[WikipediaApiResponse] =
-    Decoder.forProduct2("batchcomplete", "query")(WikipediaApiResponse.apply)
+  implicit val wikipediaPageDecoder: Decoder[WikipediaPage] = deriveDecoder[WikipediaPage]
+  implicit val wikipediaQueryDecoder: Decoder[WikipediaQuery] = deriveDecoder[WikipediaQuery]
+  implicit val wikipediaApiResponseDecoder: Decoder[WikipediaApiResponse] = deriveDecoder[WikipediaApiResponse]
 
   private def fetchContent(ctx: Ctx): Future[Ctx] = {
     logger.info(s"[${ctx.traceId}] About to read `extract` from Wikipedia entry with title: ${ctx.change.title}")
@@ -337,36 +326,27 @@ object WikipediaEditsAnalyser extends App {
     val localPersons = ctx.personsFoundLocal
     val remotePersons = ctx.personsFoundRemote
     val allPersons = (localPersons ++ remotePersons).distinct
+    if (allPersons.isEmpty) return ctx
 
-    if (allPersons.nonEmpty) {
-      val localOnly = localPersons.diff(remotePersons)
-      val remoteOnly = remotePersons.diff(localPersons)
-      val both = localPersons.intersect(remotePersons)
+    val localOnly = localPersons.diff(remotePersons)
+    val remoteOnly = remotePersons.diff(localPersons)
+    val both = localPersons.intersect(remotePersons)
+    val localLabel = if (useLocalGLiNER) "Local GLiNER NER only" else "Local Java NLP NER only"
+    val bothLabel = if (useLocalGLiNER) "Found by GLiNER & Remote" else "Found by Java NLP & Remote"
 
-      val title = s"NER results for '${ctx.change.title}'"
-      val headers = Array("Category", "Count", "Names")
-      val rowsListToDisplay = scala.collection.mutable.ListBuffer[Array[String]]()
+    def row(label: String, names: List[String]): Option[Array[String]] =
+      Option.when(names.nonEmpty)(Array(label, names.size.toString, names.mkString(", ")))
 
-      rowsListToDisplay += Array("Total Persons", allPersons.size.toString,
-        if (allPersons.nonEmpty) allPersons.mkString(", ") else "none")
-      if (localOnly.nonEmpty) {
-        val nerTypeLabel = if (useLocalGLiNER) "Local GLiNER NER only" else "Local Java NLP NER only"
-        rowsListToDisplay += Array(nerTypeLabel, localOnly.size.toString, localOnly.mkString(", "))
-      }
-      if (remoteOnly.nonEmpty) {
-        rowsListToDisplay += Array("Remote NER only", remoteOnly.size.toString, remoteOnly.mkString(", "))
-      }
-      if (both.nonEmpty) {
-        val bothLabel = if (useLocalGLiNER) "Found by GLiNER & Remote" else "Found by Java NLP & Remote"
-        rowsListToDisplay += Array(bothLabel, both.size.toString, both.mkString(", "))
-      }
-      val table = formatAsAsciiTable(title, headers, rowsListToDisplay.toArray)
-      logger.info(s"[${ctx.traceId}]\n$table")
+    val rows = List(
+      row("Total Persons", allPersons),
+      row(localLabel, localOnly),
+      row("Remote NER only", remoteOnly),
+      row(bothLabel, both)
+    ).flatten.toArray
 
-      ctx
-    } else {
-      ctx
-    }
+    val table = formatAsAsciiTable(s"NER results for '${ctx.change.title}'", Array("Category", "Count", "Names"), rows)
+    logger.info(s"[${ctx.traceId}]\n$table")
+    ctx
   }
 
   private def sanitizePersonNames(names: List[String]): List[String] = {
@@ -772,25 +752,14 @@ object WikipediaEditsAnalyser extends App {
   private final case class SearchIndexUrlResponse(url: String)
 
   private def startConversationWith(assistant: Assistant): Unit = {
-    def enableProcessing(): ProcessingControlResponse = {
-      if (!isRemoteProcessingEnabled.get()) {
-        isRemoteProcessingEnabled.set(true)
-        logger.info("Remote processing enabled - resuming remote LLM calls and indexing")
-        ProcessingControlResponse(enabled = true, "Remote processing enabled - resuming remote LLM calls and indexing")
-      } else {
-        ProcessingControlResponse(enabled = true, "Remote processing already enabled")
-      }
-    }
-
-    def disableProcessing(): ProcessingControlResponse = {
-      if (isRemoteProcessingEnabled.get()) {
-        isRemoteProcessingEnabled.set(false)
-        val msg = "Remote processing disabled - suspending remote LLM calls and indexing (local NER continues)"
-        logger.info(msg)
-        ProcessingControlResponse(enabled = false, msg)
-      } else {
-        ProcessingControlResponse(enabled = false, "Remote processing already disabled")
-      }
+    def setProcessing(enable: Boolean): ProcessingControlResponse = {
+      val state = if (enable) "enabled" else "disabled"
+      val changedMsg =
+        if (enable) "Remote processing enabled - resuming remote LLM calls and indexing"
+        else "Remote processing disabled - suspending remote LLM calls and indexing (local NER continues)"
+      val changed = isRemoteProcessingEnabled.getAndSet(enable) != enable
+      if (changed) logger.info(changedMsg)
+      ProcessingControlResponse(enable, if (changed) changedMsg else s"Remote processing already $state")
     }
 
     val route: Route =
@@ -814,9 +783,9 @@ object WikipediaEditsAnalyser extends App {
                 decode[PersonSearchRequest](jsonString) match {
                   case Right(request) =>
                     complete {
-                      searchPersons(request.query).map { persons =>
-                        PersonSearchResponse(persons: List[Person])
-                      }.map(response =>
+                      searchPersons(request.query).map(persons =>
+                        PersonSearchResponse(persons)
+                      ).map(response =>
                         HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
                       ).recover {
                         case ex =>
@@ -851,7 +820,7 @@ object WikipediaEditsAnalyser extends App {
                 entity(as[String]) { jsonString =>
                   decode[ProcessingControlRequest](jsonString) match {
                     case Right(controlRequest) =>
-                      val response = if (controlRequest.enabled) enableProcessing() else disableProcessing()
+                      val response = setProcessing(controlRequest.enabled)
                       complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
                     case Left(error) =>
                       complete(HttpResponse(400, entity = s"Invalid JSON: $error"))
@@ -901,20 +870,12 @@ object WikipediaEditsAnalyser extends App {
   private def query(): Unit = {
     logger.info(s"About to execute scrolled read queries...")
     for {
-      result <- readFromElasticsearchTyped()
-      resultRaw <- readFromElasticsearchRaw()
+      result <- elasticsearchSourceTyped.runWith(Sink.seq)
+      resultRaw <- elasticsearchSourceRaw.runWith(Sink.seq)
     } {
       logger.info(s"Read typed: ${result.size}. 1st element: ${result.head}")
       logger.info(s"Read raw: ${resultRaw.size}. 1st element: ${resultRaw.head}")
     }
-  }
-
-  private def readFromElasticsearchTyped() = {
-    elasticsearchSourceTyped.runWith(Sink.seq)
-  }
-
-  private def readFromElasticsearchRaw() = {
-    elasticsearchSourceRaw.runWith(Sink.seq)
   }
 
   private def addToEmbeddingStore(text: String) = {
