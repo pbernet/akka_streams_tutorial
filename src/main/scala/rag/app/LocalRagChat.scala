@@ -8,8 +8,8 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.model.headers.HttpCookie
+import org.apache.pekko.http.scaladsl.server.Directive1
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.Route
 import org.slf4j.{Logger, LoggerFactory}
 import rag.core.RagStatus.encoder as ragStatusEncoder
 import rag.core.{RagEngine, RagEngineProvider, SourceSummary}
@@ -53,57 +53,62 @@ object LocalRagChat {
   implicit val configureResponseEncoder: Encoder[ConfigureResponse] = deriveEncoder[ConfigureResponse]
   implicit val clearChatResponseEncoder: Encoder[ClearChatResponse] = deriveEncoder[ClearChatResponse]
 
+  private val withSession: Directive1[String] =
+    optionalCookie("rag-session").flatMap { maybe =>
+      val sessionId = maybe.map(_.value).getOrElse("web-" + UUID.randomUUID().toString)
+      setCookie(HttpCookie("rag-session", sessionId, path = Some("/rag"))).tflatMap { _ =>
+        provide(sessionId)
+      }
+    }
+
   def start(ragEngine: RagEngine)(implicit system: ActorSystem): Unit = {
     import system.dispatcher
 
     logger.info("Starting Local RAG Chat HTTP server...")
 
-    def createRoutes(): Route = {
+    val routes =
       pathPrefix("rag") {
         concat(
           path("chat") {
             post {
-              optionalCookie("rag-session") { maybeSessionCookie =>
-                val sessionId = maybeSessionCookie.map(_.value).getOrElse("web-" + UUID.randomUUID().toString)
-                setCookie(HttpCookie("rag-session", sessionId, path = Some("/rag"))) {
-                  entity(as[String]) { jsonString =>
-                    decode[ChatRequest](jsonString) match {
-                      case Right(request) =>
-                        logger.info(s"Received user query: ${request.query}")
+              withSession { sessionId =>
+                entity(as[String]) { jsonString =>
+                  decode[ChatRequest](jsonString) match {
+                    case Right(request) =>
+                      logger.info(s"Received user query: ${request.query}")
 
-                        Try {
-                          val richResponse = ragEngine.chatWithMetadata(request.query, sessionId)
+                      Try {
+                        val richResponse = ragEngine.chatWithMetadata(request.query, sessionId)
 
-                          val sourceSummaries = richResponse.sources.map { src =>
-                            SourceSummary(
-                              fileName = src.fileName,
-                              author = src.author,
-                              score = src.score,
-                              preview = src.chunkText.take(500).trim + (if (src.chunkText.length > 500) "..." else ""),
-                              pageNumbers = src.pageNumbers,
-                              reranked = src.reranked
-                            )
-                          }
-
-                          val response = ChatResponse(
-                            answer = richResponse.answer,
-                            sources = sourceSummaries,
-                            sourceCount = richResponse.sources.length
+                        val sourceSummaries = richResponse.sources.map { src =>
+                          SourceSummary(
+                            fileName = src.fileName,
+                            author = src.author,
+                            score = src.score,
+                            preview = src.chunkText.take(500).trim + (if (src.chunkText.length > 500) "..." else ""),
+                            pageNumbers = src.pageNumbers,
+                            reranked = src.reranked
                           )
-
-                          logger.info(s"Returning response with: ${response.sourceCount} sources")
-                          HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
-                        } match {
-                          case Success(entity) =>
-                            complete(entity)
-                          case Failure(ex) =>
-                            logger.error(s"Error processing chat request: ${ex.getMessage}", ex)
-                            complete(StatusCodes.InternalServerError -> s"""{"error": "${ex.getMessage}"}""")
                         }
 
-                      case Left(error) =>
-                        complete(StatusCodes.BadRequest -> s"""{"error": "Invalid JSON: $error"}""")
-                    }
+                        val response = ChatResponse(
+                          answer = richResponse.answer,
+                          sources = sourceSummaries,
+                          sourceCount = richResponse.sources.length
+                        )
+
+                        logger.info(s"Returning response with: ${response.sourceCount} sources")
+                        HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
+                      } match {
+                        case Success(entity) =>
+                          complete(entity)
+                        case Failure(ex) =>
+                          logger.error(s"Error processing chat request: ${ex.getMessage}", ex)
+                          complete(StatusCodes.InternalServerError -> s"""{"error": "${ex.getMessage}"}""")
+                      }
+
+                    case Left(error) =>
+                      complete(StatusCodes.BadRequest -> s"""{"error": "Invalid JSON: $error"}""")
                   }
                 }
               }
@@ -151,39 +156,26 @@ object LocalRagChat {
           },
           path("clear") {
             post {
-              optionalCookie("rag-session") { maybeSessionCookie =>
-                val sessionId = maybeSessionCookie.map(_.value).getOrElse("web-" + UUID.randomUUID().toString)
-                setCookie(HttpCookie("rag-session", sessionId, path = Some("/rag"))) {
-                  Try {
-                    ragEngine.clearChatMemory(sessionId)
-
-                    logger.info(s"Chat memory cleared by user (session: $sessionId)")
-
-                    val response = ClearChatResponse(
-                      success = true,
-                      message = "Chat history cleared successfully"
-                    )
-
-                    HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
-                  } match {
-                    case Success(entity) =>
-                      complete(entity)
-                    case Failure(ex) =>
-                      logger.error(s"Error clearing chat: ${ex.getMessage}", ex)
-                      val errorResponse = ClearChatResponse(
-                        success = false,
-                        message = s"Error: ${ex.getMessage}"
-                      )
-                      complete(StatusCodes.InternalServerError -> HttpEntity(ContentTypes.`application/json`, errorResponse.asJson.noSpaces))
-                  }
+              withSession { sessionId =>
+                Try {
+                  ragEngine.clearChatMemory(sessionId)
+                  logger.info(s"Chat memory cleared by user (session: $sessionId)")
+                  val response = ClearChatResponse(success = true, message = "Chat history cleared successfully")
+                  HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces)
+                } match {
+                  case Success(entity) =>
+                    complete(entity)
+                  case Failure(ex) =>
+                    logger.error(s"Error clearing chat: ${ex.getMessage}", ex)
+                    val errorResponse = ClearChatResponse(success = false, message = s"Error: ${ex.getMessage}")
+                    complete(StatusCodes.InternalServerError -> HttpEntity(ContentTypes.`application/json`, errorResponse.asJson.noSpaces))
                 }
               }
             }
           },
           path("status") {
             get {
-              val status = ragEngine.getStatus
-              complete(HttpEntity(ContentTypes.`application/json`, status.asJson.noSpaces))
+              complete(HttpEntity(ContentTypes.`application/json`, ragEngine.getStatus.asJson.noSpaces))
             }
           },
           path("pdf" / Segment) { fileName =>
@@ -199,20 +191,13 @@ object LocalRagChat {
           },
           pathEndOrSingleSlash {
             get {
-              optionalCookie("rag-session") { maybeSessionCookie =>
-                val sessionId = maybeSessionCookie.map(_.value).getOrElse("web-" + UUID.randomUUID().toString)
-                setCookie(HttpCookie("rag-session", sessionId, path = Some("/rag"))) {
-                  val chatHtml = Paths.get("src/main/resources/ragchat.html").toFile
-                  getFromFile(chatHtml, ContentTypes.`text/html(UTF-8)`)
-                }
+              withSession { _ =>
+                getFromFile(Paths.get("src/main/resources/ragchat.html").toFile, ContentTypes.`text/html(UTF-8)`)
               }
             }
           }
         )
       }
-    }
-
-    val routes = createRoutes()
 
     Http().newServerAt("localhost", 8090).bind(routes).onComplete {
       case Success(_) =>
