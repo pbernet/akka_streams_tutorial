@@ -1,6 +1,5 @@
 package tools
 
-import org.apache.commons.lang3.StringUtils
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{FileIO, Framing, Sink, Source, StreamConverters}
 import org.apache.pekko.util.ByteString
@@ -25,34 +24,30 @@ class SrtParser(sourceFilePath: String) {
 
   val ls: String = sys.props("line.separator")
 
+  private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss,SSS")
+
   private val frameByEmptyLine = Framing.delimiter(
     ByteString(ls + ls),
     maximumFrameLength = 2048,
     allowTruncation = true)
 
-  private def toMillisOfDay(value: String) = {
-    val formatter = DateTimeFormatter.ofPattern("HH:mm:ss,SSS")
-    val localTime = LocalTime.parse(value, formatter)
-    localTime.toNanoOfDay / 1_000_000
-  }
+  private def toMillisOfDay(value: String) =
+    LocalTime.parse(value, timeFormatter).toNanoOfDay / 1_000_000
 
   private def convertTo(raw: String) = {
     val parts = raw.split(ls)
     val times = parts(1).split("""\s*-->\s*""")
-    val lines = parts.drop(2).toList
-    SubtitleBlock(toMillisOfDay(times.head), toMillisOfDay(times.tail.head), lines)
+    SubtitleBlock(toMillisOfDay(times(0)), toMillisOfDay(times(1)), parts.drop(2).toList)
   }
 
-  val source: Source[SubtitleBlock, Any] = {
+  val source: Source[SubtitleBlock, Any] =
     StreamConverters.fromInputStream(() => new FileInputStream(sourceFilePath))
       .via(frameByEmptyLine)
-      .map(each => each.utf8String)
-      .map(each => convertTo(each))
-  }
+      .map(_.utf8String)
+      .map(convertTo)
 
   def runSync(): Seq[SubtitleBlock] = {
-    val resultFut = source.runWith(Sink.seq)
-    val result = Await.result(resultFut, 10.seconds)
+    val result = Await.result(source.runWith(Sink.seq), 10.seconds)
     system.terminate()
     result
   }
@@ -64,13 +59,13 @@ class SrtParser(sourceFilePath: String) {
     * @param shiftBy        offset in milliseconds (positive = forward, negative = backward)
     */
   def timeShift(targetFilePath: String, shiftBy: Long): Unit = {
-    val ioResultFut = source
-      .map(block => block.copy(start = Math.max(0, block.start + shiftBy), end = Math.max(0, block.end + shiftBy)))
-      .zipWithIndex
-      .map { case (block, idx) => ByteString(block.formatOutBlock(idx + 1), "UTF-8") }
-      .runWith(FileIO.toPath(Paths.get(targetFilePath)))
-
-    val ioResult = Await.result(ioResultFut, 10.seconds)
+    val ioResult = Await.result(
+      source
+        .map(b => b.copy(start = Math.max(0, b.start + shiftBy), end = Math.max(0, b.end + shiftBy)))
+        .zipWithIndex
+        .map { case (block, idx) => ByteString(block.formatOutBlock(idx + 1), "UTF-8") }
+        .runWith(FileIO.toPath(Paths.get(targetFilePath))),
+      10.seconds)
     system.terminate()
     logger.info(s"Wrote: ${ioResult.count} bytes to: $targetFilePath")
   }
@@ -85,10 +80,8 @@ object SrtParser extends App {
 
   def apply(sourceFilePath: String): SrtParser = new SrtParser(sourceFilePath)
 
-  def timeShift(sourceFilePath: String, targetFilePath: String, shiftBy: Long): Unit = {
-    val parser = new SrtParser(sourceFilePath)
-    parser.timeShift(targetFilePath, shiftBy)
-  }
+  def timeShift(sourceFilePath: String, targetFilePath: String, shiftBy: Long): Unit =
+    new SrtParser(sourceFilePath).timeShift(targetFilePath, shiftBy)
 }
 
 case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
@@ -102,25 +95,17 @@ case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
 
   def formatOutBlock(blockCounter: Long): String = {
     // Spec: https://wiki.videolan.org/SubRip
-    val outputFormatted = s"$blockCounter$ls${startTime()} --> ${endTime()}$ls${lines.mkString("\n")}$ls$ls"
-    logger.info(s"Writing block:$ls {}", outputFormatted)
-    outputFormatted
+    val out = s"$blockCounter$ls$startTime --> $endTime$ls${lines.mkString("\n")}$ls$ls"
+    logger.info(s"Writing block:$ls {}", out)
+    out
   }
 
-  def startTime() = {
-    toTime(start)
-  }
+  def startTime: String = toTime(start)
 
-  def endTime() = {
-    toTime(end)
-  }
+  def endTime: String = toTime(end)
 
   private def toTime(ms: Long) = {
     val d = Duration.ofMillis(ms)
-    val hours = StringUtils.leftPad(d.toHoursPart.toString, 2, "0")
-    val minutes = StringUtils.leftPad(d.toMinutesPart.toString, 2, "0")
-    val seconds = StringUtils.leftPad(d.toSecondsPart.toString, 2, "0")
-    val milliSeconds = StringUtils.leftPad(d.toMillisPart.toString, 3, "0")
-    s"$hours:$minutes:$seconds,$milliSeconds"
+    f"${d.toHoursPart}%02d:${d.toMinutesPart}%02d:${d.toSecondsPart}%02d,${d.toMillisPart}%03d"
   }
 }

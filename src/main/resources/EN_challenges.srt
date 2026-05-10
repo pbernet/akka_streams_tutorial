@@ -122,5 +122,9 @@ Dad
 
 966
 04:01:31,726 --> 04:01:34,294
--Uh, "projecting" means it sends them out.
--Happy things.
+- Uh, "projecting" means it sends them out.
+- Happy things.
+
+1000
+05:00:00,726 --> 05:00:00,999
+Rose Lewis...

@@ -15,19 +15,13 @@ import org.slf4j.{Logger, LoggerFactory}
 object SrtShifter extends App {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val defaultSource = "src/main/resources/EN_challenges.srt"
-  val defaultTarget = "output.srt"
-  val defaultShift = 5000L
+  val sourceFilePath = if (args.length > 0) args(0) else "src/main/resources/EN_challenges.srt"
+  val targetFilePath = if (args.length > 1) args(1) else "output.srt"
+  val shiftBy = if (args.length > 2) args(2).toLong else 5000L
 
-  val sourceFilePath = if (args.length > 0) args(0) else defaultSource
-  val targetFilePath = if (args.length > 1) args(1) else defaultTarget
-  val shiftBy = if (args.length > 2) args(2).toLong else defaultShift
-
-  if (args.length < 3) {
+  if (args.length < 3)
     logger.info(s"Using defaults: sourceFilePath=$sourceFilePath, targetFilePath=$targetFilePath, shiftBy=$shiftBy")
-  }
 
   logger.info(s"Shifting: '$sourceFilePath' by: $shiftBy ms -> '$targetFilePath'")
-  val parser = new SrtParser(sourceFilePath)
-  parser.timeShift(targetFilePath, shiftBy)
+  new SrtParser(sourceFilePath).timeShift(targetFilePath, shiftBy)
 }

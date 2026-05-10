@@ -16,13 +16,13 @@ import scala.util.{Failure, Success}
   *
   * Workflow:
   *  - Load all blocks from the .srt source file with [[SrtParser]]
-  *  - Group blocks to scenes (= all blocks within a session window), depending on `maxGapSeconds`
+  *  - Group blocks to scenes (= all blocks within a session window), depending on `maxGap`
   *  - Translate all blocks of a scene in one prompt (one line per block) via the LLM API
   *  - Continuously write translated blocks to target file
   *
   * Usage:
-  *  - Wire Params, eg sourceFilePath
-  *  - Decide, whether to use context info to streamline translation
+  *  - Wire Params, e.g. sourceFilePath
+  *  - Decide, whether to use optional context to streamline translation
   *  - Add API_KEY in [[AnthropicCompletions]], [[OpenAICompletions]] and then run this class
   *  - Scan log for WARN log messages and improve corresponding blocks in target file manually
   *
@@ -37,128 +37,100 @@ object SubtitleTranslator extends App {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   // Params
-  private val sourceFilePath = "EN_challenges.srt"
+  private val sourceFilePath = "src/main/resources/EN_challenges.srt"
   private val targetFilePath = "DE_challenges.srt"
   private val targetLanguage = "German"
+
+  // Optional context
+  private val useContext = false
   private val movieTitle = "Bob Marley - One Love"
   private val movieReleaseYear = 2024
 
-  private val useContext = false
   private val defaultModel = if (useContext) OpenAICompletions.withContext(movieTitle, movieReleaseYear) else new OpenAICompletions()
   private val fallbackModel = if (useContext) AnthropicCompletions.withContext(movieTitle, movieReleaseYear) else new AnthropicCompletions()
 
-  private val maxGapSeconds = 1 // gap time between two scenes (= session windows)
+  // Tuning params
+  private val maxGap = 1000 // gap time in ms between two scenes (= session windows)
   private val endLineTag = "\n"
-  private val maxCharPerTranslatedLine = 40 // recommendation
+  private val maxCharPerTranslatedLine = 40
   private val conversationPrefix = "-"
 
+  // Meta info
   private var totalTokensUsed = 0
 
-  // Sync to ensure that all blocks are readable before translation starts
+  // Ensure that all blocks are readable before translation starts
   val parseResult = SrtParser(sourceFilePath).runSync()
   logger.info("Number of subtitleBlocks to translate: {}", parseResult.length)
 
-  val source = Source(parseResult)
-
-  val workflow = Flow[SubtitleBlock]
-    .via(groupByScene(maxGapSeconds))
-    .map(translateScene)
-
-  val fileSink = FileIO.toPath(Paths.get(targetFilePath))
-
   val processingSink = Flow[SubtitleBlock]
     .zipWithIndex
-    .map { case (block: SubtitleBlock, blockCounter: Long) =>
-      ByteString(block.formatOutBlock(blockCounter + 1))
-    }
-    .toMat(fileSink)((_, bytesWritten) => bytesWritten)
+    .map { case (block, i) => ByteString(block.formatOutBlock(i + 1)) }
+    .toMat(FileIO.toPath(Paths.get(targetFilePath)))((_, bytesWritten) => bytesWritten)
 
-  val done = source
-    // https://platform.openai.com/docs/guides/rate-limits/overview
-    .throttle(25, 60.seconds, 25, ThrottleMode.shaping)
-    .via(workflow)
-    .mapConcat(identity) // flatten
+  val done = Source(parseResult)
+    // https://platform.openai.com/settings/organization/limits
+    .throttle(100, 1.minute, 25, ThrottleMode.shaping)
+    .via(groupByScene(maxGap))
+    .map(translateScene)
+    .mapConcat(identity)
     .runWith(processingSink)
 
   terminateWhen(done)
 
 
   // Partition to session windows
-  private def groupByScene(maxGap: Int) = {
+  private[tools] def groupByScene(maxGap: Int) =
     Flow[SubtitleBlock].statefulMap(() => List.empty[SubtitleBlock])(
-      (stateList, nextElem) => {
-        val newStateList = stateList :+ nextElem
-        val lastElem = if (stateList.isEmpty) nextElem else stateList.reverse.head
-        val calcGap = nextElem.start - lastElem.end
-        if (calcGap < maxGap * 1000) {
-          // (list for next iteration, list of output elements)
-          (newStateList, Nil)
-        }
-        else {
-          // (list for next iteration, list of output elements)
-          (List(nextElem), stateList)
-        }
+      (scene, next) => {
+        val gapMs = next.start - scene.lastOption.getOrElse(next).end
+        if (gapMs < maxGap) (scene :+ next, Nil)
+        else (List(next), scene)
       },
-      // Cleanup function, we return the last stateList
-      stateList => Some(stateList))
-      .filterNot(scene => scene.isEmpty)
-  }
+      // Emit whatever remains when upstream completes
+      scene => Some(scene)
+    ).filter(_.nonEmpty)
 
   private def translateScene(sceneOrig: List[SubtitleBlock]) = {
     logger.info(s"About to translate scene with: ${sceneOrig.size} original blocks targeting: $defaultModel")
 
-    val allLines = sceneOrig.foldLeft("")((acc, block) => acc + block.allLinesEnd)
-    val toTranslate = generateTranslationPrompt(allLines)
+    val toTranslate = generateTranslationPrompt(sceneOrig.map(_.allLinesEnd).mkString)
     logger.info(s"Translation prompt: $toTranslate")
 
     val firstShot = defaultModel.runCompletions(toTranslate)
-    val translated = firstShot match {
-      case translatedCheap if !isTranslationPlausible(translatedCheap.getLeft, sceneOrig.size) =>
+    val translated =
+      if (isTranslationPlausible(firstShot.getLeft, sceneOrig.size)) firstShot
+      else {
         logger.info(s"Translation with: $defaultModel is not plausible, lines do not match. Fallback to: $fallbackModel")
         fallbackModel.runCompletions(toTranslate)
-      case _ => firstShot
-    }
+      }
 
-    val newTokens = translated.getRight
-    totalTokensUsed = totalTokensUsed + newTokens
+    totalTokensUsed += translated.getRight
+    logger.debug("Response text: {}", translated.getLeft)
 
-    val rawResponseText = translated.getLeft
-    logger.debug("Response text: {}", rawResponseText)
-    val seed: Vector[SubtitleBlock] = Vector.empty
-
-    val sceneTranslated: Vector[SubtitleBlock] =
-      rawResponseText
-        .split(endLineTag)
-        .filterNot(each => each.isEmpty)
-        .zipWithIndex
-        .foldLeft(seed) { (acc: Vector[SubtitleBlock], rawResponseTextSplit: (String, Int)) =>
-          val massagedResult = massageResultText(rawResponseTextSplit._1)
-          val origBlock =
-            if (sceneOrig.isDefinedAt(rawResponseTextSplit._2)) {
-              sceneOrig(rawResponseTextSplit._2)
-            } else {
-              // Root cause: No plausible translation eg due to added lines at beginning or at end of response
-              logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: ${rawResponseTextSplit._2} requested. Fallback to last original block")
-              sceneOrig.last
-            }
-          val translatedBlock = origBlock.copy(lines = massagedResult)
-          logger.info(s"Translated block to: ${translatedBlock.allLines}")
-          acc.appended(translatedBlock)
+    val sceneTranslated = nonEmptyLines(translated.getLeft).zipWithIndex.map { case (line, i) =>
+      val origBlock =
+        if (sceneOrig.isDefinedAt(i)) sceneOrig(i)
+        else {
+          // Root cause: No plausible translation e.g. due to added lines at beginning or at end of response
+          logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: $i requested. Fallback to last original block")
+          sceneOrig.last
         }
+      val block = origBlock.copy(lines = massageResultText(line))
+      logger.info(s"Translated block to: ${block.allLines}")
+      block
+    }.toVector
+
     logger.info(s"Finished translation of scene with: ${sceneTranslated.size} blocks")
     sceneTranslated
   }
 
-  private def isTranslationPlausible(rawResponseText: String, originalSize: Int) = {
-    val resultSize = rawResponseText
-      .split(endLineTag)
-      .filterNot(each => each.isEmpty)
-      .length
+  private def nonEmptyLines(text: String): Array[String] =
+    text.split(endLineTag).filterNot(_.isEmpty)
 
-    resultSize == originalSize
-  }
+  private def isTranslationPlausible(rawResponseText: String, originalSize: Int) =
+    nonEmptyLines(rawResponseText).length == originalSize
 
-  private def generateTranslationPrompt(text: String) = {
+  private def generateTranslationPrompt(text: String) =
     s"""
        |Translate the text lines below from English to $targetLanguage.
        |
@@ -168,42 +140,43 @@ object SubtitleTranslator extends App {
        |Text lines:
        |$text
        |
+       |Strict output rules:
+       |- Return ONLY the translated text, nothing else.
+       |- In doubt return the original text.
+       |
        |""".stripMargin
-  }
 
   private def generateShortenPrompt(text: String) = {
     s"""
-       |Rewrite to ${maxCharPerTranslatedLine * 2 - 10} characters at most:
+       |Rewrite the text below to ${maxCharPerTranslatedLine * 2 - 10} characters at most, keeping the original language.
+       |
+       |Strict output rules:
+       |- Return ONLY the rewritten text, nothing else.
+       |- No preamble, explanation, labels, options, quotes, markdown, or trailing notes.
+       |- Output exactly one single line.
+       |
+       |Text:
        |$text
        |
        |""".stripMargin
   }
 
   private def massageResultText(text: String) = {
-    val textCleaned = clean(text)
-
-    if (isConversation(textCleaned)) {
-      splitConversation(textCleaned)
-    }
-    else if (isTextTooLong(textCleaned)) {
-      shortenLongText(textCleaned)
-    }
-    else {
-      splitSentence(textCleaned)
-    }
+    val cleaned = clean(text)
+    if (isConversation(cleaned)) splitConversation(cleaned)
+    else if (isTextTooLong(cleaned)) shortenLongText(cleaned)
+    else splitSentence(cleaned)
   }
 
-  private def isConversation(text: String): Boolean = {
-    text.startsWith(conversationPrefix)
-  }
+  private def isConversation(text: String): Boolean =
+    text.startsWith(s"$conversationPrefix ")
 
-  private def splitConversation(text: String): List[String] = {
-    text.split(conversationPrefix).map(line => conversationPrefix + line).toList.tail
-  }
+  private def splitConversation(text: String): List[String] =
+    // Split so that words like "Mm-hmm" are preserved
+    text.split(s" (?=$conversationPrefix )").toList
 
-  private def isTextTooLong(text: String): Boolean = {
+  private def isTextTooLong(text: String): Boolean =
     text.length > maxCharPerTranslatedLine * 2 + 10
-  }
 
   private def shortenLongText(text: String): List[String] = {
     logger.warn(s"Translated block text is too long (${text.length} chars). Try to shorten via API call. Check result manually")
@@ -214,42 +187,37 @@ object SubtitleTranslator extends App {
   }
 
   private def clean(text: String) = {
-    val filtered = text.filter(_ >= ' ')
-    if (filtered.startsWith("\"")) filtered.substring(1, filtered.length() - 1)
-    else filtered
+    // Replace control chars (\n, \r, \t) with a space so words on adjacent
+    // lines do not get glued together, then collapse runs of whitespace
+    val normalized = text.map(c => if (c < ' ') ' ' else c).replaceAll("\\s+", " ").trim
+    if (normalized.startsWith("\"") && normalized.endsWith("\"")) normalized.substring(1, normalized.length - 1)
+    else normalized
   }
 
   private def splitSentence(text: String) = {
     if (text.length > maxCharPerTranslatedLine && text.contains(",")) {
-      val indexFirstComma = text.indexOf(",")
+      val commaIdx = text.indexOf(",")
       val offset = 15
-      if (indexFirstComma > offset && indexFirstComma < text.length - offset)
-        List(text.substring(0, indexFirstComma + 1), text.substring(indexFirstComma + 1, text.length))
+      if (commaIdx > offset && commaIdx < text.length - offset)
+        List(text.substring(0, commaIdx + 1), text.substring(commaIdx + 1))
       else splitSentenceHonorWords(text)
     }
-    else if (text.length > maxCharPerTranslatedLine) {
-      splitSentenceHonorWords(text)
-    } else {
-      List(text)
-    }
+    else if (text.length > maxCharPerTranslatedLine) splitSentenceHonorWords(text)
+    else List(text)
   }
 
   private def splitSentenceHonorWords(sentence: String) = {
     val words = sentence.split(" ")
     val mid = words.length / 2
-    val firstHalf = words.slice(0, mid).mkString(" ")
-    val secondHalf = words.slice(mid, words.length).mkString(" ")
-    List(firstHalf, secondHalf)
+    List(words.take(mid).mkString(" "), words.drop(mid).mkString(" "))
   }
 
-  def terminateWhen(done: Future[IOResult]): Unit = {
-    done.onComplete {
-      case Success(_) =>
-        logger.info(s"Flow Success. Finished writing to target file: $targetFilePath. Around $totalTokensUsed tokens used. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        logger.info(s"Flow Failure: $e. Partial translations are in target file: $targetFilePath About to terminate...")
-        system.terminate()
-    }
+  def terminateWhen(done: Future[IOResult]): Unit = done.onComplete {
+    case Success(_) =>
+      logger.info(s"Flow Success. Finished writing to target file: $targetFilePath. Around $totalTokensUsed tokens used. About to terminate...")
+      system.terminate()
+    case Failure(e) =>
+      logger.info(s"Flow Failure: $e. Partial translations are in target file: $targetFilePath About to terminate...")
+      system.terminate()
   }
 }

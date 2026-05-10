@@ -23,9 +23,8 @@ public class AnthropicCompletions {
     // Add your API key
     public static final String API_KEY = "***";
 
-    // Note that sonnet 4 has a different output style
     // https://docs.anthropic.com/en/docs/about-claude/models/overview#model-comparison-table
-    public static final String MODEL_NAME = "claude-3-7-sonnet-20250219";
+    public static final String MODEL_NAME = "claude-sonnet-4-6";
 
     private final ChatModel model;
     private final String moviePlotContext;
