@@ -138,7 +138,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
 
   "org.postgresql" % "postgresql" % "42.7.7",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0" % Test pomOnly(),
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.10.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.1.0" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,
