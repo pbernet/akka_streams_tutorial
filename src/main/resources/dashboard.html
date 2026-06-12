@@ -212,13 +212,13 @@
                 <th>Method</th>
                 <th>Target URL</th>
                 <th>Status</th>
-                <th>Duration</th>
+                <th>Response time</th>
                 <th>Correlation ID</th>
             </tr>
             </thead>
             <tbody id="traffic-tbody">
             <tr>
-                <td colspan="7">Loading traffic data...</td>
+                <td colspan="6">Loading traffic data...</td>
             </tr>
             </tbody>
         </table>
@@ -234,6 +234,12 @@
 
     function formatDuration(ms) {
         return ms ? ms + ' ms' : '-';
+    }
+
+    function setConnectionStatus(connected) {
+        const el = document.getElementById('connection-status');
+        el.textContent = connected ? '🟢 Connected to ReverseProxy' : '🔴 Disconnected from ReverseProxy';
+        el.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
     }
 
     function formatStatus(status) {
@@ -282,7 +288,7 @@
     function updateTrafficTable(traffic) {
         const tbody = document.getElementById('traffic-tbody');
         if (traffic.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No traffic data available</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6">No traffic data available</td></tr>';
             return;
         }
 
@@ -310,8 +316,7 @@
         ws = new WebSocket(wsUrl);
 
         ws.onopen = function () {
-            document.getElementById('connection-status').textContent = '🟢 Connected to ReverseProxy';
-            document.getElementById('connection-status').className = 'connection-status connected';
+            setConnectionStatus(true);
         };
 
         ws.onmessage = function (event) {
@@ -324,8 +329,7 @@
         };
 
         ws.onclose = function () {
-            document.getElementById('connection-status').textContent = '🔴 Disconnected from ReverseProxy';
-            document.getElementById('connection-status').className = 'connection-status disconnected';
+            setConnectionStatus(false);
             // Attempt to reconnect after 3 seconds
             setTimeout(connectWebSocket, 3000);
         };
@@ -342,7 +346,7 @@
             .catch(error => {
                 console.error('Error loading traffic data:', error);
                 document.getElementById('traffic-tbody').innerHTML =
-                    '<tr><td colspan="7">Error loading traffic data</td></tr>';
+                    '<tr><td colspan="6">Error loading traffic data</td></tr>';
             });
     }
 

@@ -6,7 +6,7 @@ import scala.concurrent.duration.*
 
 /**
   * Start [[akkahttp.ReverseProxy]]
-  * Run this simulation from cmd shell:
+  * Run this simulation from terminal:
   * sbt 'Gatling/testOnly ReverseProxySimulation'
   * or from sbt shell:
   * Gatling/testOnly ReverseProxySimulation
@@ -38,45 +38,22 @@ class ReverseProxySimulation extends Simulation {
         .exec(session => session.set("correlationId", session("correlationId").as[Int] + 1))
     }
 
-  // Adjust to scale load
-  val loadFactorMorning = 0.01
-  val loadFactorMidday = 0.02
-  val loadFactorEvening = 0.03
-
-  val morningPeak = scenario("Morning Peak")
-    .exec(scn)
-    .inject(
-      nothingFor(5.seconds), // initial quiet period
-      rampUsers((20 * loadFactorMorning).toInt).during(10.seconds), // ramp up
-      constantUsersPerSec(50 * loadFactorMorning).during(20.seconds), // peak load
-      rampUsersPerSec(50 * loadFactorMorning).to(10 * loadFactorMorning).during(10.seconds), // ramp down
-      constantUsersPerSec(10 * loadFactorMorning).during(10.seconds), // tail off
-      nothingFor(30.seconds) // cool down period
-    )
-
-  val middayPeak = scenario("Midday Peak")
-    .exec(scn)
-    .inject(
-      nothingFor(5.seconds),
-      rampUsers((20 * loadFactorMidday).toInt).during(10.seconds),
-      constantUsersPerSec(50 * loadFactorMidday).during(20.seconds),
-      rampUsersPerSec(50 * loadFactorMidday).to(10 * loadFactorMidday).during(10.seconds),
-      constantUsersPerSec(10 * loadFactorMidday).during(10.seconds),
-      nothingFor(30.seconds)
-    )
-
-  val eveningPeak = scenario("Evening Peak")
-    .exec(scn)
-    .inject(
-      nothingFor(5.seconds),
-      rampUsers((20 * loadFactorEvening).toInt).during(10.seconds),
-      constantUsersPerSec(50 * loadFactorEvening).during(20.seconds),
-      rampUsersPerSec(50 * loadFactorEvening).to(10 * loadFactorEvening).during(10.seconds),
-      constantUsersPerSec(10 * loadFactorEvening).during(10.seconds),
-      nothingFor(30.seconds)
-    )
+  // Adjust loadFactor to scale load per peak
+  def peak(name: String, loadFactor: Double) =
+    scenario(name)
+      .exec(scn)
+      .inject(
+        nothingFor(5.seconds), // initial quiet period
+        rampUsers((20 * loadFactor).toInt).during(10.seconds), // ramp up
+        constantUsersPerSec(50 * loadFactor).during(20.seconds), // peak load
+        rampUsersPerSec(50 * loadFactor).to(10 * loadFactor).during(10.seconds), // ramp down
+        constantUsersPerSec(10 * loadFactor).during(10.seconds), // tail off
+        nothingFor(30.seconds) // cool down period
+      )
 
   setUp(
-    morningPeak.andThen(middayPeak).andThen(eveningPeak)
+    peak("Morning Peak", 0.01)
+      .andThen(peak("Midday Peak", 0.02))
+      .andThen(peak("Evening Peak", 0.03))
   ).protocols(httpProtocol)
 }

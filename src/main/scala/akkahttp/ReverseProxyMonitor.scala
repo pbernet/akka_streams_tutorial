@@ -108,15 +108,15 @@ object ReverseProxyMonitor {
 
     binding.onComplete {
       case Success(b) =>
-        logger.info(s"ReverseProxyMonitor dashboard started at http://localhost:${b.localAddress.getPort}")
+        logger.info(s"ReverseProxyMonitor: dashboard started at http://localhost:${b.localAddress.getPort}")
       case Failure(e) =>
-        logger.error(s"Failed to start ReverseProxyMonitor dashboard: ${e.getMessage}")
+        logger.error(s"ReverseProxyMonitor: failed to start dashboard: ${e.getMessage}")
     }
     browserClient()
     binding
   }
 
-  def browserClient(): AnyVal = {
+  def browserClient(): Unit = {
     val os = System.getProperty("os.name").toLowerCase
     if (os == "mac os x") Process(s"open http://127.0.0.1:9000").!
     else if (os.startsWith("windows")) Seq("cmd", "/c", s"start http://127.0.0.1:9000").!
@@ -139,7 +139,7 @@ object ReverseProxyMonitor {
 
     val entry = TrafficEntry(requestInfo)
     addToHistory(entry)
-    logger.debug(s"Logged request: $correlationId -> $targetUrl")
+    logger.debug(s"[$correlationId] ReverseProxyMonitor: logged request -> $targetUrl")
     requestId
   }
 
@@ -156,7 +156,7 @@ object ReverseProxyMonitor {
     )
 
     updateHistoryWithResponse(requestId, responseInfo, responseTimeMs)
-    logger.debug(s"Logged response: $correlationId -> ${response.status.intValue()} (${responseTimeMs}ms)")
+    logger.debug(s"[$correlationId] ReverseProxyMonitor: logged response -> ${response.status.intValue()} (${responseTimeMs}ms)")
   }
 
   def logCircuitBreakerEvent(target: String, state: String): Unit = {
@@ -166,7 +166,7 @@ object ReverseProxyMonitor {
       closedSince = if (state.equals("CLOSED")) Some(Instant.now().toEpochMilli) else None
     )
     circuitBreakerStates.put(target, circuitBreakerStatus)
-    logger.info(s"Circuit breaker for: $target changed to: $state")
+    logger.info(s"ReverseProxyMonitor: circuit breaker for: $target changed to: $state")
   }
 
 
@@ -184,7 +184,7 @@ object ReverseProxyMonitor {
         trafficHistory.remove(entry)
         trafficHistory.offer(entry.copy(response = Some(responseInfo), duration = Some(duration)))
       case None =>
-        logger.warn(s"Could not find request entry for response: $requestId")
+        logger.warn(s"ReverseProxyMonitor: could not find request entry for response: $requestId")
     }
   }
 

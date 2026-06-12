@@ -57,11 +57,14 @@ import scala.util.{Failure, Success}
   *
   * curl client:
   * curl -H "Host: local" -H "X-Correlation-ID: 1-1" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/mypath
-  * curl -H "Host: remote" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/200
+  * curl -H "Host: remote" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/status/200
   *
-  * wrk perf client:
-  * wrk -t2 -c10 -d10s -H "Host: local" --latency http://127.0.0.1:8080/mypath
-  * wrk -t2 -c10 -d10s -H "Host: remote" --latency http://127.0.0.1:8080/200
+  * wrk perf clients:
+  * wrk -t1 -c5 -d10s -H "Host: local" -H "X-Correlation-ID: wrk-t1" --latency http://127.0.0.1:8080/mypath &
+  * wrk -t1 -c5 -d10s -H "Host: local" -H "X-Correlation-ID: wrk-t2" --latency http://127.0.0.1:8080/mypath &
+  *
+  * Without Correlation-ID:
+  * wrk -t2 -c10 -d10s -H "Host: remote" --latency http://127.0.0.1:8080/status/200
   *
   * Doc:
   * https://pekko.apache.org/docs/pekko/current/common/circuitbreaker.html
@@ -116,7 +119,7 @@ object ReverseProxy extends App {
 
   // HTTP client(s)
   def clients(nbrOfClients: Int = 1, requestsPerClient: Int = 1, mode: Mode): Unit = {
-    logger.info(s"Running $nbrOfClients client(s), each sending $requestsPerClient requests")
+    logger.info(s"ReverseProxy: Running $nbrOfClients client(s), each sending $requestsPerClient requests")
     val clients = 1 to nbrOfClients
     clients.par.foreach(clientID => httpClient(clientID, proxyHost, proxyPort, mode, requestsPerClient))
 
@@ -124,7 +127,7 @@ object ReverseProxy extends App {
       def logResponse(response: HttpResponse): Unit = {
         val id = response.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
         val msg = response.entity.dataBytes.runReduce(_ ++ _).map(data => data.utf8String)
-        msg.onComplete(msg => logger.info(s"Client: $clientId got response: ${response.status.intValue()} for id: $id and msg: ${msg.getOrElse("N/A")}"))
+        msg.onComplete(msg => logger.info(s"[$id] Client: $clientId got response: ${response.status.intValue()} with msg: ${msg.getOrElse("N/A")}"))
       }
 
       val fixedPath = mode match {
@@ -134,7 +137,7 @@ object ReverseProxy extends App {
 
       Source(1 to nbrOfRequests)
         .throttle(1, 2.seconds, 10, ThrottleMode.shaping)
-        .wireTap(each => logger.info(s"Client: $clientId about to send request with id: $clientId-$each..."))
+        .wireTap(each => logger.info(s"[$clientId-$each] Client: $clientId about to send request..."))
         .mapAsync(1)(each => http.singleRequest(HttpRequest(uri = s"http://$proxyHost:$proxyPort/$fixedPath")
           .withHeaders(Seq(RawHeader("Host", targetHost.toString), RawHeader("X-Correlation-ID", s"$clientId-$each")))))
         .wireTap(response => logResponse(response))
@@ -144,20 +147,10 @@ object ReverseProxy extends App {
 
   // ReverseProxy server
   def reverseProxy(): Unit = {
-    def NotFound(id: String, path: String) = HttpResponse(
-      404,
-      entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(s"$path not found")).noSpaces)
-    ).withHeaders(Seq(RawHeader("X-Correlation-ID", id)))
-
-    def GatewayTimeout(id: String) = HttpResponse(
-      504,
-      entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(s"Target server timeout")).noSpaces)
-    ).withHeaders(Seq(RawHeader("X-Correlation-ID", id)))
-
-    def BadGateway(id: String, message: String) = HttpResponse(
-      502,
+    def errorResponse(status: StatusCode, id: String, message: String): HttpResponse = HttpResponse(
+      status,
       entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message)).noSpaces)
-    ).withHeaders(Seq(RawHeader("X-Correlation-ID", id)))
+    ).withHeaders(RawHeader("X-Correlation-ID", id))
 
     def handlerWithCircuitBreaker(request: HttpRequest): Future[HttpResponse] = {
       val host = request.header[Host].map(_.host.address()).getOrElse("N/A")
@@ -166,37 +159,33 @@ object ReverseProxy extends App {
 
       val startTime = System.currentTimeMillis()
 
-      def headers(target: Target) = {
-        val headersIn: Seq[HttpHeader] =
-          request.headers.filterNot(t => t.name() == "Host") :+
-            Host(target.host, target.port) :+
-            RawHeader("X-Forwarded-Host", host) :+
-            RawHeader("X-Forwarded-Scheme", request.uri.scheme) :+
-            RawHeader("X-Correlation-ID", id)
-
-        // Filter, to avoid log noise, see: https://github.com/akka/akka-http/issues/64
-        val filteredHeaders = headersIn.toList.filterNot(each => each.name() == "Timeout-Access")
-        filteredHeaders
+      def errorResponseFor(e: Throwable): HttpResponse = e match {
+        case e: CircuitBreakerOpenException => errorResponse(StatusCodes.BadGateway, id, e.getMessage)
+        case _: TimeoutException => errorResponse(StatusCodes.GatewayTimeout, id, "Target server timeout")
+        case e => errorResponse(StatusCodes.BadGateway, id, e.getMessage)
       }
 
-      def uri(target: Target) = {
-        val uri: Uri = request.uri.copy(
+      def headers(target: Target): Seq[HttpHeader] =
+        (request.headers.filterNot(_.name() == "Host") :+
+          Host(target.host, target.port) :+
+          RawHeader("X-Forwarded-Host", host) :+
+          RawHeader("X-Forwarded-Scheme", request.uri.scheme) :+
+          RawHeader("X-Correlation-ID", id))
+          // Filter Timeout-Access to avoid log noise, see: https://github.com/akka/akka-http/issues/64
+          .filterNot(_.name() == "Timeout-Access")
+
+      def uri(target: Target): Uri =
+        request.uri.copy(
           scheme = target.scheme,
-          authority = Authority(host = Uri.NamedHost(target.host), port = target.port))
-        uri
-      }
+          authority = Authority(Uri.NamedHost(target.host), target.port))
 
-      case class HashAccumulator(digest: MessageDigest, payload: ByteString, length: Int)
-
-      def computeHashFromPayloadAndPayloadLength: Flow[ByteString, HashAccumulator, NotUsed] =
-        Flow[ByteString].fold(HashAccumulator(
-          MessageDigest.getInstance("SHA-256"),
-          ByteString.empty,
-          0)) { (acc, chunk) =>
-          val bytes = chunk.toArray
-          acc.digest.update(bytes, 0, bytes.length)
-          HashAccumulator(acc.digest, acc.payload ++ chunk, acc.length + chunk.length)
-        }
+      def contentHashHeader: Flow[ByteString, RawHeader, NotUsed] =
+        Flow[ByteString]
+          .fold(MessageDigest.getInstance("SHA-256")) { (digest, chunk) =>
+            digest.update(chunk.toArray)
+            digest
+          }
+          .map(digest => RawHeader("X-Content-Hash", Hex.toHexString(digest.digest())))
 
 
       services.get(mode) match {
@@ -204,7 +193,7 @@ object ReverseProxy extends App {
           val seq = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
           val index = requestCounter.incrementAndGet() % (if (seq.isEmpty) 1 else seq.size)
           val target = seq(index)
-          logger.info(s"Forwarding request with id: $id to $mode target server: ${target.url}")
+          logger.info(s"[$id] ReverseProxy: Forwarding request to $mode target server: ${target.url}")
 
           val requestId = ReverseProxyMonitor.logRequest(request, target.url, id)
 
@@ -224,11 +213,8 @@ object ReverseProxy extends App {
 
           //  Example of an on-the-fly processing scenario
           val hashFuture = request.entity.dataBytes
-            .via(computeHashFromPayloadAndPayloadLength)
+            .via(contentHashHeader)
             .runWith(Sink.head)
-            .map { accumulator =>
-              RawHeader("X-Content-Hash", Hex.toHexString(accumulator.digest.digest()))
-            }
 
           hashFuture.flatMap { hashHeader =>
             val proxyReq = request
@@ -243,26 +229,16 @@ object ReverseProxy extends App {
             }
           }.andThen {
             case Success(response) =>
-              val responseTime = System.currentTimeMillis() - startTime
-              ReverseProxyMonitor.logResponse(requestId, response, responseTime, id)
+              ReverseProxyMonitor.logResponse(requestId, response, System.currentTimeMillis() - startTime, id)
             case Failure(exception) =>
-              val responseTime = System.currentTimeMillis() - startTime
-              val errorResponse = exception match {
-                case e: CircuitBreakerOpenException => BadGateway(id, e.getMessage)
-                case _: TimeoutException => GatewayTimeout(id)
-                case e => BadGateway(id, e.getMessage)
-              }
-              ReverseProxyMonitor.logResponse(requestId, errorResponse, responseTime, id, Some(exception.getMessage))
+              ReverseProxyMonitor.logResponse(requestId, errorResponseFor(exception), System.currentTimeMillis() - startTime, id, Some(exception.getMessage))
           }.recover {
-            case e: CircuitBreakerOpenException => BadGateway(id, e.getMessage)
-            case _: TimeoutException => GatewayTimeout(id)
-            case e => BadGateway(id, e.getMessage)
+            case exception => errorResponseFor(exception)
           }
         case None =>
           val requestId = ReverseProxyMonitor.logRequest(request, host, id)
-          val notFoundResponse = NotFound(id, host)
-          val responseTime = System.currentTimeMillis() - startTime
-          ReverseProxyMonitor.logResponse(requestId, notFoundResponse, responseTime, id, Some("Host not found"))
+          val notFoundResponse = errorResponse(StatusCodes.NotFound, id, s"$host not found")
+          ReverseProxyMonitor.logResponse(requestId, notFoundResponse, System.currentTimeMillis() - startTime, id, Some("Host not found"))
           Future.successful(notFoundResponse)
       }
     }
@@ -270,14 +246,14 @@ object ReverseProxy extends App {
 
     futReverseProxy.onComplete {
       case Success(b) =>
-        logger.info("ReverseProxy started, listening on: " + b.localAddress)
+        logger.info(s"ReverseProxy: started, listening on: ${b.localAddress}")
       case Failure(e) =>
-        logger.info(s"ReverseProxy failed. Exception message: ${e.getMessage}")
+        logger.info(s"ReverseProxy: failed. Exception message: ${e.getMessage}")
         system.terminate()
     }
   }
 
-  // Local target servers (with faulty behaviour and throttled)
+  // Local target servers (with faulty behavior and throttled)
   def localTargetServers(maxConnections: Int): Unit = {
     val echoRoute: Route =
       extractRequest { request =>
@@ -286,7 +262,7 @@ object ReverseProxy extends App {
           val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
 
           val randomResponseCode = responseCodes(new scala.util.Random().nextInt(responseCodes.length))
-          logger.info(s"Target server: ${request.uri.authority.host}:${request.uri.effectivePort} got echo request with id: $id, reply with: $randomResponseCode")
+          logger.info(s"[$id] Target server: ${request.uri.authority.host}:${request.uri.effectivePort} got echo request, reply with: $randomResponseCode")
           (StatusCode.int2StatusCode(randomResponseCode), Seq(RawHeader("X-Correlation-ID", id)))
         }
       }
@@ -305,9 +281,9 @@ object ReverseProxy extends App {
 
         futTargetServer.onComplete {
           case Success(b) =>
-            logger.info(s"Local target server started, listening on: ${b.localAddress}")
+            logger.info(s"Local target server: started, listening on: ${b.localAddress}")
           case Failure(e) =>
-            logger.info(s"Local target server could not bind to... Exception message: ${e.getMessage}")
+            logger.info(s"Local target server: could not bind to... Exception message: ${e.getMessage}")
             system.terminate()
         }
       }
@@ -358,14 +334,9 @@ object Retry {
         f.onComplete {
           case Success(httpResponse: HttpResponse) if httpResponse.status.intValue() >= 500 =>
             val id = httpResponse.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
-            logger.info(s"ReverseProxy got 5xx server error for id: $id. Retries left: ${times - 1}")
+            logger.info(s"[$id] ReverseProxy: got 5xx server error. Retries left: ${times - 1}")
             val exception = new RuntimeException(s"Received: ${httpResponse.status.intValue()} from target server")
-            if (times == 1) {
-              // Last retry failed - propagate as failure to CircuitBreaker
-              promise.tryFailure(exception)
-            } else {
-              retryPromise[T](times - 1, promise, Some(exception), f)
-            }
+            retryPromise[T](times - 1, promise, Some(exception), f)
           case Success(t) => promise.trySuccess(t)
           case Failure(e) => retryPromise[T](times - 1, promise, Some(e), f)
         }
