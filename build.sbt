@@ -20,7 +20,7 @@ val sttpVersion = "3.11.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.25.32"
 val gatlingVersion = "3.14.9"
-val circeVersion = "0.14.14"
+val circeVersion = "0.14.16"
 
 val langchain4jVersion = "1.13.1"
 val langchain4jEmbeddingsVersion = "1.11.6-beta19"
