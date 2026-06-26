@@ -92,9 +92,9 @@ object ReverseProxy extends App {
       Target.weighted("http://127.0.0.1:9083", 3)
     ),
     Mode.remote -> Seq(
-      Target.weighted("https://httpbin.org:443", 1),
-      Target.weighted("https://httpbin.org:443", 2),
-      Target.weighted("https://httpbin.org:443", 3)
+      Target.weighted("https://httpbingo.org:443", 1),
+      Target.weighted("https://httpbingo.org:443", 2),
+      Target.weighted("https://httpbingo.org:443", 3)
     )
   )
 
