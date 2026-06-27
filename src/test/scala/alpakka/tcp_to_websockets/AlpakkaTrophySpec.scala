@@ -3,7 +3,7 @@ package alpakka.tcp_to_websockets
 import alpakka.env.WebsocketServer
 import alpakka.tcp_to_websockets.hl7mllp.{Hl7Tcp2Kafka, Hl7TcpClient}
 import alpakka.tcp_to_websockets.websockets.{Kafka2SSE, Kafka2Websocket}
-import io.github.embeddedkafka.EmbeddedKafka
+import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{BeforeAndAfterEachTestData, TestData}
@@ -24,6 +24,10 @@ import util.LogFileScanner
 final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAndAfterEachTestData {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  // Avoid collision with the WebsocketServer port (6002)
+  implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
+    EmbeddedKafkaConfig(kafkaPort = 6001, controllerPort = 6003)
+
   private var bootstrapServer: String = _
   var mappedPortKafka: Int = _
 
@@ -37,8 +41,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       val numberOfMessages = 10
       Hl7TcpClient(numberOfMessages)
 
-      // With EmbeddedKafka there is one ERROR due to flaky port binding at the start
-      new LogFileScanner().run(10, 10, "Starting test: Happy path should find all processed messages in WebsocketServer log", "ERROR").length should equal(1)
+      new LogFileScanner().run(10, 10, "Starting test: Happy path should find all processed messages in WebsocketServer log", "ERROR").length should equal(0)
       // 10 + 1 Initial message
       new LogFileScanner().run(10, 10, "Starting test: Happy path should find all processed messages in WebsocketServer log", "WebsocketServer received:").length should equal(numberOfMessages + 1)
     }
@@ -91,8 +94,8 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
 
       // The restart of the Kafka consumer and the recovery of the ws connection needs a long time...
       // Unfortunately, even with the pessimistic connection check approach in Kafka2Websocket>>safeSendToWebsocket,
-      // due to the async sending via SourceQueue, we may loose in-flight message(s) sometimes :-(
-      // 10 - 1 (lost in-flight message) + 1 (initial message)
+      // due to the async sending via SourceQueue, we may lose in-flight message(s) sometimes :-(
+      // 10 - 1 (= lost in-flight message) + 1 (= initial message)
       new LogFileScanner().run(30, 10, "Starting test: NOT Happy path should recover after WebsocketServer restart", "WebsocketServer received:").length should be >= (numberOfMessages - 1 + 1)
     }
 
@@ -108,8 +111,7 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       bootstrapServer = s"localhost:$mappedPortKafka"
       logger.info(s"Re-started Kafka on mapped port: $mappedPortKafka")
 
-      // Now we need to restart the components sending/receiving to/from Kafka as well,
-      // to connect to the new mapped port
+      // Restart the components sending/receiving to/from Kafka allow to connect to the new mapped port
       hl7Tcp2Kafka.stop()
       hl7Tcp2Kafka = Hl7Tcp2Kafka(mappedPortKafka)
       hl7Tcp2Kafka.run()
@@ -122,8 +124,11 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
       kafka2SSE = Kafka2SSE(mappedPortKafka)
       kafka2SSE.run()
 
-      // 10 + 1 Initial message
-      new LogFileScanner().run(30, 10, "Starting test: NOT Happy path should recover after Kafka restart", "WebsocketServer received:").length should be >= (numberOfMessages + 1)
+      // Across a full in-memory Kafka restart, messages produced to the old broker
+      // but not yet consumed are lost (no persistence, already ACKed to client).
+      // Allow for that inherent in-flight loss; both InitialMsgs (pre- and
+      // post-restart) are delivered, so the best case would be: numberOfMessages + 2.
+      new LogFileScanner().run(30, 10, "Starting test: NOT Happy path should recover after Kafka restart", "WebsocketServer received:").length should be >= (numberOfMessages)
     }
   }
 

@@ -16,7 +16,7 @@ import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
   *  - Use Confluent Cloud, see: https://www.confluent.io/confluent-cloud/#view-pricing
   */
 object KafkaServerEmbedded extends App {
-  implicit val config: EmbeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 29092, zooKeeperPort = 2181)
+  implicit val config: EmbeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 29092)
   EmbeddedKafka.start()
 
   sys.addShutdownHook {

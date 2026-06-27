@@ -46,6 +46,9 @@ class LogFileScanner(localLogFilePath: String = "logs/application.log") {
 
     val resultList = Await.result(resultFut, 1.seconds)
     println(s"Occurrences found: ${resultList.length}")
+
+    Await.result(system.terminate(), 5.seconds)
+
     resultList.toList
   }
 
