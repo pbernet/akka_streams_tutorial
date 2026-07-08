@@ -3,4 +3,4 @@
 //addDependencyTreePlugin
 
 // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
-addSbtPlugin("io.gatling" % "gatling-sbt" % "4.18.3")
+addSbtPlugin("io.gatling" % "gatling-sbt" % "4.18.4")
