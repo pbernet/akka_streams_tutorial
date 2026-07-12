@@ -71,7 +71,7 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
 
   private def handleChangedFiles(uploadDirPath: Path) = {
     logger.info(s"About to start listening for file changes in dir: $uploadDirPath")
-    val observer = new FileAlterationObserver(uploadDirPath.toString)
+    val observer = FileAlterationObserver.builder().setPath(uploadDirPath).get()
     val monitor = new FileAlterationMonitor(1000)
     val listener = new FileAlterationListenerAdaptor() {
 
