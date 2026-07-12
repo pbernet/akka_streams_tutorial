@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Docling document parsing service
   # Note that this needs a lot of CPU/GPU power, config Docker accordingly

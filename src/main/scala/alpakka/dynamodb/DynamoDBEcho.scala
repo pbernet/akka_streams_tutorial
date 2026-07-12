@@ -10,11 +10,9 @@ import org.apache.pekko.stream.scaladsl.{FlowWithContext, Sink, Source}
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
-import software.amazon.awssdk.core.internal.retry.SdkDefaultRetrySetting
-import software.amazon.awssdk.core.retry.RetryPolicy
-import software.amazon.awssdk.core.retry.backoff.BackoffStrategy
-import software.amazon.awssdk.core.retry.conditions.RetryCondition
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.retries.StandardRetryStrategy
+import software.amazon.awssdk.retries.api.RetryStrategy
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 
@@ -147,6 +145,8 @@ class DynamoDBEcho(urlWithMappedPort: URI, accessKey: String, secretKey: String,
   }
 
   private def createAsyncClient() = {
+    val retryStrategy: RetryStrategy = StandardRetryStrategy.builder().build()
+
     val client = DynamoDbAsyncClient
       .builder()
       .endpointOverride(urlWithMappedPort)
@@ -154,21 +154,14 @@ class DynamoDBEcho(urlWithMappedPort: URI, accessKey: String, secretKey: String,
       .credentialsProvider(credentialsProvider)
       .httpClient(PekkoHttpClient.builder().withActorSystem(system).build())
       // https://pekko.apache.org/docs/pekko-connectors/current/aws-shared-configuration.html
-      // https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/core/retry/RetryPolicy.html
+      // https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/retries/api/RetryStrategy.html
       .overrideConfiguration(
         ClientOverrideConfiguration
           .builder()
-          .retryPolicy(
-            RetryPolicy.builder
-              .backoffStrategy(BackoffStrategy.defaultStrategy)
-              .throttlingBackoffStrategy(BackoffStrategy.defaultThrottlingStrategy)
-              .numRetries(SdkDefaultRetrySetting.defaultMaxAttempts)
-              .retryCondition(RetryCondition.defaultRetryCondition)
-              .build)
+          .retryStrategy(retryStrategy)
           .build())
       .build()
     system.registerOnTermination(client.close())
     client
   }
 }
-
