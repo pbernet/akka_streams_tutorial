@@ -146,7 +146,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
     }
 
 
-    def download(fileHandle: HttpFileEchoStream.FileHandle) = {
+    def download(fileHandle: FileHandle) = {
       val queueSize = 1
       val hostConnectionPoolDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
       val queue =

@@ -7,14 +7,14 @@ import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source, Tcp}
 import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.collection.parallel.CollectionConverters.ImmutableIterableIsParallelizable
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 /**
   * Client to send HL7 msgs to [[Hl7Tcp2Kafka]]
+  * Also used in [[AlpakkaTrophySpec]]
   */
-class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
+class Hl7TcpClient(messagesPerClient: Int = 100, numberOfClients: Int = 1) extends MllpProtocol {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
@@ -23,7 +23,7 @@ class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
   val (address, port) = ("127.0.0.1", 6160)
   val connection: Flow[ByteString, ByteString, Future[Tcp.OutgoingConnection]] = Tcp().outgoingConnection(address, port)
 
-  (1 to 2).par.foreach(each => localSingleMessageClient(each, numberOfMessages))
+  (1 to numberOfClients).foreach(client => localSingleMessageClient(client, messagesPerClient))
 
   def localSingleMessageClient(client: Int, nbrOfMgs: Int): Unit = {
     Source(1 to nbrOfMgs)
@@ -78,7 +78,8 @@ class Hl7TcpClient(numberOfMessages: Int = 100) extends MllpProtocol {
 }
 
 object Hl7TcpClient extends App {
-  val client = new Hl7TcpClient()
+  val client = new Hl7TcpClient(numberOfClients = 2)
 
-  def apply(numberOfMessages: Int = 100): Hl7TcpClient = new Hl7TcpClient(numberOfMessages)
+  def apply(messagesPerClient: Int = 100, numberOfClients: Int = 1): Hl7TcpClient =
+    new Hl7TcpClient(messagesPerClient, numberOfClients)
 }

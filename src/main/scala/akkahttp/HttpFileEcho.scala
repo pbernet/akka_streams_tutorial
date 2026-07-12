@@ -16,24 +16,16 @@ import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import java.io.File
 import java.nio.file.Paths
 import java.time.LocalTime
-import scala.annotation.unchecked.uncheckedStable
 import scala.collection.parallel.CollectionConverters.*
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.sys.process.{Process, stringSeqToProcess}
 import scala.util.{Failure, Success}
 
+final case class FileHandle(fileName: String, absolutePath: String, length: Long)
+
 trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
-
-  @uncheckedStable
-  final case class FileHandle(fileName: String, absolutePath: String, length: Long)
-
-  object FileHandle extends ((String, String, Long) => FileHandle) {
-    def apply(fileName: String, absolutePath: String, length: Long): FileHandle =
-      new FileHandle(fileName, absolutePath, length)
-
-    implicit def fileInfoFormat: RootJsonFormat[FileHandle] = jsonFormat3(FileHandle.apply)
-  }
+  implicit val fileInfoFormat: RootJsonFormat[FileHandle] = jsonFormat3(FileHandle.apply)
 }
 
 /**
@@ -145,7 +137,7 @@ object HttpFileEcho extends App with JsonProtocol {
     }
   }
 
-  def uploadClient(id: Int, address: String, port: Int): Future[HttpFileEcho.FileHandle] = {
+  def uploadClient(id: Int, address: String, port: Int): Future[FileHandle] = {
 
     def createEntityFrom(file: File): Future[RequestEntity] = {
       require(file.exists())
