@@ -22,11 +22,29 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success, Try, Using}
 
 case class DocumentInfo(name: String, chunks: Int)
+
+sealed trait DocumentIngestionResult
+
+case class IndexedDocument(document: DocumentInfo) extends DocumentIngestionResult
+
+case class SkippedDocument(fileName: String, reason: String) extends DocumentIngestionResult
+
+case class FailedDocument(fileName: String, cause: Throwable) extends DocumentIngestionResult
+
+case class IngestionResult(
+                            indexed: List[DocumentInfo],
+                            skipped: List[SkippedDocument],
+                            failures: List[FailedDocument]
+                          ) {
+  def documentsIndexed: Int = indexed.size
+
+  def totalChunks: Int = indexed.map(_.chunks).sum
+}
 
 case class RagStatus(
                       status: String,
@@ -145,6 +163,7 @@ class RagEngine(
     * @throws IllegalStateException if OPENAI_API_KEY was not provided at construction
     */
   def initialize(): Unit = {
+    implicit val ec: ExecutionContextExecutor = system.dispatcher
     logger.info("Initializing RAG Engine...")
     logger.info(s"Connecting to PostgreSQL at $dbHost:$dbPort/$dbName")
     logger.info(s"Documents path: $documentsPath")
@@ -158,7 +177,15 @@ class RagEngine(
     assistant = createAssistant()
     logger.info("RAG Engine initialized - assistant ready, starting async document ingestion...")
 
-    startAsyncIngestion()
+    def handleIngestionFailure(ex: Throwable): Unit = {
+      ingesting = false
+      logger.error(s"Async ingestion stream failed: ${ex.getMessage}", ex)
+    }
+
+    Try(startAsyncIngestion()) match {
+      case Success(ingestion) => ingestion.failed.foreach(handleIngestionFailure)
+      case Failure(ex) => handleIngestionFailure(ex)
+    }
   }
 
   /**
@@ -383,13 +410,22 @@ class RagEngine(
   }
 
 
-  private def processDocument(path: Path): DocumentInfo = {
+  private def processDocument(path: Path): DocumentIngestionResult = {
     val fileName = path.getFileName.toString
-    if (DoclingChunkingService.isAvailable) {
-      processWithDocling(path, fileName)
-    } else {
-      logger.warn(s"Docling server unavailable, falling back to Tika for: $fileName")
-      processWithParser(path, fileName)
+    Try {
+      if (DoclingChunkingService.isAvailable) {
+        processWithDocling(path, fileName)
+      } else {
+        logger.warn(s"Docling server unavailable, falling back to Tika for: $fileName")
+        processWithParser(path, fileName)
+      }
+    } match {
+      case Success(document) if document.chunks > 0 =>
+        IndexedDocument(document)
+      case Success(_) =>
+        SkippedDocument(fileName, "No chunks were produced")
+      case Failure(ex) =>
+        FailedDocument(fileName, ex)
     }
   }
 
@@ -447,8 +483,8 @@ class RagEngine(
               logger.warn(s"No text extracted from file: $fileName")
               DocumentInfo(fileName, 0)
             }
-          case Failure(_) =>
-            DocumentInfo(fileName, 0)
+          case Failure(ex) =>
+            throw ex
         }
       case None =>
         logger.warn(s"No parser available for file: $fileName")
@@ -456,53 +492,67 @@ class RagEngine(
     }
   }
 
-  private def startAsyncIngestion(): Unit = {
+  private def startAsyncIngestion(): Future[IngestionResult] = {
+    implicit val ec = system.dispatcher
     val documentsDir = Paths.get(documentsPath)
 
     if (!Files.exists(documentsDir)) {
       logger.warn(s"Documents directory does not exist: $documentsPath")
       Files.createDirectories(documentsDir)
       logger.info(s"Created documents directory: $documentsPath")
-      return
+      return Future.successful(IngestionResult(Nil, Nil, Nil))
     }
 
-    val documentFiles = Files.list(documentsDir)
-      .iterator()
-      .asScala
-      .filter { path =>
-        val fileName = path.toString.toLowerCase
-        supportedExtensions.exists(fileName.endsWith)
-      }
-      .toList
+    val documentFiles = Using.resource(Files.list(documentsDir)) { paths =>
+      paths
+        .iterator()
+        .asScala
+        .filter { path =>
+          val fileName = path.toString.toLowerCase
+          supportedExtensions.exists(fileName.endsWith)
+        }
+        .toList
+    }
 
     if (documentFiles.isEmpty) {
       logger.warn(s"No supported document files found in: $documentsPath")
       logger.info(s"Supported formats: ${supportedExtensions.mkString(", ")}")
-      return
+      return Future.successful(IngestionResult(Nil, Nil, Nil))
     }
 
     documentsTotal = documentFiles.size
     ingesting = true
     documentsProcessed = 0
-    logger.info(s"Found ${documentFiles.size} document files - starting async ingestion")
+    logger.info(s"Found: ${documentFiles.size} documents")
 
-    implicit val ec = system.dispatcher
 
     Source(documentFiles)
       .mapAsync(1)(path => Future(processDocument(path)))
-      .runWith(Sink.foreach { doc =>
-        indexedDocuments = indexedDocuments :+ doc
+      .map { result =>
         documentsProcessed += 1
-        logger.info(s"Ingestion progress: $documentsProcessed/$documentsTotal - ${doc.name} (${doc.chunks} chunks)")
+        result match {
+          case IndexedDocument(document) =>
+            indexedDocuments = indexedDocuments :+ document
+            logger.info(s"Ingestion progress: $documentsProcessed/$documentsTotal - ${document.name} (${document.chunks} chunks)")
+          case SkippedDocument(fileName, reason) =>
+            logger.warn(s"Ingestion progress: $documentsProcessed/$documentsTotal - $fileName skipped ($reason)")
+          case FailedDocument(fileName, cause) =>
+            logger.error(s"Ingestion progress: $documentsProcessed/$documentsTotal - $fileName failed", cause)
+        }
+        result
+      }
+      .runWith(Sink.fold(IngestionResult(Nil, Nil, Nil)) {
+        case (result, IndexedDocument(document)) => result.copy(indexed = document :: result.indexed)
+        case (result, skipped: SkippedDocument) => result.copy(skipped = skipped :: result.skipped)
+        case (result, failed: FailedDocument) => result.copy(failures = failed :: result.failures)
       })
-      .onComplete {
-        case scala.util.Success(_) =>
-          ingesting = false
-          val totalChunks = indexedDocuments.map(_.chunks).sum
-          logger.info(s"Async ingestion complete: ${indexedDocuments.size} documents, $totalChunks total chunks")
-        case scala.util.Failure(ex) =>
-          ingesting = false
-          logger.error(s"Async ingestion failed: ${ex.getMessage}", ex)
+      .map { result =>
+        ingesting = false
+        logger.info(
+          s"Async ingestion complete: ${result.documentsIndexed} indexed, " +
+            s"${result.skipped.size} skipped, ${result.failures.size} failed, ${result.totalChunks} chunks total"
+        )
+        result
       }
   }
 

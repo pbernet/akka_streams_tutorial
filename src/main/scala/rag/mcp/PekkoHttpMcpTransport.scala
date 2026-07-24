@@ -63,7 +63,7 @@ class PekkoHttpMcpTransport(
 
     bindingFuture.onComplete {
       case Success(binding) =>
-        logger.info(s"MCP HTTP Server started at http://$host:$port/$path")
+        logger.info(s"MCP HTTP Server started at: http://$host:$port/$path")
       case Failure(ex) =>
         logger.error(s"Failed to bind MCP HTTP server: ${ex.getMessage}", ex)
     }

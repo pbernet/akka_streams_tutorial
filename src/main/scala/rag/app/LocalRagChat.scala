@@ -201,7 +201,7 @@ object LocalRagChat {
 
     Http().newServerAt("localhost", 8090).bind(routes).onComplete {
       case Success(_) =>
-        logger.info(s"RAG Chat server started at http://localhost:8090/rag")
+        logger.info(s"RAG Chat server started at: http://localhost:8090/rag")
 
         val os = System.getProperty("os.name").toLowerCase
         val url = "http://localhost:8090/rag"

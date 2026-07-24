@@ -20,6 +20,4 @@ object LocalRagApplication extends App {
 
   LocalRagChat.start(ragEngine)
   LocalRagMcpServer.start(ragEngine)
-
-  logger.info("Local RAG started: http://localhost:8090/rag and http://localhost:8091/mcp")
 }

@@ -60,9 +60,6 @@ object LocalRagMcpServer {
     server.addTool(createGetStatusTool(ragEngine))
     server.addTool(createConfigureRerankerTool(ragEngine))
 
-    logger.info("MCP Server initialized with tools: query_rag, prepare_query, list_documents, get_status, configure_reranker")
-    logger.info("Listening at http://localhost:8091/mcp")
-
     if (launchInspector) {
       launchMcpInspector()
     }
@@ -326,7 +323,7 @@ object LocalRagMcpServer {
           s"""Status: ${status.status}
              |Message: ${status.message}
              |Documents indexed: ${status.documentsIndexed}
-             |Total chunks: ${status.totalChunks}
+             |Chunks total: ${status.totalChunks}
              |$rerankerInfo""".stripMargin
         } match {
           case Success(result) =>
