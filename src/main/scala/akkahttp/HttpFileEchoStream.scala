@@ -1,6 +1,5 @@
 package akkahttp
 
-import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
@@ -9,6 +8,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.FileInfo
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.scaladsl.{FileIO, Keep, Sink, Source}
 import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
 import org.slf4j.{Logger, LoggerFactory}
@@ -22,8 +22,8 @@ import scala.util.{Failure, Success}
 
 /**
   * Differences to [[HttpFileEcho]]:
-  *  - The upload client is processing a stream of FileHandle
-  *  - The download client is using the host-level API with a SourceQueue
+  *  - The upload client is processing a stream of [[FileHandle]]
+  *  - The download client is using the host-level API with a [[SourceQueue]]
   *
   * Doc:
   * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html#using-the-host-level-api-with-a-queue
@@ -31,7 +31,9 @@ import scala.util.{Failure, Success}
   *
   * Remarks:
   *  - No retry on upload because POST request is non-idempotent
-  *  - Homegrown retry on download, because this does somehow not work yet via the cachedHostConnectionPool
+  *  - The cached host connection pool retries transport failures for the idempotent download GET request.
+  *    A bounded application-level retry handles HTTP 5xx responses, which are valid responses and therefore
+  *    are intentionally not retried by the host connection pool
   *  - Shows more robust behavior with large files than [[akkahttp.HttpFileEcho]]
   */
 object HttpFileEchoStream extends App with JsonProtocol {
@@ -108,7 +110,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
   def roundtripClient(address: String, port: Int) = {
 
     val filesToUpload =
-      // Unbounded stream. Limited for testing purposes by appending eg .take(n)
+      // Unbounded stream. Limit for testing purposes by appending .take(n)
       Source(LazyList.continually(FileHandle(resourceFileName, Paths.get(s"src/main/resources/$resourceFileName").toString, 0))).take(100)
 
     val hostConnectionPoolUpload = Http().cachedHostConnectionPool[FileHandle](address, port)
@@ -148,7 +150,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
     }
 
 
-    def download(fileHandle: FileHandle) = {
+    def download(fileHandle: FileHandle): Future[Unit] = {
       val queueSize = 1
       val hostConnectionPoolDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
       val queue =
@@ -170,29 +172,32 @@ object HttpFileEchoStream extends App with JsonProtocol {
         }
       }
 
-      def downloadRetry(fileHandle: FileHandle): Future[NotUsed] = {
-        queueRequest(createDownloadRequestBlocking(fileHandle)).flatMap(response =>
-
+      def downloadWithRetry(fileHandle: FileHandle, retriesRemaining: Int): Future[Unit] = {
+        queueRequest(createDownloadRequestBlocking(fileHandle)).flatMap { response =>
           if (response.status.isSuccess()) {
             val localFile = File.createTempFile("downloadLocal", ".tmp.client")
-            val result = response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
-            result.map {
-              ioresult =>
-                logger.info(s"Client: Finished download file: $response (size: ${ioresult.count} bytes)")
-            }
+            response.entity.dataBytes
+              .runWith(FileIO.toPath(localFile.toPath))
+              .map { ioResult =>
+                logger.info(s"Client: Finished download file: $response (size: ${ioResult.count} bytes)")
+              }
           } else {
-            throw new RuntimeException("Retry")
+            val status = response.status
+            response.discardEntityBytes().future.flatMap { _ =>
+              if (status.intValue() >= 500 && status.intValue() < 600 && retriesRemaining > 0) {
+                logger.warn(s"Download returned: $status. Retries remaining: $retriesRemaining")
+                after(1.second, system.scheduler) {
+                  downloadWithRetry(fileHandle, retriesRemaining - 1)
+                }
+              } else {
+                Future.failed(new RuntimeException(s"Download failed with status: $status"))
+              }
+            }
           }
-        ).recoverWith {
-          case ex: RuntimeException =>
-            logger.warn("About to retry download...", ex)
-            downloadRetry(fileHandle)
-          case e: Throwable => Future.failed(e)
         }
-        Future(NotUsed)
       }
 
-      downloadRetry(fileHandle)
+      downloadWithRetry(fileHandle, retriesRemaining = 5)
     }
 
     filesToUpload
@@ -206,18 +211,19 @@ object HttpFileEchoStream extends App with JsonProtocol {
       // report each response
       // Note: responses will NOT come in the same order as requests. The requests will be run on one of the
       // multiple pooled connections and may thus "overtake" each other!
-      .runForeach {
+      .mapAsync(1) {
         case (Success(response: HttpResponse), fileToUpload) =>
           logger.info(s"Client: Uploaded file: $fileToUpload (status: ${response.status})")
 
-          val fileHandleFuture = Unmarshal(response.entity).to[FileHandle]
-          val fileHandle = Await.result(fileHandleFuture, 1.second)
-
-          // Finish the roundtrip
-          download(fileHandle)
+          // Keep the download Future in the stream so completion and failures are observed.
+          Unmarshal(response.entity)
+            .to[FileHandle]
+            .flatMap(download)
 
         case (Failure(ex), fileToUpload) =>
           logger.error(s"Uploading file failed: $fileToUpload", ex)
+          Future.unit
       }
+      .runWith(Sink.ignore)
   }
 }
