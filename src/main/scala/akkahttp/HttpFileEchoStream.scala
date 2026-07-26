@@ -5,12 +5,13 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.server.Directives.{complete, logRequestResult, path, *}
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.FileInfo
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.scaladsl.{FileIO, Keep, Sink, Source}
 import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Paths
@@ -25,15 +26,16 @@ import scala.util.{Failure, Success}
   *  - The download client is using the host-level API with a SourceQueue
   *
   * Doc:
-  * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html#using-the-host-level-api-with-a-queue
-  * https://doc.akka.io/docs/akka-http/current/client-side/host-level.html?language=scala#retrying-a-request
+  * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html#using-the-host-level-api-with-a-queue
+  * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html#retrying-a-request
   *
   * Remarks:
   *  - No retry on upload because POST request is non-idempotent
-  *  - Homegrown retry on download, because this does somehow not work yet via the cachedHostConnectionPool$
-  *  - Shows more robust behaviour with large files than [[akkahttp.HttpFileEcho]]
+  *  - Homegrown retry on download, because this does somehow not work yet via the cachedHostConnectionPool
+  *  - Shows more robust behavior with large files than [[akkahttp.HttpFileEcho]]
   */
 object HttpFileEchoStream extends App with JsonProtocol {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
@@ -48,8 +50,8 @@ object HttpFileEchoStream extends App with JsonProtocol {
     def throwRndRuntimeException(operation: String): Unit = {
       val time = LocalTime.now()
       if (time.getSecond % 2 == 0) {
-        val msg = s"Server RuntimeException during $operation at: $time"
-        println(msg)
+        val msg = s"Server RuntimeException during: $operation at: $time"
+        logger.error(msg)
         throw new RuntimeException(s"BOOM - $msg")
       }
     }
@@ -61,7 +63,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
 
         storeUploadedFile("binary", tempDestination) {
           case (metadataFromClient: FileInfo, uploadedFile: File) =>
-            println(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+            logger.info(s"Server: Stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
 
             // Activate to simulate rnd server ex during upload
             //throwRndRuntimeException("upload")
@@ -72,7 +74,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle =>
-              println(s"Server: Received download request for: ${fileHandle.fileName}")
+              logger.info(s"Server: Received download request for: ${fileHandle.fileName}")
 
               // Activate to simulate rnd server ex during download
               //throwRndRuntimeException("download")
@@ -86,17 +88,17 @@ object HttpFileEchoStream extends App with JsonProtocol {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info(s"Server started, listening on: ${b.localAddress}")
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.error(s"Server could not bind to $address:$port", e)
         system.terminate()
     }
     sys.addShutdownHook {
-      println("About to shutdown...")
+      logger.info("About to shut down...")
       val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-      println("Waiting for connections to terminate...")
+      logger.info("Waiting for connections to terminate...")
       val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-      println("Connections terminated")
+      logger.info("Connections terminated")
       onceAllConnectionsTerminated.flatMap { _ => system.terminate()
       }
     }
@@ -123,7 +125,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
     }
 
     def createUploadRequest(fileToUpload: FileHandle): Future[(HttpRequest, FileHandle)] = {
-      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/upload"))
+      val target = Uri(s"http://$address:$port").withPath(Uri.Path("/upload"))
 
       createEntityFrom(new File(fileToUpload.absolutePath))
         .map(entity => HttpRequest(HttpMethods.POST, uri = target, entity = entity))
@@ -133,13 +135,13 @@ object HttpFileEchoStream extends App with JsonProtocol {
 
     def createDownloadRequest(fileToDownload: FileHandle): Future[HttpRequest] = {
       Marshal(fileToDownload).to[RequestEntity].map { entity =>
-        val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
+        val target = Uri(s"http://$address:$port").withPath(Uri.Path("/download"))
         HttpRequest(HttpMethods.GET, uri = target, entity = entity)
       }
     }
 
     def createDownloadRequestBlocking(fileToDownload: FileHandle) = {
-      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
+      val target = Uri(s"http://$address:$port").withPath(Uri.Path("/download"))
       val entityFuture = Marshal(fileToDownload).to[MessageEntity]
       val entity = Await.result(entityFuture, 1.second)
       HttpRequest(HttpMethods.GET, target, entity = entity)
@@ -176,14 +178,14 @@ object HttpFileEchoStream extends App with JsonProtocol {
             val result = response.entity.dataBytes.runWith(FileIO.toPath(Paths.get(localFile.getAbsolutePath)))
             result.map {
               ioresult =>
-                println(s"Client: Finished download file: $response (size: ${ioresult.count} bytes)")
+                logger.info(s"Client: Finished download file: $response (size: ${ioresult.count} bytes)")
             }
           } else {
             throw new RuntimeException("Retry")
           }
         ).recoverWith {
           case ex: RuntimeException =>
-            println(s"About to retry download, because of: $ex")
+            logger.warn("About to retry download...", ex)
             downloadRetry(fileHandle)
           case e: Throwable => Future.failed(e)
         }
@@ -202,11 +204,11 @@ object HttpFileEchoStream extends App with JsonProtocol {
       // then dispatch the request to the connection pool
       .via(hostConnectionPoolUpload)
       // report each response
-      // Note: responses will NOT come in in the same order as requests. The requests will be run on one of the
+      // Note: responses will NOT come in the same order as requests. The requests will be run on one of the
       // multiple pooled connections and may thus "overtake" each other!
       .runForeach {
         case (Success(response: HttpResponse), fileToUpload) =>
-          println(s"Client: Uploaded file: $fileToUpload (status: ${response.status})")
+          logger.info(s"Client: Uploaded file: $fileToUpload (status: ${response.status})")
 
           val fileHandleFuture = Unmarshal(response.entity).to[FileHandle]
           val fileHandle = Await.result(fileHandleFuture, 1.second)
@@ -215,7 +217,7 @@ object HttpFileEchoStream extends App with JsonProtocol {
           download(fileHandle)
 
         case (Failure(ex), fileToUpload) =>
-          println(s"Uploading file: $fileToUpload failed with: $ex")
+          logger.error(s"Uploading file failed: $fileToUpload", ex)
       }
   }
 }

@@ -5,12 +5,13 @@ import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.server.Directives.{complete, logRequestResult, path, *}
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.FileInfo
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.RestartSettings
 import org.apache.pekko.stream.scaladsl.{FileIO, RestartSource, Sink, Source}
+import org.slf4j.{Logger, LoggerFactory}
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
 import java.io.File
@@ -36,16 +37,16 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   *
   * Added:
   *  - Retry on upload/download
-  *    Doc: https://blog.colinbreck.com/backoff-and-retry-error-handling-for-akka-streams
+  *    Doc: https://pekko.apache.org/docs/pekko/current/stream/operators/RestartSource/withBackoff.html
   *  - Browser client for manual upload
   *
   * To prove that the streaming works:
   *  - Replace testfile.jpg with a large file, eg 63MB.pdf
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
-  *
   */
 object HttpFileEcho extends App with JsonProtocol {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
@@ -64,7 +65,7 @@ object HttpFileEcho extends App with JsonProtocol {
       val time = LocalTime.now()
       if (time.getSecond % 2 == 0) {
         val msg = s"Server RuntimeException during $operation at: $time"
-        println(msg)
+        logger.error(msg)
         throw new RuntimeException(s"BOOM - $msg")
       }
     }
@@ -72,7 +73,7 @@ object HttpFileEcho extends App with JsonProtocol {
     def routes: Route = logRequestResult("fileecho") {
       path("upload") {
           formFields(Symbol("payload")) { payload =>
-            println(s"Server received request with additional form data: $payload")
+            logger.info(s"Server received request with additional form data: $payload")
 
             def tempDestination(fileInfo: FileInfo): File = File.createTempFile(fileInfo.fileName, ".tmp.server")
 
@@ -81,7 +82,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
             storeUploadedFile("binary", tempDestination) {
               case (metadataFromClient: FileInfo, uploadedFile: File) =>
-                println(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
+                logger.info(s"Server stored uploaded tmp file with name: ${uploadedFile.getName} (Metadata from client: $metadataFromClient)")
                 complete(Future(FileHandle(uploadedFile.getName, uploadedFile.getAbsolutePath, uploadedFile.length())))
             }
           }
@@ -89,7 +90,7 @@ object HttpFileEcho extends App with JsonProtocol {
         path("download") {
           get {
             entity(as[FileHandle]) { fileHandle =>
-              println(s"Server received download request for: ${fileHandle.fileName}")
+              logger.info(s"Server received download request for: ${fileHandle.fileName}")
 
               // Activate to simulate rnd server ex during download and thus provoke retry on client
               //throwRndRuntimeException("download")
@@ -112,18 +113,18 @@ object HttpFileEcho extends App with JsonProtocol {
     val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
     bindingFuture.onComplete {
       case Success(b) =>
-        println("Server started, listening on: " + b.localAddress)
+        logger.info(s"Server started, listening on: ${b.localAddress}")
       case Failure(e) =>
-        println(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+        logger.error(s"Server could not bind to $address:$port", e)
         system.terminate()
     }
 
     sys.addShutdownHook {
-      println("About to shutdown...")
+      logger.info("About to shut down...")
       val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-      println("Waiting for connections to terminate...")
+      logger.info("Waiting for connections to terminate...")
       val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-      println("Connections terminated")
+      logger.info("Connections terminated")
       onceAllConnectionsTerminated.flatMap { _ => system.terminate()
       }
     }
@@ -133,7 +134,7 @@ object HttpFileEcho extends App with JsonProtocol {
     val fileHandle = uploadClient(id, address, port)
     fileHandle.onComplete {
       case Success(each) => downloadClient(id, each, address, port)
-      case Failure(exception) => println(s"Exception during upload: $exception")
+      case Failure(exception) => logger.error("Exception during upload", exception)
     }
   }
 
@@ -184,7 +185,7 @@ object HttpFileEcho extends App with JsonProtocol {
 
       delayRequestSoTheServerIsNotHammered()
 
-      val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/upload"))
+      val target = Uri(s"http://$address:$port").withPath(Uri.Path("/upload"))
 
       val result: Future[FileHandle] =
         for {
@@ -193,7 +194,7 @@ object HttpFileEcho extends App with JsonProtocol {
           responseBodyAsString <- Unmarshal(response).to[FileHandle]
         } yield responseBodyAsString
 
-      result.onComplete(res => println(s"UploadClient with id: $id received result: $res"))
+      result.onComplete(res => logger.info(s"UploadClient with id: $id received result: $res"))
       result
     }
 
@@ -201,7 +202,7 @@ object HttpFileEcho extends App with JsonProtocol {
   }
 
   def downloadClient(id: Int, remoteFile: FileHandle, address: String, port: Int): Future[File] = {
-    val target = Uri(s"http://$address:$port").withPath(org.apache.pekko.http.scaladsl.model.Uri.Path("/download"))
+    val target = Uri(s"http://$address:$port").withPath(Uri.Path("/download"))
 
     def getResponseDownload(request: HttpRequest): Future[HttpResponse] = {
       val restartSettings = RestartSettings(1.second, 60.seconds, 0.2).withMaxRestarts(10, 1.minute)
@@ -234,7 +235,7 @@ object HttpFileEcho extends App with JsonProtocol {
       } yield downloaded
 
       val ioresult = Await.result(result, 180.seconds)
-      println(s"DownloadClient with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
+      logger.info(s"DownloadClient with id: $id finished downloading: ${ioresult.count} bytes to file: ${localFile.getAbsolutePath}")
     }
 
     val localFile = File.createTempFile("downloadLocal", ".tmp.client")
