@@ -49,7 +49,7 @@ public class ClickhousedbIT {
             .withUsername("test")
             .withPassword("test")
             .withDatabaseName("test")
-            .withUrlParam("max_result_rows", "5");
+            .withUrlParam("clickhouse_setting_max_result_rows", "5");
 
 
     @BeforeAll

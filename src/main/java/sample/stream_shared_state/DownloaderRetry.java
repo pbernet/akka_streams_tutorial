@@ -39,7 +39,7 @@ public class DownloaderRetry {
 
     public static void main(String[] args) throws Exception {
 
-        URI url = new URI("http://httpstat.us/503");
+        URI url = new URI("https://httpbingo.org/status/503");
         //URI url = new URI("http://127.0.0.1:6001/download/30");
 
         Path resFile = new DownloaderRetry().download(0, url, Paths.get(System.getProperty("java.io.tmpdir")).resolve(Paths.get("test.zip")));

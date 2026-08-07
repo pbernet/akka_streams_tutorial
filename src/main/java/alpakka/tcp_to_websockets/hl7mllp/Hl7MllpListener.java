@@ -47,10 +47,10 @@ public class Hl7MllpListener {
 
             // ADT
             AppRoutingDataImpl adtRouter = new AppRoutingDataImpl("ADT", "A0.", "*",
-                     "2.5.1");
+                    "2.5.1");
             // ORM
             AppRoutingDataImpl ormRouter = new AppRoutingDataImpl("ORM", "O01", "*",
-             "2.5.1");
+                    "2.5.1");
 
             ourHl7Server.registerApplication(adtRouter, new MockApp());
             ourHl7Server.registerApplication(ormRouter, new MockApp());

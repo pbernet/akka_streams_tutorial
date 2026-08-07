@@ -61,7 +61,7 @@ public class Hl7TcpClientClassic {
                     LOGGER.info("Response: " + stripMessage(messageResponse.encode()));
                 } catch (IOException e) {
                     // TODO handle connection exceptions and retry, currently in-flight message is lost
-                    LOGGER.error("Inner Ex during message processing:",  e);
+                    LOGGER.error("Inner Ex during message processing:", e);
                     // At least a new tcp connection will be used for the next message
                     connectionWithServer.close();
                     connectionWithServer = null;
@@ -69,7 +69,7 @@ public class Hl7TcpClientClassic {
             }
 
         } catch (Exception e) {
-            LOGGER.error("Outer Ex during message processing:",  e);
+            LOGGER.error("Outer Ex during message processing:", e);
         } finally {
             if (connectionWithServer != null) connectionWithServer.close();
         }

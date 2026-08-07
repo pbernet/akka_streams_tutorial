@@ -12,6 +12,7 @@ import scala.concurrent.duration.*
 
 /**
   * Client to send HL7 msgs to [[Hl7Tcp2Kafka]]
+  * Improved version of [[Hl7TcpClientClassic]]
   * Also used in [[AlpakkaTrophySpec]]
   */
 class Hl7TcpClient(messagesPerClient: Int = 100, numberOfClients: Int = 1) extends MllpProtocol {

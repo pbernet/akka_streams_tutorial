@@ -10,8 +10,7 @@ public class AdtMessageFactory {
     public static Message createMessage(String messageType) throws HL7Exception, IOException {
 
         //This patterns enables you to build other message types
-        if ( messageType.equals("A01") )
-        {
+        if (messageType.equals("A01")) {
             return new OurAdtA01MessageBuilder().Build();
         }
 

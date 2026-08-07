@@ -36,7 +36,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   implicit val system: ActorSystem = ActorSystem("S3Echo")
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  private val resourceFileName = "content/63MB.pdf"
+  private val resourceFileName = "63MB.pdf"
   private val archiveFileName = "archive.zip"
 
   // Bucket name must be unique and may only contain certain characters
@@ -105,7 +105,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
 
     Source(1 to 10)
       .mapAsync(5)(each => uploadClient(each))
-      .map(key => downloadClient(key))
+      .mapAsync(5)(key => downloadClient(key))
       .runWith(Sink.ignore)
   }
 
@@ -114,7 +114,7 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
     logger.info(s"About to upload file with bucketKey: $bucketKey")
 
     val fileSource =
-      FileIO.fromPath(Paths.get(s"src/main/resources/$resourceFileName"), 1024)
+      FileIO.fromPath(Paths.get(s"src/main/resources/content/$resourceFileName"), 1024)
 
     val s3Sink: Sink[ByteString, Future[MultipartUploadResult]] =
       S3.multipartUpload(bucketName, bucketKey).withAttributes(s3attributes)
