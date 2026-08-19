@@ -116,7 +116,7 @@ libraryDependencies ++= Seq(
   "com.github.blemale" %% "scaffeine" % "5.3.0",
   "ch.qos.logback" % "logback-classic" % "1.5.18",
   "com.crobox.clickhouse" %% "client" % "1.2.17",
-  "com.clickhouse" % "clickhouse-jdbc" % "0.9.8" % Test,
+  "com.clickhouse" % "clickhouse-jdbc" % "0.10.0" % Test,
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
   "org.testcontainers" % "elasticsearch" % testContainersVersion,
