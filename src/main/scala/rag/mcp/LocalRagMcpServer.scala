@@ -9,6 +9,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import rag.core.{RagEngine, RagEngineProvider}
 
 import java.util.UUID
+import scala.jdk.CollectionConverters.*
 import scala.sys.process.*
 import scala.util.{Failure, Success, Try}
 
@@ -47,18 +48,19 @@ object LocalRagMcpServer {
     logger.info("Starting Local RAG MCP Server (HTTP transport)...")
 
     val transportProvider = PekkoHttpMcpTransport()
-    val server = McpServer.sync(transportProvider)
+    McpServer.sync(transportProvider)
       .serverInfo("local-rag-chat", "1.0.0")
       .capabilities(ServerCapabilities.builder()
         .tools(true)
         .build())
+      .tools(List(
+        createQueryRagTool(ragEngine),
+        createPrepareQueryTool(ragEngine),
+        createListDocsTool(ragEngine),
+        createGetStatusTool(ragEngine),
+        createConfigureRerankerTool(ragEngine)
+      ).asJava)
       .build()
-
-    server.addTool(createQueryRagTool(ragEngine))
-    server.addTool(createPrepareQueryTool(ragEngine))
-    server.addTool(createListDocsTool(ragEngine))
-    server.addTool(createGetStatusTool(ragEngine))
-    server.addTool(createConfigureRerankerTool(ragEngine))
 
     if (launchInspector) {
       launchMcpInspector()
@@ -122,10 +124,8 @@ object LocalRagMcpServer {
         |}
         |""".stripMargin
 
-    val tool = Tool.builder()
-      .name("query_rag")
+    val tool = Tool.builder("query_rag", jsonMapper, schema)
       .description("Query the local RAG system with indexed PDF documents. Returns the answer along with source attribution showing which documents and chunks were used to generate the response.")
-      .inputSchema(jsonMapper, schema)
       .build()
 
     McpStatelessServerFeatures.SyncToolSpecification.builder()
@@ -193,10 +193,8 @@ object LocalRagMcpServer {
         |}
         |""".stripMargin
 
-    val tool = Tool.builder()
-      .name("prepare_query")
+    val tool = Tool.builder("prepare_query", jsonMapper, schema)
       .description("Prepare a query by retrieving matching chunks from indexed PDF documents and assembling a complete prompt. Returns the prepared query text with context and full source chunk details, without calling an LLM. Use this when you want to send the query to your own LLM.")
-      .inputSchema(jsonMapper, schema)
       .build()
 
     McpStatelessServerFeatures.SyncToolSpecification.builder()
@@ -261,10 +259,8 @@ object LocalRagMcpServer {
   private def createListDocsTool(ragEngine: RagEngine): McpStatelessServerFeatures.SyncToolSpecification = {
     val schema = """{"type": "object", "properties": {}}"""
 
-    val tool = Tool.builder()
-      .name("list_documents")
+    val tool = Tool.builder("list_documents", jsonMapper, schema)
       .description("List all PDF documents that have been indexed in the RAG system, including the number of chunks per document.")
-      .inputSchema(jsonMapper, schema)
       .build()
 
     McpStatelessServerFeatures.SyncToolSpecification.builder()
@@ -304,10 +300,8 @@ object LocalRagMcpServer {
   private def createGetStatusTool(ragEngine: RagEngine): McpStatelessServerFeatures.SyncToolSpecification = {
     val schema = """{"type": "object", "properties": {}}"""
 
-    val tool = Tool.builder()
-      .name("get_status")
+    val tool = Tool.builder("get_status", jsonMapper, schema)
       .description("Get the current status of the RAG system including document count, total chunks, and readiness state.")
-      .inputSchema(jsonMapper, schema)
       .build()
 
     McpStatelessServerFeatures.SyncToolSpecification.builder()
@@ -374,10 +368,8 @@ object LocalRagMcpServer {
         |}
         |""".stripMargin
 
-    val tool = Tool.builder()
-      .name("configure_reranker")
+    val tool = Tool.builder("configure_reranker", jsonMapper, schema)
       .description("Configure the reranking behavior: adjust minScore threshold (0-1) or toggle reranking enabled/disabled. Changes take effect immediately on next query.")
-      .inputSchema(jsonMapper, schema)
       .build()
 
     McpStatelessServerFeatures.SyncToolSpecification.builder()
