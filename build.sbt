@@ -161,7 +161,7 @@ libraryDependencies ++= Seq(
   "ai.docling" % "docling-serve-client" % doclingJavaVersion,
 
   // CLI output formatting
-  "xyz.matthieucourt" %% "layoutz" % "0.7.0",
+  "xyz.matthieucourt" %% "layoutz" % "0.8.0",
 
   // https://docs.gatling.io/reference/integrations/build-tools/sbt-plugin
   "io.gatling" % "gatling-core" % gatlingVersion,
