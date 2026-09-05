@@ -29,13 +29,15 @@ import scala.util.{Failure, Success}
   * https://stackoverflow.com/questions/69380115/akka-how-to-close-a-websocket-connection-from-server
   * https://doc.akka.io/docs/akka/current/stream/operators/Source/actorRef.html?_ga#description
   */
-object WebsocketEchoActors extends App with ClientCommon {
+object WebsocketEchoActors extends ClientCommon {
+  def main(args: Array[String]): Unit = {
+    server(address, port)
+    browserClient()
+    //To observe the limiting behaviour add another browser client (or open 2nd tab in 1st browser)
+    //browserClient()
+  }
 
   val (address, port) = ("127.0.0.1", 6002)
-  server(address, port)
-  browserClient()
-  //To observe the limiting behaviour add another browser client (or open 2nd tab in 1st browser)
-  //browserClient()
 
   val maxClients = 1
 

@@ -12,12 +12,14 @@ import rag.mcp.LocalRagMcpServer
   *  - Chat UI / REST API: http://localhost:8090/rag
   *  - MCP server:         http://localhost:8091/mcp
   */
-object LocalRagApplication extends App {
+object LocalRagApplication {
+  def main(args: Array[String]): Unit = {
+    LocalRagChat.start(ragEngine)
+    LocalRagMcpServer.start(ragEngine)
+  }
+
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  implicit val system: ActorSystem = ActorSystem("local-rag-unified")
-  private val ragEngine = RagEngineProvider.get()
-
-  LocalRagChat.start(ragEngine)
-  LocalRagMcpServer.start(ragEngine)
+  implicit lazy val system: ActorSystem = ActorSystem("local-rag-unified")
+  private lazy val ragEngine = RagEngineProvider.get()
 }

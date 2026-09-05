@@ -17,38 +17,41 @@ import scala.util.{Failure, Success}
   *
   * Similar to: [[HandleFirstElementSpecially]]
   */
-object DeferredStreamCreation extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+object DeferredStreamCreation {
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val source = Source(List(1, 2, 3, 4, 5))
-  val printSink = Sink.foreach[String](each => println(s"Reached sink: $each"))
+    val source = Source(List(1, 2, 3, 4, 5))
+    val printSink = Sink.foreach[String](each => println(s"Reached sink: $each"))
 
-  def processingFlow(id: Int): Future[Flow[Int, String, NotUsed]] = {
-    println("About to process tail elements...")
-    Thread.sleep(2000)
-    Future(Flow[Int].map(n => s"head element: $id, tail element: $n"))
-  }
+    def processingFlow(id: Int): Future[Flow[Int, String, NotUsed]] = {
+      println("About to process tail elements...")
+      Thread.sleep(2000)
+      Future(Flow[Int].map(n => s"head element: $id, tail element: $n"))
+    }
 
-  val doneDelayed =
-    source.prefixAndTail(1).flatMapConcat {
-      case (Seq(id), tailSource) =>
-        // process all tail elements once the first element is here
-        tailSource.via(Flow.futureFlow(processingFlow(id)))
-    }.runWith(printSink)
+    val doneDelayed =
+      source.prefixAndTail(1).flatMapConcat {
+        case (id +: _, tailSource) =>
+          // process all tail elements once the first element is here
+          tailSource.via(Flow.futureFlow(processingFlow(id)))
+        case (_, _) => Source.empty
+      }.runWith(printSink)
 
-  terminateWhen(doneDelayed)
+    terminateWhen(doneDelayed)
 
-  def terminateWhen(done: Future[?]): Unit = {
-    done.onComplete {
-      case Success(_) =>
-        println("Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        println(s"Flow Failure: $e. About to terminate...")
-        system.terminate()
+    def terminateWhen(done: Future[?]): Unit = {
+      done.onComplete {
+        case Success(_) =>
+          println("Flow Success. About to terminate...")
+          system.terminate()
+        case Failure(e) =>
+          println(s"Flow Failure: $e. About to terminate...")
+          system.terminate()
+      }
     }
   }
 }

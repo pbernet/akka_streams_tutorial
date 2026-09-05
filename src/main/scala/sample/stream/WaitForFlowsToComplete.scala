@@ -22,89 +22,91 @@ import scala.util.{Failure, Success}
   *  - Use custom dispatcher for slow FileIO flows
   *    See [[actor.BlockingRight]] for use of custom dispatcher in typed Actor
   */
-object WaitForFlowsToComplete extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+object WaitForFlowsToComplete {
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  def lineSink(filename: String): Sink[String, Future[IOResult]] =
-    Flow[String]
-      .map(s => ByteString(s + "\n"))
-      .wireTap(_ => logger.info(s"Add line to file: $filename"))
-      .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right) //retain to the Future[IOResult]
-      .withAttributes(ActorAttributes.dispatcher("custom-dispatcher-for-blocking"))
+    def lineSink(filename: String): Sink[String, Future[IOResult]] =
+      Flow[String]
+        .map(s => ByteString(s + "\n"))
+        .wireTap(_ => logger.info(s"Add line to file: $filename"))
+        .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right) //retain to the Future[IOResult]
+        .withAttributes(ActorAttributes.dispatcher("custom-dispatcher-for-blocking"))
 
-  val origSource = Source(1 to 10)
+    val origSource = Source(1 to 10)
 
-  // scan (= transform) the source
-  val factorialsSource = origSource.scan(BigInt(1))((acc, next) => acc * next)
+    // scan (= transform) the source
+    val factorialsSource = origSource.scan(BigInt(1))((acc, next) => acc * next)
 
-  val fastFlow = origSource.runForeach(i => logger.info(s"Reached fast sink: $i"))
+    val fastFlow = origSource.runForeach(i => logger.info(s"Reached fast sink: $i"))
 
-  val slowFlow = factorialsSource
-    .map(_.toString)
-    .throttle(1, 1.second, 1, ThrottleMode.shaping)
-    .runWith(lineSink("factorials_slow.txt"))
+    val slowFlow = factorialsSource
+      .map(_.toString)
+      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+      .runWith(lineSink("factorials_slow.txt"))
 
-  val slowFaultyFlow = factorialsSource
-    .map(_.toString)
-    .throttle(1, 1.second, 1, ThrottleMode.shaping)
-    .map(each => simulateFaultyProcessing(isFaulty = false, each))
-    .runWith(lineSink("factorial_slow_faulty.txt"))
+    lazy val slowFaultyFlow = factorialsSource
+      .map(_.toString)
+      .throttle(1, 1.second, 1, ThrottleMode.shaping)
+      .map(each => simulateFaultyProcessing(isFaulty = false, each))
+      .runWith(lineSink("factorial_slow_faulty.txt"))
 
-  //processWithForComprehension()
+    //processWithForComprehension()
 
-  processWithFutureSequence()
+    processWithFutureSequence()
 
-  private def processWithForComprehension(): Unit = {
-    val allDone = for {
-      slowFaultyFlowDone <- slowFaultyFlow
-      slowFlowDone <- slowFlow
-      fastFlowDone <- fastFlow
-    } yield (fastFlowDone, slowFlowDone, slowFaultyFlowDone)
+    def processWithForComprehension(): Unit = {
+      val allDone = for {
+        slowFaultyFlowDone <- slowFaultyFlow
+        slowFlowDone <- slowFlow
+        fastFlowDone <- fastFlow
+      } yield (fastFlowDone, slowFlowDone, slowFaultyFlowDone)
 
-    allDone.onComplete {
-      case Success(r) =>
-        logger.info(s"Success. Flow results: $r")
-        system.terminate()
-      case Failure(e) =>
-        logger.info(s"Failure. Exception message: ${e.getMessage}")
-      system.terminate()
+      allDone.onComplete {
+        case Success(r) =>
+          logger.info(s"Success. Flow results: $r")
+          system.terminate()
+        case Failure(e) =>
+          logger.info(s"Failure. Exception message: ${e.getMessage}")
+          system.terminate()
+      }
     }
-  }
 
-  // Allows for more control
-  private def processWithFutureSequence(): Unit = {
+    // Allows for more control
+    def processWithFutureSequence(): Unit = {
 
-    // completes when either:
-    //  - all futures have completed successfully, or
-    //  - one of the futures has failed
-    val futSeq = Future.sequence(List(fastFlow, slowFlow, slowFaultyFlow)
-      // Lifting each flow result to a Try allows to wait for *all* flow results (Success OR Failure)
-      // see: https://stackoverflow.com/questions/29344430/scala-waiting-for-sequence-of-futures
-      //.map(each => each.transform(Success(_)))
-    )
+      // completes when either:
+      //  - all futures have completed successfully, or
+      //  - one of the futures has failed
+      val futSeq = Future.sequence(List(fastFlow, slowFlow, slowFaultyFlow)
+        // Lifting each flow result to a Try allows to wait for *all* flow results (Success OR Failure)
+        // see: https://stackoverflow.com/questions/29344430/scala-waiting-for-sequence-of-futures
+        //.map(each => each.transform(Success(_)))
+      )
 
-    futSeq.onComplete {
-      case Success(r) =>
-        logger.info(s"Success. Flow results: $r")
-        system.terminate()
-      case Failure(e) =>
-        logger.info(s"Failure. Exception message: ${e.getMessage}")
-        system.terminate()
+      futSeq.onComplete {
+        case Success(r) =>
+          logger.info(s"Success. Flow results: $r")
+          system.terminate()
+        case Failure(e) =>
+          logger.info(s"Failure. Exception message: ${e.getMessage}")
+          system.terminate()
+      }
     }
-  }
 
-  private def simulateFaultyProcessing(isFaulty: Boolean, payload: String) = {
-    if (isFaulty) {
-    val time = LocalTime.now()
-      logger.info(s"Processing $payload at: $time")
-    if (time.getSecond % 2 == 0) {
-      logger.info(s"RuntimeException at: $time")
-      throw new RuntimeException("BOOM - RuntimeException")
+    def simulateFaultyProcessing(isFaulty: Boolean, payload: String) = {
+      if (isFaulty) {
+        val time = LocalTime.now()
+        logger.info(s"Processing $payload at: $time")
+        if (time.getSecond % 2 == 0) {
+          logger.info(s"RuntimeException at: $time")
+          throw new RuntimeException("BOOM - RuntimeException")
+        }
+        payload
+      } else payload
     }
-      payload
-    } else payload
   }
 }

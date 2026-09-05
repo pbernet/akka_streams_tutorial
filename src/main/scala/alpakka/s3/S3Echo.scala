@@ -82,21 +82,15 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
         case BucketAccess.NotExists =>
           logger.info(s"Bucket: $bucketName does not exist. About to create bucket...")
 
-          S3.makeBucket(bucketName).flatMap {
-            case Done =>
-              logger.info(s"Successfully created bucket with name: $bucketName")
-              Future.successful(Done)
-            case _ =>
-              // Hangs, when "endpoint-url" is not correct
-              Future.failed(new RuntimeException(s"Unable to create bucket: $bucketName"))
+          S3.makeBucket(bucketName).map { _ =>
+            logger.info(s"Successfully created bucket with name: $bucketName")
+            Done
           }
         case BucketAccess.AccessGranted =>
           logger.info(s"Bucket: $bucketName already exists. Proceed...")
           Future.successful(Done)
         case BucketAccess.AccessDenied =>
           Future.failed(new RuntimeException(s"Access denied to create bucket: $bucketName"))
-        case resp =>
-          Future.failed(new RuntimeException(s"Error during initialization of: $bucketName. Details: ${resp.toString}"))
       }
   }
 
@@ -195,6 +189,8 @@ class S3Echo(urlWithMappedPort: String = "", accessKey: String = "", secretKey: 
   }
 }
 
-object S3Echo extends App {
-  new S3Echo().run()
+object S3Echo {
+  def main(args: Array[String]): Unit = {
+    new S3Echo().run()
+  }
 }

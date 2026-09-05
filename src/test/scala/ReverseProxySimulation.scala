@@ -29,7 +29,7 @@ class ReverseProxySimulation extends Simulation {
           .header("X-Correlation-ID", session => s"load-${session.userId}-${session("correlationId").as[Int]}")
           .check(status.is(200))
           .check(status.saveAs("responseStatus"))
-          .check(header("X-Correlation-ID").saveAs("responseCorrelationId"))
+          .check(header("X-Correlation-ID": CharSequence).saveAs("responseCorrelationId"))
       )
         .exec(session => {
           println(s"Got: ${session.status} response with HTTP status: ${session("responseStatus").as[String]} for id: ${session("responseCorrelationId").as[String]}")

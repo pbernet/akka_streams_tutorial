@@ -16,21 +16,28 @@ import java.time.LocalDateTime
   * Applied in [[alpakka.kafka.WordCountConsumer]]
   *
   */
-object PassThroughFlowExample extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object PassThroughFlowExample {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
+  }
 
-  val sourceOfOriginalValues = Source(1 to 100)
-    .map(origValue => (origValue.toString, LocalDateTime.now()))
+  private class Application {
+    implicit val system: ActorSystem = ActorSystem()
 
-  val esotericSlowFlow = Flow[(String, LocalDateTime)]
-    .buffer(1, OverflowStrategy.dropHead)
-    .map { s => Thread.sleep(2000); s }
-    .scan(Map[String, LocalDateTime]())((m, s) => m + (s._1 -> s._2))
-    .extrapolate(Iterator.continually(_), Some(Map.empty)) // no backpressure, emit always a element
-    .buffer(1, OverflowStrategy.dropHead)
+    val sourceOfOriginalValues = Source(1 to 100)
+      .map(origValue => (origValue.toString, LocalDateTime.now()))
 
-  sourceOfOriginalValues.via(PassThroughFlow(esotericSlowFlow))
-    .runWith(Sink.foreach(t => println(s"Reached sink: originalValue: ${t._2}, resultMap: ${t._1}")))
+    val esotericSlowFlow = Flow[(String, LocalDateTime)]
+      .buffer(1, OverflowStrategy.dropHead)
+      .map { s => Thread.sleep(2000); s }
+      .scan(Map[String, LocalDateTime]())((m, s) => m + (s._1 -> s._2))
+      .extrapolate(Iterator.continually(_), Some(Map.empty)) // no backpressure, emit always a element
+      .buffer(1, OverflowStrategy.dropHead)
+
+    sourceOfOriginalValues.via(PassThroughFlow(esotericSlowFlow))
+      .runWith(Sink.foreach(t => println(s"Reached sink: originalValue: ${t._2}, resultMap: ${t._1}")))
+  }
 }
 
 object PassThroughFlow {

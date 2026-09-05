@@ -15,22 +15,29 @@ import scala.jdk.CollectionConverters.*
   * Run [[alpakka.env.KafkaServerEmbedded]]
   * Run [[alpakka.kafka.avro.SimpleAvroProducer]]
   */
-object SimpleAvroConsumer extends App {
-  val props = new Properties()
-  props.put("bootstrap.servers", "localhost:29092")
-  props.put("group.id", "mygroup")
-  props.put("key.deserializer", classOf[StringDeserializer].getName)
-  props.put("value.deserializer", classOf[AvroDeserializer].getName)
+object SimpleAvroConsumer {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
+  }
 
-  val consumer = new KafkaConsumer[String, AvroRecord](props)
-  consumer.subscribe(List("avro-topic").asJava)
+  private class Application {
+    val props = new Properties()
+    props.put("bootstrap.servers", "localhost:29092")
+    props.put("group.id", "mygroup")
+    props.put("key.deserializer", classOf[StringDeserializer].getName)
+    props.put("value.deserializer", classOf[AvroDeserializer].getName)
 
-  var running = true
-  while (running) {
-    val records = consumer.poll(Duration.ofMillis(100))
-    for (record: ConsumerRecord[String, AvroRecord] <- records.asScala) {
-      val avroRecord = record.value()
-      println(s"Receiving record: str1=${avroRecord.str1}, str2=${avroRecord.str2}, int1=${avroRecord.int1}")
+    val consumer = new KafkaConsumer[String, AvroRecord](props)
+    consumer.subscribe(List("avro-topic").asJava)
+
+    var running = true
+    while (running) {
+      val records = consumer.poll(Duration.ofMillis(100))
+      for (record: ConsumerRecord[String, AvroRecord] <- records.asScala) {
+        val avroRecord = record.value()
+        println(s"Receiving record: str1=${avroRecord.str1}, str2=${avroRecord.str2}, int1=${avroRecord.int1}")
+      }
     }
   }
 }

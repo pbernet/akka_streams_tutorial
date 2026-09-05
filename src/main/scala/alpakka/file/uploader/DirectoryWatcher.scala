@@ -1,10 +1,11 @@
 package alpakka.file.uploader
 
 import org.apache.commons.io.monitor.{FileAlterationListenerAdaptor, FileAlterationMonitor, FileAlterationObserver}
+import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.{ActorSystem, Terminated}
 import org.apache.pekko.stream.connectors.file.scaladsl.Directory
-import org.apache.pekko.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
-import org.apache.pekko.stream.{ActorAttributes, OverflowStrategy, QueueOfferResult, Supervision}
+import org.apache.pekko.stream.scaladsl.{Keep, MergeHub, Sink, Source}
+import org.apache.pekko.stream.{ActorAttributes, Supervision}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
@@ -13,8 +14,8 @@ import scala.compat.java8.StreamConverters.StreamHasToScala
 import scala.concurrent.Future
 
 /**
-  * Detect (new/changed) files in `rootDir/upload` and send file path to uploadSourceQueue
-  * From uploadSourceQueue do a HTTP file upload via [[Uploader]]
+  * Detect (new/changed) files in `rootDir/upload` and send file paths to the upload sink
+  * From the upload sink do a HTTP file upload via [[Uploader]]
   * Finally move the file to `rootDir/processed`
   *
   * Run with test class: [[DirectoryWatcherSpec]]
@@ -22,7 +23,7 @@ import scala.concurrent.Future
   *
   * Remarks:
   *  - [[FileAlterationListenerAdaptor]] allows to recursively listen to file changes at runtime
-  *  - Currently Alpakka DirectoryChangesSource can not do this, see:
+  *  - Currently Pekko connectors [[DirectoryChangesSource]] can not do this, see:
   *    https://discuss.lightbend.com/t/using-directorychangessource-recursively/7630
   *  - Alternative Impl: https://github.com/gmethvin/directory-watcher
   */
@@ -40,8 +41,8 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
     throw new IllegalArgumentException(errorMessage)
   }
 
-  private val uploadSourceQueue: SourceQueueWithComplete[Path] = Source
-    .queue[Path](bufferSize = 1000, OverflowStrategy.backpressure, maxConcurrentOffers = 1000)
+  private val uploadSink: Sink[Path, NotUsed] = MergeHub
+    .source[Path](perProducerBufferSize = 1000)
     .mapAsync(1)(path => uploadAndMove(path))
     .withAttributes(ActorAttributes.supervisionStrategy(Supervision.restartingDecider))
     .to(Sink.ignore)
@@ -65,8 +66,7 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
     logger.info(s"About to upload files in dir: $path")
 
     Directory.ls(path)
-      .mapAsync(1)(each => addToUploadQueue(each))
-      .run()
+      .runWith(uploadSink)
   }
 
   private def handleChangedFiles(uploadDirPath: Path) = {
@@ -94,13 +94,13 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
     monitor
   }
 
-  private def addToUploadQueue(path: Path) = {
-    uploadSourceQueue.offer(path).map {
-      case QueueOfferResult.Enqueued => logger.info(s"Enqueued: $path")
-      case QueueOfferResult.Dropped => logger.info(s"Dropped: $path")
-      case QueueOfferResult.Failure(ex) => logger.info(s"Offer failed: $ex")
-      case QueueOfferResult.QueueClosed => logger.info("SourceQueue closed")
-    }
+  private def addToUploadQueue(path: Path): Unit = {
+    Source.single(path)
+      .watchTermination(Keep.right)
+      .toMat(uploadSink)(Keep.left)
+      .run()
+      .failed
+      .foreach(exception => logger.warn(s"Offer failed for: $path", exception))
   }
 
   private def uploadAndMove(path: Path) = {
@@ -131,6 +131,7 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
   }
 }
 
-object DirectoryWatcher extends App {
+object DirectoryWatcher {
+  def main(args: Array[String]): Unit = {}
   def apply(uploadDir: Path, processedDir: Path) = new DirectoryWatcher(uploadDir, processedDir)
 }

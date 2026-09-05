@@ -18,9 +18,11 @@ object WindTurbineSimulator {
   def props(id: String, endpoint: String): Props =
     Props(new WindTurbineSimulator(id, endpoint))
 
-  final case object Upgraded
-  final case object Connected
-  final case object Terminated
+  case object Upgraded
+
+  case object Connected
+
+  case object Terminated
   final case class ConnectionFailure(ex: Throwable)
   final case class FailedUpgrade(statusCode: StatusCode)
 }

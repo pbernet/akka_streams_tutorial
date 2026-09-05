@@ -14,6 +14,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Files
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -28,7 +29,7 @@ class Uploader(system: ActorSystem) {
   implicit val systemImpl: ActorSystem = system
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  var serverBinding: Future[Http.ServerBinding] = _
+  var serverBinding: Future[Http.ServerBinding] = uninitialized
 
   val (protocol, address, port) = ("http", "localhost", 6010)
 
@@ -135,6 +136,7 @@ class Uploader(system: ActorSystem) {
 
 }
 
-object Uploader extends App {
+object Uploader {
+  def main(args: Array[String]): Unit = {}
   def apply(system: ActorSystem) = new Uploader(system)
 }

@@ -48,14 +48,22 @@ import scala.util.{Failure, Success}
   * https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter
   * https://pekko.apache.org/docs/pekko-http/1.0/routing-dsl/directives/security-directives/index.html
   */
-object OIDCKeycloak extends App with CORSHandler with JsonSupport {
+object OIDCKeycloak extends CORSHandler with JsonSupport {
+  def main(args: Array[String]): Unit = {
+    val runningKeycloak = keycloak
+    val _ = adminClient
+    adminConsole(runningKeycloak.getAuthServerUrl)
+    runBackendServer(runningKeycloak)
+    browserClient()
+    Thread.sleep(100000)
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   private val CLIENT_ID = "my-test-client"
   private val REALM_NAME = "test"
 
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+  implicit lazy val system: ActorSystem = ActorSystem()
+  implicit lazy val executionContext: ExecutionContextExecutor = system.dispatcher
 
   def runKeycloak() = {
     // Pin to same version as "keycloakVersion" in build.sbt
@@ -258,10 +266,6 @@ object OIDCKeycloak extends App with CORSHandler with JsonSupport {
   }
 
 
-  val keycloak = runKeycloak()
-  val adminClient = configureKeycloak(keycloak)
-  adminConsole(keycloak.getAuthServerUrl)
-  runBackendServer(keycloak)
-  browserClient()
-  Thread.sleep(100000)
+  lazy val keycloak = runKeycloak()
+  lazy val adminClient = configureKeycloak(keycloak)
 }

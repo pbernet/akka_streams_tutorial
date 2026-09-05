@@ -33,9 +33,13 @@ import scala.util.{Failure, Success}
   *  - No retry logic
   *
   */
-object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSupport {
+object HTTPResponseStream extends DefaultJsonProtocol with SprayJsonSupport {
+  def main(args: Array[String]): Unit = {
+    server(address, port)
+    client(address, port)
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
@@ -48,9 +52,6 @@ object HTTPResponseStream extends App with DefaultJsonProtocol with SprayJsonSup
   implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   val (address, port) = ("127.0.0.1", 8080)
-  server(address, port)
-  client(address, port)
-
   def client(address: String, port: Int): Unit = {
     val requestParallelism = 2
 

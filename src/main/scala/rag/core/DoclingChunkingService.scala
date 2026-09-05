@@ -87,8 +87,8 @@ object DoclingChunkingService {
         .build()
 
       val request = HierarchicalChunkDocumentRequest.builder()
-        .options(convertOptions)
         .chunkingOptions(chunkingOptions)
+        .options(convertOptions)
         .build()
 
       val response = client.chunkFilesWithHierarchicalChunker(request, path)
@@ -126,8 +126,8 @@ object DoclingChunkingService {
         .build()
 
       val request = HybridChunkDocumentRequest.builder()
-        .options(convertOptions)
         .chunkingOptions(chunkingOptions)
+        .options(convertOptions)
         .build()
 
       val response = client.chunkFilesWithHybridChunker(request, path)

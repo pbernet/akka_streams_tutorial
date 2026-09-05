@@ -10,6 +10,8 @@ import org.scalatest.{BeforeAndAfterEachTestData, TestData}
 import org.slf4j.{Logger, LoggerFactory}
 import util.LogFileScanner
 
+import scala.compiletime.uninitialized
+
 /**
   * Integration-Test class for example "HL7 V2 over TCP via Kafka to Websockets"
   *
@@ -28,13 +30,13 @@ final class AlpakkaTrophySpec extends AsyncWordSpec with Matchers with BeforeAnd
   implicit val embeddedKafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 6001, controllerPort = 6003)
 
-  private var bootstrapServer: String = _
-  var mappedPortKafka: Int = _
+  private var bootstrapServer: String = uninitialized
+  var mappedPortKafka: Int = uninitialized
 
-  var websocketServer: WebsocketServer = _
-  var hl7Tcp2Kafka: Hl7Tcp2Kafka = _
-  var kafka2Websocket: Kafka2Websocket = _
-  var kafka2SSE: Kafka2SSE = _
+  var websocketServer: WebsocketServer = uninitialized
+  var hl7Tcp2Kafka: Hl7Tcp2Kafka = uninitialized
+  var kafka2Websocket: Kafka2Websocket = uninitialized
+  var kafka2SSE: Kafka2SSE = uninitialized
 
   "Happy path" should {
     "find all processed messages in WebsocketServer log" in {

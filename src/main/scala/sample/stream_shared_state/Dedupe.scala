@@ -18,38 +18,41 @@ import scala.util.{Failure, Success}
   * Similar example implemented with Apache Flink:
   * https://github.com/pbernet/flink-scala-3/blob/main/src/main/scala/com/ververica/Example_05_DataStream_Deduplicate.scala
   */
-object Dedupe extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+object Dedupe {
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val maxRandomNumber = 50
-  // use take() for testing
-  val sourceOfRndElements = Source.fromIterator(() => Iterator.continually(Element(ThreadLocalRandom.current().nextInt(maxRandomNumber), "payload"))).take(100)
-
-  val done = sourceOfRndElements
-    .wireTap(each => logger.info(s"Before: $each"))
-    // When duplicateCount is reached:
-    // Remove element from internal registry/cache of already seen elements to prevent the registry growing unboundedly
-    .via(Deduplicate((el: Element) => el.id, duplicateCount = 2))
-    .wireTap(each => logger.info(s"After: $each"))
-    .runWith(Sink.ignore)
-
-  terminateWhen(done)
-
-  def terminateWhen(done: Future[?]): Unit = {
-    done.onComplete {
-      case Success(_) =>
-        logger.info("Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        logger.error(s"Flow Failure: $e. About to terminate...")
-        system.terminate()
+    case class Element(id: Int, payload: String) {
+      override def toString = s"$id"
     }
-  }
 
-  case class Element(id: Int, payload: String) {
-    override def toString = s"$id"
+    val maxRandomNumber = 50
+    // use take() for testing
+    val sourceOfRndElements = Source.fromIterator(() => Iterator.continually(Element(ThreadLocalRandom.current().nextInt(maxRandomNumber), "payload"))).take(100)
+
+    val done = sourceOfRndElements
+      .wireTap(each => logger.info(s"Before: $each"))
+      // When duplicateCount is reached:
+      // Remove element from internal registry/cache of already seen elements to prevent the registry growing unboundedly
+      .via(Deduplicate((el: Element) => el.id, duplicateCount = 2))
+      .wireTap(each => logger.info(s"After: $each"))
+      .runWith(Sink.ignore)
+
+    terminateWhen(done)
+
+    def terminateWhen(done: Future[?]): Unit = {
+      done.onComplete {
+        case Success(_) =>
+          logger.info("Flow Success. About to terminate...")
+          system.terminate()
+        case Failure(e) =>
+          logger.error(s"Flow Failure: $e. About to terminate...")
+          system.terminate()
+      }
+    }
+
   }
 }

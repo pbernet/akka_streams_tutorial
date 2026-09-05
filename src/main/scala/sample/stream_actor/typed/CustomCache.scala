@@ -12,7 +12,8 @@ object CustomCache {
   final case class AddDevices(devices: List[DeviceId])                       extends CacheRequests
 
   sealed trait CacheResponses
-  final case object EmptyCache                            extends CacheResponses
+
+  case object EmptyCache extends CacheResponses
   final case class CachedDevices(devices: List[DeviceId]) extends CacheResponses
 
   val empty: Behavior[CacheRequests] =

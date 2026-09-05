@@ -29,14 +29,36 @@ import scala.util.{Failure, Success}
   * No streams here
   *
   */
-object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
+object SampleRoutes extends DefaultJsonProtocol with SprayJsonSupport {
+  def main(args: Array[String]): Unit = {
+    implicit val executionContext = system.dispatcher
+    bindingFuture.onComplete {
+      case Success(b) =>
+        println("Server started, listening on: " + b.localAddress)
+      case Failure(e) =>
+        println(s"Server could not bind to... Exception message: ${e.getMessage}")
+        system.terminate()
+    }
+
+    browserClient()
+
+    sys.addShutdownHook {
+      println("About to shutdown...")
+      val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
+      println("Waiting for connections to terminate...")
+      val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
+      println("Connections terminated")
+      onceAllConnectionsTerminated.flatMap { _ => system.terminate()
+      }
+    }
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
   import spray.json.*
   import system.dispatcher
 
-  val faultyActor = system.actorOf(Props[FaultyActor](), "FaultyActor")
+  lazy val faultyActor = system.actorOf(Props[FaultyActor](), "FaultyActor")
 
   final case class FaultyActorResponse(totalAttempts: Int)
 
@@ -203,15 +225,7 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
     }
   }
 
-  val bindingFuture = Http().newServerAt("127.0.0.1", 6002).bind(routes)
-
-  bindingFuture.onComplete {
-    case Success(b) =>
-      println("Server started, listening on: " + b.localAddress)
-    case Failure(e) =>
-      println(s"Server could not bind to... Exception message: ${e.getMessage}")
-      system.terminate()
-  }
+  lazy val bindingFuture = Http().newServerAt("127.0.0.1", 6002).bind(routes)
 
   def browserClient() = {
     val os = System.getProperty("os.name").toLowerCase
@@ -219,15 +233,4 @@ object SampleRoutes extends App with DefaultJsonProtocol with SprayJsonSupport {
     else if (os.startsWith("windows")) Seq("cmd", "/c", s"start http://127.0.0.1:6002").!
   }
 
-  browserClient()
-
-  sys.addShutdownHook {
-    println("About to shutdown...")
-    val fut = bindingFuture.map(serverBinding => serverBinding.terminate(hardDeadline = 3.seconds))
-    println("Waiting for connections to terminate...")
-    val onceAllConnectionsTerminated = Await.result(fut, 10.seconds)
-    println("Connections terminated")
-    onceAllConnectionsTerminated.flatMap { _ => system.terminate()
-    }
-  }
 }

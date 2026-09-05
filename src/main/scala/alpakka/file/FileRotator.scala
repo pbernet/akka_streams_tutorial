@@ -20,26 +20,33 @@ import java.nio.file.StandardOpenOption.*
   * So all .txt files are written with the correct content
   *
   */
-object FileRotator extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
-
-  import system.dispatcher
-
-  val logRotatorSink = {
-    LogRotatorSink.withSinkFactory(
-      triggerGeneratorCreator =
-        () => n => Some(new File(s"file${n.decodeString("UTF-8")}.txt").toPath),
-      sinkFactory =
-        (path: Path) =>
-          Flow[ByteString].toMat(FileIO.toPath(path, Set(CREATE, WRITE, TRUNCATE_EXISTING, SYNC)))(Keep.right)
-    )
+object FileRotator {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
   }
 
-  val done =
-    Source(1 to 4)
-      .map(i => ByteString.fromString(i.toString))
-      .runWith(logRotatorSink)
+  private class Application {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  done.onComplete(_ => system.terminate())
+    import system.dispatcher
+
+    val logRotatorSink = {
+      LogRotatorSink.withSinkFactory(
+        triggerGeneratorCreator =
+          () => n => Some(new File(s"file${n.decodeString("UTF-8")}.txt").toPath),
+        sinkFactory =
+          (path: Path) =>
+            Flow[ByteString].toMat(FileIO.toPath(path, Set(CREATE, WRITE, TRUNCATE_EXISTING, SYNC)))(Keep.right)
+      )
+    }
+
+    val done =
+      Source(1 to 4)
+        .map(i => ByteString.fromString(i.toString))
+        .runWith(logRotatorSink)
+
+    done.onComplete(_ => system.terminate())
+  }
 }

@@ -36,7 +36,7 @@ class ClickhouseDB(httpPort: Int) {
     .withFallback(ConfigFactory.load())
 
   val client = new ClickhouseClient(Some[Config](tweakedConf))
-  logger.info(s"Connected to server version: ${client.serverVersion}")
+  client.query("SELECT version()").foreach(version => logger.info(s"Connected to server version: $version"))
 
   def testRead(): String = {
     val result = Await.result(client.query("SELECT 1"), 10.seconds)
@@ -79,7 +79,8 @@ class ClickhouseDB(httpPort: Int) {
   }
 }
 
-object ClickhouseDB extends App {
+object ClickhouseDB {
+  def main(args: Array[String]): Unit = {}
 
   def apply(httpPort: Int) = new ClickhouseDB(httpPort: Int)
 }

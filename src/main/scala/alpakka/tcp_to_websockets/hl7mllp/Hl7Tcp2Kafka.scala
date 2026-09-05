@@ -15,6 +15,7 @@ import org.apache.pekko.stream.{ActorAttributes, Supervision}
 import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.compiletime.uninitialized
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -49,7 +50,7 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 29092) extends MllpProtocol {
   initializeTopic(topic).failed.foreach(error => logger.error(s"Failed to initialize Kafka topic $topic", error))
 
   val (address, port) = ("127.0.0.1", 6160)
-  var serverBinding: Future[Tcp.ServerBinding] = _
+  var serverBinding: Future[Tcp.ServerBinding] = uninitialized
 
   def run(): Unit = {
     serverBinding = server(address, port)
@@ -136,7 +137,7 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 29092) extends MllpProtocol {
         .via(hl7Parser)
         .map(ByteString(_))
         .withAttributes(ActorAttributes.supervisionStrategy(deciderFlow))
-        .watchTermination() { (_, done) =>
+        .watchTermination { (_, done) =>
           done.onComplete {
             case Failure(err) => logger.error(s"Server flow failed: $err")
             case _ => logger.debug(s"Server flow terminated for client: ${connection.remoteAddress}")
@@ -147,7 +148,7 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 29092) extends MllpProtocol {
 
     val binding = Tcp()
       .bind(interface = address, port = port)
-      .watchTermination()(Keep.left)
+      .watchTermination(Keep.left)
       .to(handler)
       .run()
 
@@ -187,9 +188,12 @@ class Hl7Tcp2Kafka(mappedPortKafka: Int = 29092) extends MllpProtocol {
   }
 }
 
-object Hl7Tcp2Kafka extends App {
-  val server = new Hl7Tcp2Kafka()
-  server.run()
+object Hl7Tcp2Kafka {
+  lazy val server = new Hl7Tcp2Kafka()
+
+  def main(args: Array[String]): Unit = {
+    server.run()
+  }
 
   def apply(mappedPort: Int): Hl7Tcp2Kafka = new Hl7Tcp2Kafka(mappedPort)
 

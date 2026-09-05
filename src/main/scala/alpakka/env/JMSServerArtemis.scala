@@ -23,82 +23,89 @@ import javax.naming.{Context, InitialContext}
   * https://github.com/apache/activemq-artemis/tree/master/examples/features/standard/embedded-simple
   *
   */
-object JMSServerArtemis extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val host: String = "127.0.0.1"
-  val port = 21616
-  private val serverUrl = s"tcp://$host:$port"
-
-  // Does not run with Java 23, this suggested workaround does not help
-  // Doc: https://issues.apache.org/jira/browse/ARTEMIS-4975
-  System.setProperty("java.security.manager", "allow")
-
-  private val securityConfig = new SecurityConfiguration()
-  securityConfig.addUser("artemis", "artemis")
-  securityConfig.addRole("artemis", "guest")
-  // Needed when run with broker_docker.xml
-  securityConfig.addRole("artemis", "amq")
-  securityConfig.setDefaultUser("artemis")
-  private val securityManager = new ActiveMQJAASSecurityManager(classOf[InVMLoginModule].getName, securityConfig)
-
-  val broker = new EmbeddedActiveMQ()
-  broker.setConfigResourcePath("broker.xml")
-  broker.setSecurityManager(securityManager)
-  broker.start()
-
-  runTestClient()
-  runTestClientJNDI()
-
-  private def runTestClient(): Unit = {
-    val cf = new ActiveMQConnectionFactory(serverUrl)
-    val connection = cf.createConnection()
-    connection.start()
-
-    try {
-      val session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE)
-      val bootstrapTestQueue = session.createQueue("jms.queue.bootstrapTestQueue")
-
-      val producer = session.createProducer(bootstrapTestQueue)
-      val message = session.createTextMessage("Test msg sent at: " + LocalDateTime.now())
-      logger.info("About to send: " + message.getText)
-      producer.send(message)
-
-      val messageConsumer = session.createConsumer(bootstrapTestQueue)
-      val messageReceived = messageConsumer.receive(10000).asInstanceOf[TextMessage]
-      logger.info("Received message: " + messageReceived.getText)
-    } finally {
-      connection.close()
-    }
+object JMSServerArtemis {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
   }
 
-  private def runTestClientJNDI(): Unit = {
-    // Picks up jndi.properties from resources
-    val props = new Properties()
-    props.setProperty(Context.INITIAL_CONTEXT_FACTORY, "org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory")
-    props.setProperty(Context.PROVIDER_URL, serverUrl)
-    val initialContext = new InitialContext(props)
+  private class Application {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    val host: String = "127.0.0.1"
+    val port = 21616
+    private val serverUrl = s"tcp://$host:$port"
 
-    // Use queue configured jndi.properties
-    val queue = initialContext.lookup("queue/bootstrapTestQueueJNDI").asInstanceOf[Queue]
-    val cf = initialContext.lookup("ConnectionFactory").asInstanceOf[ConnectionFactory]
-    val connection = cf.createConnection()
-    connection.start()
+    // Does not run with Java 23, this suggested workaround does not help
+    // Doc: https://issues.apache.org/jira/browse/ARTEMIS-4975
+    System.setProperty("java.security.manager", "allow")
 
-    try {
-      val session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE)
-      val producer = session.createProducer(queue)
-      val message = session.createTextMessage("Test msg JNDI sent at: " + LocalDateTime.now())
-      logger.info("About to send: " + message.getText)
-      producer.send(message)
-      val messageConsumer = session.createConsumer(queue)
+    private val securityConfig = new SecurityConfiguration()
+    securityConfig.addUser("artemis", "artemis")
+    securityConfig.addRole("artemis", "guest")
+    // Needed when run with broker_docker.xml
+    securityConfig.addRole("artemis", "amq")
+    securityConfig.setDefaultUser("artemis")
+    private val securityManager = new ActiveMQJAASSecurityManager(classOf[InVMLoginModule].getName, securityConfig)
 
-      val messageReceived = messageConsumer.receive(1000).asInstanceOf[TextMessage]
-      logger.info("Received message JNDI: " + messageReceived.getText)
-    } finally {
-      connection.close()
+    val broker = new EmbeddedActiveMQ()
+    broker.setConfigResourcePath("broker.xml")
+    broker.setSecurityManager(securityManager)
+    broker.start()
+
+    runTestClient()
+    runTestClientJNDI()
+
+    private def runTestClient(): Unit = {
+      val cf = new ActiveMQConnectionFactory(serverUrl)
+      val connection = cf.createConnection()
+      connection.start()
+
+      try {
+        val session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE)
+        val bootstrapTestQueue = session.createQueue("jms.queue.bootstrapTestQueue")
+
+        val producer = session.createProducer(bootstrapTestQueue)
+        val message = session.createTextMessage("Test msg sent at: " + LocalDateTime.now())
+        logger.info("About to send: " + message.getText)
+        producer.send(message)
+
+        val messageConsumer = session.createConsumer(bootstrapTestQueue)
+        val messageReceived = messageConsumer.receive(10000).asInstanceOf[TextMessage]
+        logger.info("Received message: " + messageReceived.getText)
+      } finally {
+        connection.close()
+      }
     }
-  }
 
-  System.in.read
-  broker.stop()
+    private def runTestClientJNDI(): Unit = {
+      // Picks up jndi.properties from resources
+      val props = new Properties()
+      props.setProperty(Context.INITIAL_CONTEXT_FACTORY, "org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory")
+      props.setProperty(Context.PROVIDER_URL, serverUrl)
+      val initialContext = new InitialContext(props)
+
+      // Use queue configured jndi.properties
+      val queue = initialContext.lookup("queue/bootstrapTestQueueJNDI").asInstanceOf[Queue]
+      val cf = initialContext.lookup("ConnectionFactory").asInstanceOf[ConnectionFactory]
+      val connection = cf.createConnection()
+      connection.start()
+
+      try {
+        val session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE)
+        val producer = session.createProducer(queue)
+        val message = session.createTextMessage("Test msg JNDI sent at: " + LocalDateTime.now())
+        logger.info("About to send: " + message.getText)
+        producer.send(message)
+        val messageConsumer = session.createConsumer(queue)
+
+        val messageReceived = messageConsumer.receive(1000).asInstanceOf[TextMessage]
+        logger.info("Received message JNDI: " + messageReceived.getText)
+      } finally {
+        connection.close()
+      }
+    }
+
+    System.in.read
+    broker.stop()
+  }
 }

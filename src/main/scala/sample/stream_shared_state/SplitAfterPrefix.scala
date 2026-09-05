@@ -17,44 +17,47 @@ import scala.concurrent.Future
   * Similar to: [[DeferredStreamCreation]]
   * Similar to: [[SplitAfter]]
   */
-object SplitAfterPrefix extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
-  import system.dispatcher
+object SplitAfterPrefix {
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  val chunkTerminator = "STOP"
-  val input = Seq(
-    "A", "say", "a", "word", chunkTerminator,
-    "B", "be", "ready", chunkTerminator
-  )
+    import system.dispatcher
 
-  def handleLine(prefix: Seq[String], stream: Source[String, Any]): Source[Any, Any] = {
-    prefix.head match {
-      case "A" =>
-        stream
-          .map(_.toUpperCase())
-          .runFold("")(_ + " " + _)
-          .onComplete(res => logger.info(s"Result for $prefix: $res"))
-      case "B" =>
-        stream
-          .map(_.toLowerCase)
-          .runFold("")(_ + " " + _)
-          .onComplete(res => logger.info(s"Result for $prefix: $res"))
+    val chunkTerminator = "STOP"
+    val input = Seq(
+      "A", "say", "a", "word", chunkTerminator,
+      "B", "be", "ready", chunkTerminator
+    )
+
+    def handleLine(prefix: Seq[String], stream: Source[String, Any]): Source[Any, Any] = {
+      prefix.head match {
+        case "A" =>
+          stream
+            .map(_.toUpperCase())
+            .runFold("")(_ + " " + _)
+            .onComplete(res => logger.info(s"Result for $prefix: $res"))
+        case "B" =>
+          stream
+            .map(_.toLowerCase)
+            .runFold("")(_ + " " + _)
+            .onComplete(res => logger.info(s"Result for $prefix: $res"))
+      }
+      Source.empty
     }
-    Source.empty
+
+    val handleChunk: Sink[String, Future[Any]] =
+      Flow[String]
+        .prefixAndTail(1)
+        .flatMapConcat(handleLine.tupled) // getting only a single element (of type Tuple)
+        .toMat(Sink.ignore)(Keep.right)
+
+    val done = Source(input)
+      .splitAfter(_ == chunkTerminator)
+      .to(handleChunk)
+      .run()
+
+    Thread.sleep(1000)
+    system.terminate()
   }
-
-  val handleChunk: Sink[String, Future[Any]] =
-    Flow[String]
-      .prefixAndTail(1)
-      .flatMapConcat((handleLine _).tupled) // getting only a single element (of type Tuple)
-      .toMat(Sink.ignore)(Keep.right)
-
-  val done = Source(input)
-    .splitAfter(_ == chunkTerminator)
-    .to(handleChunk)
-    .run()
-
-  Thread.sleep(1000)
-  system.terminate()
 }

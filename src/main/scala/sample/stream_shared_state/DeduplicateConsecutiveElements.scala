@@ -11,20 +11,22 @@ import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
   *
   * See also: [[Dedupe]] and [[LocalFileCacheCaffeine]]
   */
-object DeduplicateConsecutiveElements extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object DeduplicateConsecutiveElements {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  val source = Source(List(1, 1, 1, 2, 2, 1, 2, 2, 2, 3, 4, 4, 5, 6))
+    val source = Source(List(1, 1, 1, 2, 2, 1, 2, 2, 2, 3, 4, 4, 5, 6))
 
-  val flow = Flow[Int]
-    .sliding(2, 1)
-    .mapConcat { case prev +: current +: _ =>
-      if (prev == current) Nil
-      else List(current)
-    }
+    val flow = Flow[Int]
+      .sliding(2, 1)
+      .mapConcat { case prev +: current +: _ =>
+        if (prev == current) Nil
+        else List(current)
+      }
 
-  // prepend this value to the source to avoid losing the first value
-  val ignoredValue = Int.MinValue
-  val prependedSource = Source.single(ignoredValue).concat(source)
-  prependedSource.via(flow).runWith(Sink.foreach(println))
+    // prepend this value to the source to avoid losing the first value
+    val ignoredValue = Int.MinValue
+    val prependedSource = Source.single(ignoredValue).concat(source)
+    prependedSource.via(flow).runWith(Sink.foreach(println))
+  }
 }

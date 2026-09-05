@@ -48,7 +48,7 @@ class SlickRunner(urlWithMappedPort: String) {
     def * = (id, name)
   }
 
-  implicit val getUserResult: AnyRef & GetResult[User] = GetResult(r => User(r.nextInt(), r.nextString()))
+  given getUserResult: GetResult[User] = GetResult(using r => User(r.nextInt(), r.nextString()))
 
   def insertUser(user: User): DBIO[Int] =
     sqlu"INSERT INTO public.users VALUES(${user.id}, ${user.name})"
@@ -124,6 +124,7 @@ class SlickRunner(urlWithMappedPort: String) {
   }
 }
 
-object SlickRunner extends App {
+object SlickRunner {
+  def main(args: Array[String]): Unit = {}
   def apply(urlWithMappedPort: String) = new SlickRunner(urlWithMappedPort)
 }

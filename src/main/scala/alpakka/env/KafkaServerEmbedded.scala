@@ -15,12 +15,19 @@ import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
   *  - Setup Kafka server manually, see: https://kafka.apache.org/quickstart
   *  - Use Confluent Cloud, see: https://www.confluent.io/confluent-cloud/#view-pricing
   */
-object KafkaServerEmbedded extends App {
-  implicit val config: EmbeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 29092)
-  EmbeddedKafka.start()
+object KafkaServerEmbedded {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
+  }
 
-  sys.addShutdownHook {
-    println("Got control-c cmd from shell or SIGTERM, about to shutdown...")
-    EmbeddedKafka.stop()
+  private class Application {
+    implicit val config: EmbeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 29092)
+    EmbeddedKafka.start()
+
+    sys.addShutdownHook {
+      println("Got control-c cmd from shell or SIGTERM, about to shutdown...")
+      EmbeddedKafka.stop()
+    }
   }
 }

@@ -13,51 +13,53 @@ import scala.util.{Failure, Success}
   * Similar to: [[tools.SubtitleTranslator]]
   *
   */
-object SessionWindow extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object SessionWindow {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val maxGap = 5 // between session windows
+    val maxGap = 5 // between session windows
 
-  case class Event[T](timestamp: Long, data: T)
+    case class Event[T](timestamp: Long, data: T)
 
-  private def groupBySessionWindow(maxGap: Long) =
-    Flow[Event[String]].statefulMap(() => List.empty[Event[String]])(
-      (stateList, nextElem) => {
-        val newStateList = stateList :+ nextElem
-        val lastElem = if (stateList.isEmpty) nextElem else stateList.reverse.head
-        val calcGap = nextElem.timestamp - lastElem.timestamp
-        if (calcGap < maxGap) {
-          // (list for next iteration, list of output elements)
-          (newStateList, Nil)
-        }
-        else {
-          // (list for next iteration, list of output elements)
-          (List(nextElem), stateList)
-        }
-      },
-      // Cleanup function, we return the last stateList
-      stateList => Some(stateList))
-      .filterNot(each => each.isEmpty)
+    def groupBySessionWindow(maxGap: Long) =
+      Flow[Event[String]].statefulMap(() => List.empty[Event[String]])(
+          (stateList, nextElem) => {
+            val newStateList = stateList :+ nextElem
+            val lastElem = if (stateList.isEmpty) nextElem else stateList.reverse.head
+            val calcGap = nextElem.timestamp - lastElem.timestamp
+            if (calcGap < maxGap) {
+              // (list for next iteration, list of output elements)
+              (newStateList, Nil)
+            }
+            else {
+              // (list for next iteration, list of output elements)
+              (List(nextElem), stateList)
+            }
+          },
+          // Cleanup function, we return the last stateList
+          stateList => Some(stateList))
+        .filterNot(each => each.isEmpty)
 
-  val input = Source(List(
-    Event(1, "A"),
-    Event(7, "B"), Event(8, "C"),
-    Event(15, "D"), Event(16, "E"), Event(18, "F"),
-    Event(25, "G"), Event(26, "H"), Event(26, "I"), Event(28, "J"), Event(32, "K"),
-    Event(42, "L"), Event(43, "M")
-  ))
+    val input = Source(List(
+      Event(1, "A"),
+      Event(7, "B"), Event(8, "C"),
+      Event(15, "D"), Event(16, "E"), Event(18, "F"),
+      Event(25, "G"), Event(26, "H"), Event(26, "I"), Event(28, "J"), Event(32, "K"),
+      Event(42, "L"), Event(43, "M")
+    ))
 
-  val result: Future[Seq[List[Event[String]]]] = input
-    .via(groupBySessionWindow(maxGap))
-    .runWith(Sink.seq)
+    val result: Future[Seq[List[Event[String]]]] = input
+      .via(groupBySessionWindow(maxGap))
+      .runWith(Sink.seq)
 
-  result.onComplete {
-    case Success(sessions) =>
-      sessions.foreach(sessionWindow => println(s"Session window with events: ${sessionWindow.mkString}"))
-      system.terminate()
-    case Failure(e) => e.printStackTrace()
-      system.terminate()
+    result.onComplete {
+      case Success(sessions) =>
+        sessions.foreach(sessionWindow => println(s"Session window with events: ${sessionWindow.mkString}"))
+        system.terminate()
+      case Failure(e) => e.printStackTrace()
+        system.terminate()
+    }
   }
 }

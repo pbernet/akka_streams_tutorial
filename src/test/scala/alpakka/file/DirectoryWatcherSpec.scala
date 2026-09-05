@@ -10,6 +10,7 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEachTestData, TestData}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path, Paths}
+import scala.compiletime.uninitialized
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -25,9 +26,9 @@ final class DirectoryWatcherSpec extends AsyncWordSpec with Matchers with Before
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val defaultTimeout: FiniteDuration = 5.seconds
   implicit val patience: PatienceConfig = PatienceConfig(timeout = Span(20, Seconds))
-  var tmpRootDir: Path = _
-  var uploadDir: Path = _
-  var processedDir: Path = _
+  var tmpRootDir: Path = uninitialized
+  var uploadDir: Path = uninitialized
+  var processedDir: Path = uninitialized
 
   case class WatcherFixture(watcher: DirectoryWatcher) {
     def withWatcher[T](testCode: DirectoryWatcher => T): T = {
@@ -71,14 +72,14 @@ final class DirectoryWatcherSpec extends AsyncWordSpec with Matchers with Before
     }
 
     "detect_added_nested_subdir_at_runtime_with_files_in_subdir" in {
-        val tmpDir = Files.createTempDirectory("tmp")
-        val sourcePath = Paths.get("src/main/resources/testfile.jpg")
-        val targetPath = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
-        val targetPath2 = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
-        Files.copy(sourcePath, targetPath)
-        Files.copy(sourcePath, targetPath2)
-        val targetDir = Files.createDirectories(uploadDir.resolve("subdir").resolve("nestedDirWithFiles"))
-        FileUtils.copyDirectory(tmpDir.toFile, targetDir.toFile)
+      val tmpDir = Files.createTempDirectory("tmp")
+      val sourcePath = Paths.get("src/main/resources/testfile.jpg")
+      val targetPath = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
+      val targetPath2 = tmpDir.resolve(createUniqueFileName(sourcePath.getFileName))
+      Files.copy(sourcePath, targetPath)
+      Files.copy(sourcePath, targetPath2)
+      val targetDir = Files.createDirectories(uploadDir.resolve("subdir").resolve("nestedDirWithFiles"))
+      FileUtils.copyDirectory(tmpDir.toFile, targetDir.toFile)
       WatcherFixture(DirectoryWatcher(uploadDir, processedDir))
         .withWatcher { watcher =>
           eventually {
@@ -157,6 +158,7 @@ final class DirectoryWatcherSpec extends AsyncWordSpec with Matchers with Before
     val targetPath = target.resolve(createUniqueFileName(createUniqueFileName(sourcePath.getFileName)))
     Files.copy(sourcePath, targetPath)
   }
+
   private def createUniqueFileName(fileName: Path) = {
     val parts = fileName.toString.split('.').map(_.trim)
     Paths.get(s"${parts.head}${Random.nextInt()}.${parts.reverse.head}")

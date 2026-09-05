@@ -15,15 +15,15 @@ import scala.util.{Failure, Success}
 
 object WebSocketClient {
   def apply(id: String, endpoint: String, windTurbineSimulator: ActorRef)
-           (implicit
+           (using
             system: ActorSystem,
             executionContext: ExecutionContext): WebSocketClient = {
-    new WebSocketClient(id, endpoint, windTurbineSimulator)(system, executionContext)
+    new WebSocketClient(id, endpoint, windTurbineSimulator)
   }
 }
 
 class WebSocketClient(id: String, endpoint: String, windTurbineSimulator: ActorRef)
-                     (implicit
+                     (using
                       system: ActorSystem,
                       executionContext: ExecutionContext) {
 

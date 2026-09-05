@@ -71,17 +71,20 @@ class SrtParser(sourceFilePath: String) {
   }
 }
 
-object SrtParser extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val parser = new SrtParser("src/main/resources/EN_challenges.srt")
-  val result = parser.runSync()
-  logger.info(s"File contains: ${result.size} SubtitleBlock(s)")
-  logger.info(s"Blocks: $result")
-
+object SrtParser {
   def apply(sourceFilePath: String): SrtParser = new SrtParser(sourceFilePath)
 
   def timeShift(sourceFilePath: String, targetFilePath: String, shiftBy: Long): Unit =
     new SrtParser(sourceFilePath).timeShift(targetFilePath, shiftBy)
+
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    val parser = new SrtParser("src/main/resources/EN_challenges.srt")
+    val result = parser.runSync()
+    logger.info(s"File contains: ${result.size} SubtitleBlock(s)")
+    logger.info(s"Blocks: $result")
+
+  }
 }
 
 case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {

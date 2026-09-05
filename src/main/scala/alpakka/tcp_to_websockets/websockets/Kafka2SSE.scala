@@ -17,6 +17,7 @@ import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.Locale
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
@@ -38,8 +39,8 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
   val (address, port) = ("127.0.0.1", 6000)
   val bootstrapServers = s"127.0.0.1:$mappedPortKafka"
 
-  var clientKillSwitch: UniqueKillSwitch = _
-  var serverBinding: ServerBinding = _
+  var clientKillSwitch: UniqueKillSwitch = uninitialized
+  var serverBinding: ServerBinding = uninitialized
 
   def run(): Unit = {
     server(address, port)
@@ -121,8 +122,13 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
   }
 }
 
-object Kafka2SSE extends App {
-  val instance = new Kafka2SSE()
+object Kafka2SSE {
+  lazy val instance = new Kafka2SSE()
+
+  def main(args: Array[String]): Unit = {
+    instance
+    ()
+  }
 
   def apply(mappedPortKafka: Int) = new Kafka2SSE(mappedPortKafka)
 }

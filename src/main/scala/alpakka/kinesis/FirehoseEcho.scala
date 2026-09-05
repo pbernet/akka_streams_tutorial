@@ -104,8 +104,10 @@ class FirehoseEcho(urlWithMappedPort: URI = new URI("http://localhost:4566"), ac
   }
 }
 
-object FirehoseEcho extends App {
-  // Use to connect to ministack with default params, eg when ministack image is run via Cockpit
-  val echo = new FirehoseEcho()
-  echo.run()
+object FirehoseEcho {
+  def main(args: Array[String]): Unit = {
+    // Use to connect to ministack with default params, eg when ministack image is run via Cockpit
+    val echo = new FirehoseEcho()
+    echo.run()
+  }
 }

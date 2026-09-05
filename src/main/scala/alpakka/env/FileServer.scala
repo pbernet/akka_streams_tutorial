@@ -29,98 +29,105 @@ import scala.util.{Failure, Success}
   * Note that pekko-http would also support server-side caching (by wrapping caffeine in caching directives):
   * https://pekko.apache.org/docs/pekko-http/current/common/caching.html
   */
-object FileServer extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+object FileServer {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
+  }
 
-  import system.dispatcher
+  private class Application {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  val (address, port) = ("127.0.0.1", 6001)
-  server(address, port)
+    import system.dispatcher
 
-  def server(address: String, port: Int): Unit = {
-    val resourceFileName = "payload.zip"
-    val payloadFile = new File(Paths.get("src/main/resources", resourceFileName).toAbsolutePath.toString)
+    val (address, port) = ("127.0.0.1", 6001)
+    server(address, port)
 
-    val cache: Cache[String, String] =
-      Scaffeine()
-        .recordStats()
-        .expireAfterWrite(1.hour)
-        .maximumSize(500)
-        .build[String, String]()
+    def server(address: String, port: Int): Unit = {
+      val resourceFileName = "payload.zip"
+      val payloadFile = new File(Paths.get("src/main/resources", resourceFileName).toAbsolutePath.toString)
+
+      val cache: Cache[String, String] =
+        Scaffeine()
+          .recordStats()
+          .expireAfterWrite(1.hour)
+          .maximumSize(500)
+          .build[String, String]()
 
 
-    val exceptionHandler = ExceptionHandler {
-      case ex: RuntimeException =>
-        extractUri { uri =>
-          logger.error(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
-          //cache.invalidate(id)
-          complete(HttpResponse(InternalServerError, entity = "Runtime ex occurred"))
-        }
-    }
-
-    def routes: Route = handleExceptions(exceptionHandler) {
-      logRequestResult("FileServer") {
-        path("download" / Segment) { id =>
-          logger.info(s"TRACE_ID: $id Server received download request")
-          get {
-            getFromFile(payloadFile, MediaTypes.`application/zip`)
+      val exceptionHandler = ExceptionHandler {
+        case ex: RuntimeException =>
+          extractUri { uri =>
+            logger.error(s"Request to $uri could not be handled normally message: ${ex.getMessage}")
+            //cache.invalidate(id)
+            complete(HttpResponse(InternalServerError, entity = "Runtime ex occurred"))
           }
-        } ~ path("downloadflaky" / Segment) { id =>
-          logger.info(s"TRACE_ID: $id Server received flaky download request")
-          get {
-            if (id.toInt % 10 == 0) { // 10, 20, 30
-              complete(randomErrorHttpStatusCode)
-            } else if (id.toInt % 5 == 0) { // 5, 15, 25
-              // Causes TimeoutException on client if sleep time > 5 sec
-              randomSleeper()
-              getFromFile(payloadFile, MediaTypes.`application/zip`)
-            } else {
+      }
+
+      def routes: Route = handleExceptions(exceptionHandler) {
+        logRequestResult("FileServer") {
+          path("download" / Segment) { id =>
+            logger.info(s"TRACE_ID: $id Server received download request")
+            get {
               getFromFile(payloadFile, MediaTypes.`application/zip`)
             }
-          }
-        } ~ path("downloadni" / Segment) { id =>
-          logger.info(s"TRACE_ID: $id Server received non-idempotent request")
-
-          if (cache.getIfPresent(id).isDefined) {
-            logger.warn(s"TRACE_ID: $id Only one download file request per TRACE_ID allowed. Reply with 404")
-            complete(StatusCodes.NotFound)
-
-          } else {
-            cache.put(id, "downloading") // to simulate blocking on concurrent requests
+          } ~ path("downloadflaky" / Segment) { id =>
+            logger.info(s"TRACE_ID: $id Server received flaky download request")
             get {
-              randomSleeper()
-              val response = getFromFile(payloadFile, MediaTypes.`application/zip`)
-              cache.put(id, "downloaded")
-              response
+              if (id.toInt % 10 == 0) { // 10, 20, 30
+                complete(randomErrorHttpStatusCode)
+              } else if (id.toInt % 5 == 0) { // 5, 15, 25
+                // Causes TimeoutException on client if sleep time > 5 sec
+                randomSleeper()
+                getFromFile(payloadFile, MediaTypes.`application/zip`)
+              } else {
+                getFromFile(payloadFile, MediaTypes.`application/zip`)
+              }
+            }
+          } ~ path("downloadni" / Segment) { id =>
+            logger.info(s"TRACE_ID: $id Server received non-idempotent request")
+
+            if (cache.getIfPresent(id).isDefined) {
+              logger.warn(s"TRACE_ID: $id Only one download file request per TRACE_ID allowed. Reply with 404")
+              complete(StatusCodes.NotFound)
+
+            } else {
+              cache.put(id, "downloading") // to simulate blocking on concurrent requests
+              get {
+                randomSleeper()
+                val response = getFromFile(payloadFile, MediaTypes.`application/zip`)
+                cache.put(id, "downloaded")
+                response
+              }
             }
           }
         }
       }
+
+      val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
+      bindingFuture.onComplete {
+        case Success(b) =>
+          logger.info(s"Server started, listening on: ${b.localAddress}")
+        case Failure(e) =>
+          logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
+          system.terminate()
+      }
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
-    bindingFuture.onComplete {
-      case Success(b) =>
-        logger.info(s"Server started, listening on: ${b.localAddress}")
-      case Failure(e) =>
-        logger.info(s"Server could not bind to $address:$port. Exception message: ${e.getMessage}")
-        system.terminate()
+    def randomSleeper(): Unit = {
+      val (start, end) = (1000, 10000)
+      val rnd = new scala.util.Random
+      val sleepTime = start + rnd.nextInt((end - start) + 1)
+      logger.debug(s" -> Sleep for $sleepTime ms")
+      Thread.sleep(sleepTime.toLong)
     }
-  }
 
-  def randomSleeper(): Unit = {
-    val (start, end) = (1000, 10000)
-    val rnd = new scala.util.Random
-    val sleepTime = start + rnd.nextInt((end - start) + 1)
-    logger.debug(s" -> Sleep for $sleepTime ms")
-    Thread.sleep(sleepTime.toLong)
-  }
-
-  def randomErrorHttpStatusCode: StatusCode = {
-    val statusCodes = Seq(StatusCodes.NotFound, StatusCodes.InternalServerError, StatusCodes.ServiceUnavailable)
-    val statusCode = statusCodes(scala.util.Random.nextInt(statusCodes.size))
-    logger.info(s" -> Complete with HTTP status code: $statusCode")
-    statusCode
+    def randomErrorHttpStatusCode: StatusCode = {
+      val statusCodes = Seq(StatusCodes.NotFound, StatusCodes.InternalServerError, StatusCodes.ServiceUnavailable)
+      val statusCode = statusCodes(scala.util.Random.nextInt(statusCodes.size))
+      logger.info(s" -> Complete with HTTP status code: $statusCode")
+      statusCode
+    }
   }
 }

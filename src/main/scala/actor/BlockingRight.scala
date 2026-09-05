@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ActorSystem, DispatcherSelector}
 
 /**
-  * If blocking (eg by an external resource) is required,
+  * If blocking (e.g. by an external resource) is required,
   * a custom dispatcher (see application.conf) avoids
   * thread starvation of the default dispatcher
   *
@@ -14,7 +14,10 @@ import org.apache.pekko.actor.typed.{ActorSystem, DispatcherSelector}
   * See [[sample.stream.WaitForFlowsToComplete]] for use of custom dispatcher in a stream
   *
   */
-object BlockingRight extends App {
+object BlockingRight {
+  def main(args: Array[String]): Unit = {
+    val _ = system
+  }
 
   val root = Behaviors.setup[Nothing] { context =>
     (1 to 50).foreach { i =>
@@ -31,5 +34,5 @@ object BlockingRight extends App {
     Behaviors.empty
   }
 
-  val system = ActorSystem[Nothing](root, "BlockingRight")
+  lazy val system: ActorSystem[Nothing] = ActorSystem[Nothing](root, "BlockingRight")
 }

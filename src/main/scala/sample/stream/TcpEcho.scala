@@ -27,28 +27,30 @@ import scala.util.{Failure, Success}
   * Doc:
   * https://pekko.apache.org/docs/pekko/current/stream/stream-io.html?language=scala
   */
-object TcpEcho extends App {
+object TcpEcho {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val systemServer = ActorSystem("TcpEchoServer")
-  val systemClient = ActorSystem("TcpEchoClient")
+  lazy val systemServer: ActorSystem = ActorSystem("TcpEchoServer")
+  lazy val systemClient: ActorSystem = ActorSystem("TcpEchoClient")
 
-  if (args.isEmpty) {
-    val (host, port) = ("127.0.0.1", 6000)
-    server(systemServer, host, port)
-
-    // Issue: https://github.com/akka/akka/issues/29842
-    checkResources()
-
-    val maxClients = 100
-    (1 to maxClients).par.foreach(each => client(each, systemClient, host, port))
-  } else {
-    val (host, port) =
-      if (args.length == 3) (args(1), args(2).toInt)
-      else ("127.0.0.1", 6000)
-    if (args(0) == "server") {
+  def main(args: Array[String]): Unit = {
+    if (args.isEmpty) {
+      val (host, port) = ("127.0.0.1", 6000)
       server(systemServer, host, port)
-    } else if (args(0) == "client") {
-      client(1, systemClient, host, port)
+
+      // Issue: https://github.com/akka/akka/issues/29842
+      checkResources()
+
+      val maxClients = 100
+      (1 to maxClients).par.foreach(each => client(each, systemClient, host, port))
+    } else {
+      val (host, port) =
+        if (args.length == 3) (args(1), args(2).toInt)
+        else ("127.0.0.1", 6000)
+      if (args(0) == "server") {
+        server(systemServer, host, port)
+      } else if (args(0) == "client") {
+        client(1, systemClient, host, port)
+      }
     }
   }
 
@@ -74,7 +76,7 @@ object TcpEcho extends App {
         .merge(welcomeSource) // merge the initial banner after parser
         .map(_ + "\n")
         .map(ByteString(_))
-        .watchTermination()((_, done) => done.onComplete {
+        .watchTermination((_, done) => done.onComplete {
           case Failure(err) =>
             logger.info(s"Server flow failed: $err")
           case _ => logger.info(s"Server flow terminated for client: ${connection.remoteAddress}")
@@ -83,7 +85,7 @@ object TcpEcho extends App {
     }
 
     val connections = Tcp().bind(interface = host, port = port)
-    val binding = connections.watchTermination()(Keep.left).to(handler).run()
+    val binding = connections.watchTermination(Keep.left).to(handler).run()
 
     binding.onComplete {
       case Success(b) =>

@@ -145,9 +145,11 @@ class SqsEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", secr
   }
 }
 
-object SqsEcho extends App {
-  val echo = new SqsEcho()
-  echo.run()
-  // Avoid dangling resources on AWS, comment out for testing
-  echo.deleteQueue()
+object SqsEcho {
+  def main(args: Array[String]): Unit = {
+    val echo = new SqsEcho()
+    echo.run()
+    // Avoid dangling resources on AWS, comment out for testing
+    echo.deleteQueue()
+  }
 }

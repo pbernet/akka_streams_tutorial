@@ -4,12 +4,12 @@ name := "pekko-tutorial"
 
 version := "1.0"
 
-scalaVersion := "2.13.18"
+scalaVersion := "3.9.0"
 
-val pekkoVersion = "1.7.0"
-val pekkoHTTPVersion = "1.4.0"
-val pekkoConnectorVersion = "1.3.0"
-val pekkoConnectorKafkaVersion = "1.2.0"
+val pekkoVersion = "2.0.0-M4"
+val pekkoHTTPVersion = "2.0.0-M1"
+val pekkoConnectorVersion = "2.0.0-M1"
+val pekkoConnectorKafkaVersion = "2.0.0-M1"
 
 val kafkaVersion = "4.3.1"
 val artemisVersion = "2.44.0"
@@ -61,7 +61,9 @@ libraryDependencies ++= Seq(
   "org.bouncycastle" % "bcprov-jdk18on" % "1.81",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
-  "org.apache.kafka" %% "kafka" % kafkaVersion,
+  // Kafka does not publish its Scala module for Scala 3.
+  ("org.apache.kafka" %% "kafka" % kafkaVersion)
+    .cross(CrossVersion.for3Use2_13),
   "org.apache.kafka" % "kafka-streams" % kafkaVersion,
   "io.github.embeddedkafka" %% "embedded-kafka" % kafkaVersion,
 
@@ -87,7 +89,10 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-sqs" % pekkoConnectorVersion,
   "software.amazon.awssdk" % "sqs" % awsClientVersion,
 
-  "com.influxdb" %% "influxdb-client-scala" % influxdbVersion,
+  // InfluxDB does not publish its Scala client for Scala 3.
+  ("com.influxdb" %% "influxdb-client-scala" % influxdbVersion)
+    .cross(CrossVersion.for3Use2_13)
+    .excludeAll(ExclusionRule(organization = "org.apache.pekko")),
   "com.influxdb" % "flux-dsl" % influxdbVersion,
   "org.influxdb" % "influxdb-java" % "2.24",
 
@@ -105,7 +110,7 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
   "commons-io" % "commons-io" % "2.20.0",
   "org.apache.commons" % "commons-lang3" % "3.18.0",
-  "com.sksamuel.avro4s" %% "avro4s-core" % "4.1.2", // 5.x for Scala 3
+  "com.sksamuel.avro4s" %% "avro4s-core" % "5.0.15",
 
   "org.apache.camel" % "camel-core" % "4.16.0",
   "org.apache.camel" % "camel-seda" % "4.16.0",
@@ -115,7 +120,7 @@ libraryDependencies ++= Seq(
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
   "ch.qos.logback" % "logback-classic" % "1.5.18",
-  "com.crobox.clickhouse" %% "client" % "1.2.17",
+  "com.crobox.clickhouse" %% "client" % "2.0.0",
   "com.clickhouse" % "clickhouse-jdbc" % "0.9.8" % Test,
 
   "org.testcontainers" % "testcontainers" % testContainersVersion,
@@ -169,6 +174,8 @@ libraryDependencies ++= Seq(
   "io.gatling" % "gatling-test-framework" % gatlingVersion
 )
 
+excludeDependencies += ExclusionRule("com.typesafe.scala-logging", "scala-logging_2.13")
+
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 //see: https://github.com/sbt/sbt/issues/3618
@@ -179,8 +186,6 @@ val workaround = {
 
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
-//https://docs.scala-lang.org/scala3/guides/migration/tooling-scala2-xsource3.html
-scalacOptions += "-Xsource:3"
 
 run / fork := true
 
@@ -192,3 +197,13 @@ enablePlugins(GatlingPlugin)
 // https://eed3si9n.com/sbt-1.5.0
 // https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
+
+// TODO  scoped eviction rules are required because Connectors/HTTP M1 target Pekko Core M1, while this build intentionally selects Core M4
+// Pekko 2.0.0-M1 modules depend on Core M1; use the requested Core M4 milestone consistently.
+ThisBuild / libraryDependencySchemes ++= Seq(
+  "org.apache.pekko" %% "pekko-actor" % "always",
+  "org.apache.pekko" %% "pekko-actor-typed" % "always",
+  "org.apache.pekko" %% "pekko-stream" % "always",
+  "org.apache.pekko" %% "pekko-stream-typed" % "always",
+  "org.apache.pekko" %% "pekko-http" % "always"
+)

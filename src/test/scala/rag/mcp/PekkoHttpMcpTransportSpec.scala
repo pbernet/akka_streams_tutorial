@@ -3,8 +3,8 @@ package rag.mcp
 import io.modelcontextprotocol.common.McpTransportContext
 import io.modelcontextprotocol.server.McpStatelessServerHandler
 import io.modelcontextprotocol.spec.McpSchema.{ErrorCodes, JSONRPCNotification, JSONRPCRequest, JSONRPCResponse}
-import org.apache.pekko.http.scaladsl.model.headers.{Accept, RawHeader}
 import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.{Accept, RawHeader}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.matchers.should.Matchers
@@ -36,7 +36,7 @@ class PekkoHttpMcpTransportSpec extends AnyWordSpec with Matchers with Scalatest
     }
   }
 
-  private val transport = new PekkoHttpMcpTransport()(system)
+  private val transport = new PekkoHttpMcpTransport()(using system)
   private val route = transport.createRoutes(handler)
   private val requiredHeaders: List[HttpHeader] = List(
     Accept(MediaTypes.`application/json`, MediaTypes.`text/event-stream`),

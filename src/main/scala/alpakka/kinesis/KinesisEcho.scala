@@ -160,8 +160,10 @@ class KinesisEcho(urlWithMappedPort: URI = new URI(""), accessKey: String = "", 
   }
 }
 
-object KinesisEcho extends App {
-  val echo = new KinesisEcho()
-  echo.run()
-  // TODO Add stream removal
+object KinesisEcho {
+  def main(args: Array[String]): Unit = {
+    val echo = new KinesisEcho()
+    echo.run()
+    // TODO Add stream removal
+  }
 }

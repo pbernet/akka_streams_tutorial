@@ -22,6 +22,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.ConcurrentHashMap
+import scala.compiletime.uninitialized
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try, Using}
@@ -58,6 +59,7 @@ case class RagStatus(
                       rerankerMinScore: Double,
                       rerankerModelName: String
                     )
+
 object RagStatus {
   implicit val encoder: Encoder[RagStatus] = deriveEncoder[RagStatus]
 }
@@ -144,8 +146,8 @@ class RagEngine(
   @volatile private var ingesting: Boolean = false
   @volatile private var documentsProcessed: Int = 0
   @volatile private var documentsTotal: Int = 0
-  @volatile private var assistant: ChatAssistant = _
-  @volatile private var loggingAggregator: LoggingContentAggregator = _
+  @volatile private var assistant: ChatAssistant = uninitialized
+  @volatile private var loggingAggregator: LoggingContentAggregator = uninitialized
   // TODO sessionMemories grows unboundedly, no explicit removal yet
   // Replace with cache with TTL-based eviction (e.g. Caffeine cache with expireAfterAccess).
   private val sessionMemories = new ConcurrentHashMap[Object, ChatMemory]()

@@ -10,7 +10,7 @@ import scala.language.reflectiveCalls
 
 /**
   * Source -> Flow(Blacklist) -> Sink
-  * Inject shared state (eg Blacklist) from outside the flow execution
+  * Inject shared state (e.g. Blacklist) from outside the flow execution
   *
   * Implementation doc:
   * https://doc.akka.io/docs/akka/current/stream/stream-customize.html#custom-materialized-values
@@ -21,28 +21,30 @@ import scala.language.reflectiveCalls
   * https://discuss.lightbend.com/t/the-idiomatic-way-to-manage-shared-state-with-akka-streams/2552
   */
 
-object Blacklist extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object Blacklist {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  val initBlacklist = Set.empty[String]
+    val initBlacklist = Set.empty[String]
 
-  val service: StateService[Set[String]] =
-    Source.repeat("yes")
-      .throttle(1, 1.second, 10, ThrottleMode.shaping)
-      .viaMat(new ZipWithState(initBlacklist))(Keep.right)
-      .filterNot { case (blacklist: Set[String], elem: String) => blacklist(elem) }
-      .to(Sink.foreach(each => println(each._2)))
-      .run()
+    val service: StateService[Set[String]] =
+      Source.repeat("yes")
+        .throttle(1, 1.second, 10, ThrottleMode.shaping)
+        .viaMat(new ZipWithState(initBlacklist))(Keep.right)
+        .filterNot { case (blacklist: Set[String], elem: String) => blacklist(elem) }
+        .to(Sink.foreach(each => println(each._2)))
+        .run()
 
-  println("Starting with empty blacklist on a list of 'yes' elements -> elements are passing")
+    println("Starting with empty blacklist on a list of 'yes' elements -> elements are passing")
 
-  Thread.sleep(2000)
-  println("Inject new blacklist with value: 'yes' -> elements are filtered")
-  service.update(Set("yes"))
+    Thread.sleep(2000)
+    println("Inject new blacklist with value: 'yes' -> elements are filtered")
+    service.update(Set("yes"))
 
-  Thread.sleep(5000)
-  println("Inject new blacklist with value: 'no' -> elements are passing again")
-  service.update(Set("no"))
+    Thread.sleep(5000)
+    println("Inject new blacklist with value: 'no' -> elements are passing again")
+    service.update(Set("no"))
+  }
 }
 
 
@@ -61,8 +63,8 @@ class ZipWithState[S, I](initState: S) extends GraphStageWithMaterializedValue[F
   override val shape: FlowShape[I, (S, I)] = FlowShape.of(in, out)
 
   override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, StateService[S]) = {
-    val logic = new GraphStageLogic(shape) {
-      private[this] var state: S = initState
+    class Logic extends GraphStageLogic(shape) {
+      private var state: S = initState
       val updateStateCallback: AsyncCallback[S] =
         getAsyncCallback[S] {
           state = _
@@ -80,6 +82,7 @@ class ZipWithState[S, I](initState: S) extends GraphStageWithMaterializedValue[F
         }
       })
     }
+    val logic = new Logic
 
     (logic, new StateServiceCallback(logic.updateStateCallback))
   }

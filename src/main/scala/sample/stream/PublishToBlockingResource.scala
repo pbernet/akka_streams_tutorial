@@ -16,34 +16,36 @@ import scala.util.Failure
   * Doc:
   * https://doc.akka.io/docs/akka/current/stream/operators/Source/unfoldResource.html
   */
-object PublishToBlockingResource extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object PublishToBlockingResource {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val slowSink: Sink[Seq[Int], NotUsed] =
-    Flow[Seq[Int]]
-      .delay(1.seconds, DelayOverflowStrategy.backpressure)
-      .to(Sink.foreach(e => println(s"Reached sink: $e")))
+    val slowSink: Sink[Seq[Int], NotUsed] =
+      Flow[Seq[Int]]
+        .delay(1.seconds, DelayOverflowStrategy.backpressure)
+        .to(Sink.foreach(e => println(s"Reached sink: $e")))
 
-  val blockingResource: BlockingQueue[Int] = new ArrayBlockingQueue[Int](100)
+    val blockingResource: BlockingQueue[Int] = new ArrayBlockingQueue[Int](100)
 
-  // Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
-  val source: Source[Int, NotUsed] =
-    Source.unfoldResource[Int, BlockingQueue[Int]](
-      () => blockingResource,                    //open
-      (q: BlockingQueue[Int]) => Some(q.take()), //read
-      (_: BlockingQueue[Int]) => {})             //close
+    // Start a new `Source` from some (third party) blocking resource which can be opened, read and closed
+    val source: Source[Int, NotUsed] =
+      Source.unfoldResource[Int, BlockingQueue[Int]](
+        () => blockingResource, //open
+        (q: BlockingQueue[Int]) => Some(q.take()), //read
+        (_: BlockingQueue[Int]) => {}) //close
 
-  source
-    .groupedWithin(10, 2.seconds)
-    .watchTermination()((_, done) => done.onComplete {
-      case Failure(err) =>
-        println(s"Flow failed: $err")
-      case each => println(s"Server flow terminated: $each")
-    })
-    .runWith(slowSink)
+    source
+      .groupedWithin(10, 2.seconds)
+      .watchTermination((_, done) => done.onComplete {
+        case Failure(err) =>
+          println(s"Flow failed: $err")
+        case each => println(s"Server flow terminated: $each")
+      })
+      .runWith(slowSink)
 
-  // simulate n clients that publish to blockingResource
-  (1 to 1000).par.foreach(value => blockingResource.put(value))
+    // simulate n clients that publish to blockingResource
+    (1 to 1000).par.foreach(value => blockingResource.put(value))
+  }
 }

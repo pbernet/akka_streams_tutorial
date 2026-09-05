@@ -12,23 +12,30 @@ import java.util.Properties
   * Prerequisite:
   * Run [[alpakka.env.KafkaServerEmbedded]]
   */
-object SimpleAvroProducer extends App {
-  val props = new Properties()
-  props.put("bootstrap.servers", "localhost:29092")
-  props.put("key.serializer", classOf[StringSerializer].getName)
-  props.put("value.serializer", classOf[AvroSerializer].getName)
+object SimpleAvroProducer {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
+  }
 
-  val producer = new KafkaProducer[String, AvroRecord](props)
+  private class Application {
+    val props = new Properties()
+    props.put("bootstrap.servers", "localhost:29092")
+    props.put("key.serializer", classOf[StringSerializer].getName)
+    props.put("value.serializer", classOf[AvroSerializer].getName)
 
-  try for (i <- 0 until 100) {
-    val avroRecord = AvroRecord(s"Str 1-$i", s"Str 2-$i", i)
-    println(s"Sending record: $avroRecord")
+    val producer = new KafkaProducer[String, AvroRecord](props)
 
-    val record = new ProducerRecord[String, AvroRecord]("avro-topic", avroRecord)
-    producer.send(record)
+    try for (i <- 0 until 100) {
+      val avroRecord = AvroRecord(s"Str 1-$i", s"Str 2-$i", i)
+      println(s"Sending record: $avroRecord")
 
-    Thread.sleep(100)
-  } finally producer.close()
+      val record = new ProducerRecord[String, AvroRecord]("avro-topic", avroRecord)
+      producer.send(record)
+
+      Thread.sleep(100)
+    } finally producer.close()
+  }
 }
 
 class AvroSerializer extends org.apache.kafka.common.serialization.Serializer[AvroRecord] {

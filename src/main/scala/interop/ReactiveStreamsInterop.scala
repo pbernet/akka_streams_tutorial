@@ -33,50 +33,54 @@ import scala.concurrent.duration.DurationInt
   * https://projectreactor.io/docs/core/release/reference/
   * https://github.com/ReactiveX/RxJava
   */
-object ReactiveStreamsInterop extends App {
+object ReactiveStreamsInterop {
+  def main(args: Array[String]): Unit = {
+    implicit val executionContext = system.dispatcher
+    camel.start()
+
+    // Slow consumer with Reactor 3
+    Flux.from(publisher)
+      .delayElements(Duration.ofMillis(2000))
+      .map(each => each.toUpperCase())
+      .doOnNext(each => logger.info(s"Consumed with Reactor: $each"))
+      .subscribe()
+
+    // Slow consumer with RxJava 3
+    Flowable.fromPublisher(publisher)
+      .delay(2L, TimeUnit.SECONDS)
+      .map(each => each.toUpperCase())
+      .doOnNext(each => logger.info(s"Consumed with RxJava: $each"))
+      .subscribe()
+
+    // Slow consumer with pekko-streams
+    Source.fromPublisher(publisher)
+      .throttle(2, 2.seconds, 2, ThrottleMode.shaping)
+      .map(each => each.toUpperCase())
+      .wireTap(each => logger.info(s"Consumed with pekko-streams: $each"))
+      .runWith(Sink.ignore)
+
+    Source(1 to 10)
+      .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
+      .mapAsync(1) { i =>
+        producerTemplate
+          .withBody(s"Camel$i")
+          .to("seda:words")
+          .send
+        Future(i)
+      }.runWith(Sink.ignore)
+  }
+
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
   val camel = new DefaultCamelContext()
   val rsCamel: CamelReactiveStreamsService = CamelReactiveStreams.get(camel)
-  camel.start()
 
   // Producer/Publisher from Camel SEDA queue using Reactive Streams
-  val publisher: Publisher[String] = rsCamel.from("seda:words", classOf[String])
+  lazy val publisher: Publisher[String] = rsCamel.from("seda:words", classOf[String])
 
-  // Slow consumer with Reactor 3
-  Flux.from(publisher)
-    .delayElements(Duration.ofMillis(2000))
-    .map(each => each.toUpperCase())
-    .doOnNext(each => logger.info(s"Consumed with Reactor: $each"))
-    .subscribe()
-
-  // Slow consumer with RxJava 3
-  Flowable.fromPublisher(publisher)
-    .delay(2L, TimeUnit.SECONDS)
-    .map(each => each.toUpperCase())
-    .doOnNext(each => logger.info(s"Consumed with RxJava: $each"))
-    .subscribe()
-
-  // Slow consumer with pekko-streams
-  Source.fromPublisher(publisher)
-    .throttle(2, 2.seconds, 2, ThrottleMode.shaping)
-    .map(each => each.toUpperCase())
-    .wireTap(each => logger.info(s"Consumed with pekko-streams: $each"))
-    .runWith(Sink.ignore)
-
-  val producerTemplate: FluentProducerTemplate = camel.createFluentProducerTemplate
-
-  Source(1 to 10)
-    .throttle(1, 1.seconds, 1, ThrottleMode.shaping)
-    .mapAsync(1) { i =>
-      producerTemplate
-        .withBody(s"Camel$i")
-        .to("seda:words")
-        .send
-      Future(i)
-    }.runWith(Sink.ignore)
+  lazy val producerTemplate: FluentProducerTemplate = camel.createFluentProducerTemplate
 }

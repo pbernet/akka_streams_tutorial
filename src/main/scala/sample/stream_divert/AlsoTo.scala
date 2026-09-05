@@ -15,32 +15,34 @@ import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
   *
   */
 
-object AlsoTo extends App {
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val adapter: LoggingAdapter = Logging(system, this.getClass)
+object AlsoTo {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
+    implicit val adapter: LoggingAdapter = Logging(system, "AlsoTo")
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val source = Source(1 to 10)
+    val source = Source(1 to 10)
 
-  val sink = Sink.foreach((value: Int) => adapter.log(Logging.InfoLevel, s" --> Element: $value reached sink"))
+    val sink = Sink.foreach((value: Int) => adapter.log(Logging.InfoLevel, s" --> Element: $value reached sink"))
 
-  def sinkBlocking = Sink.foreach { (value: Int) =>
-    Thread.sleep(1000)
-    adapter.log(Logging.InfoLevel, s" --> Element: $value logged in alsoTo sinkBlocking by ${Thread.currentThread().getName}")
+    def sinkBlocking = Sink.foreach { (value: Int) =>
+      Thread.sleep(1000)
+      adapter.log(Logging.InfoLevel, s" --> Element: $value logged in alsoTo sinkBlocking by ${Thread.currentThread().getName}")
+    }
+
+    val flow = Flow[Int]
+      .log("before alsoTo")
+      .alsoTo(sinkBlocking)
+      .log("after alsoTo")
+      .withAttributes(
+        Attributes.logLevels(
+          onElement = Logging.InfoLevel,
+          onFinish = Logging.InfoLevel,
+          onFailure = Logging.DebugLevel
+        ))
+
+    val done = source.via(flow).runWith(sink)
+    done.onComplete(_ => system.terminate())
   }
-
-  val flow = Flow[Int]
-    .log("before alsoTo")
-    .alsoTo(sinkBlocking)
-    .log("after alsoTo")
-    .withAttributes(
-      Attributes.logLevels(
-        onElement = Logging.InfoLevel,
-        onFinish = Logging.InfoLevel,
-        onFailure = Logging.DebugLevel
-      ))
-
-  val done = source.via(flow).runWith(sink)
-  done.onComplete(_ => system.terminate())
 }

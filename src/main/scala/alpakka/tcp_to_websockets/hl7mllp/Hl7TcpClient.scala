@@ -78,8 +78,13 @@ class Hl7TcpClient(messagesPerClient: Int = 100, numberOfClients: Int = 1) exten
   }
 }
 
-object Hl7TcpClient extends App {
-  val client = new Hl7TcpClient(numberOfClients = 2)
+object Hl7TcpClient {
+  lazy val client = new Hl7TcpClient(numberOfClients = 2)
+
+  def main(args: Array[String]): Unit = {
+    client
+    ()
+  }
 
   def apply(messagesPerClient: Int = 100, numberOfClients: Int = 1): Hl7TcpClient =
     new Hl7TcpClient(messagesPerClient, numberOfClients)

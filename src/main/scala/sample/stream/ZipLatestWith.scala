@@ -60,23 +60,25 @@ import scala.concurrent.duration.DurationInt
   * Record(A,1) vs Record(B,6)
   * -> Record(B,6)...
   */
-object ZipLatestWith extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+object ZipLatestWith {
+  def main(args: Array[String]): Unit = {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  case class Record(id: String, version: Integer)
+    case class Record(id: String, version: Integer)
 
-  val printSink = Sink.foreach[Record](winner => logger.info(s"                          -> $winner"))
+    val printSink = Sink.foreach[Record](winner => logger.info(s"                          -> $winner"))
 
-  // Simulate an unbounded stream, note that the use of 'take' influences the result
-  val sourceA = Source.cycle(() => List(Record("A", 1), Record("A", 3), Record("A", 5)).iterator) //.take(10)
-  val sourceB = Source.cycle(() => List(Record("B", 2), Record("B", 4), Record("B", 6)).iterator) //.take(10)
-  val latestCombinedSource: Source[Record, ?] =
-    sourceA.zipLatestWith(sourceB) { (a, b) =>
-      logger.info(s"$a vs $b")
-      if (a.version > b.version) a else b
-    }
-  latestCombinedSource
-    .throttle(1, 1.second, 10, ThrottleMode.shaping)
-    .runWith(printSink)
+    // Simulate an unbounded stream, note that the use of 'take' influences the result
+    val sourceA = Source.cycle(() => List(Record("A", 1), Record("A", 3), Record("A", 5)).iterator) //.take(10)
+    val sourceB = Source.cycle(() => List(Record("B", 2), Record("B", 4), Record("B", 6)).iterator) //.take(10)
+    val latestCombinedSource: Source[Record, ?] =
+      sourceA.zipLatestWith(sourceB) { (a, b) =>
+        logger.info(s"$a vs $b")
+        if (a.version > b.version) a else b
+      }
+    latestCombinedSource
+      .throttle(1, 1.second, 10, ThrottleMode.shaping)
+      .runWith(printSink)
+  }
 }

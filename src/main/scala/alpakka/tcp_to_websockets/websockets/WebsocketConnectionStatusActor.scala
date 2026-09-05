@@ -10,9 +10,11 @@ object WebsocketConnectionStatusActor {
   def props(id: String, endpoint: String): Props =
     Props(new WebsocketConnectionStatusActor(id, endpoint))
 
-  final case object Connected
-  final case object Terminated
-  final case object ConnectionStatus
+  case object Connected
+
+  case object Terminated
+
+  case object ConnectionStatus
 
 }
 

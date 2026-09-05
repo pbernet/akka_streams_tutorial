@@ -16,31 +16,33 @@ import scala.concurrent.duration.*
   *
   * The server is started with [[WindTurbineServer]]
   */
-object SimulateWindTurbines extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object SimulateWindTurbines {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  val endpoint = "ws://127.0.0.1:8080"
-  val numberOfTurbines = 5
-  Source(1 to numberOfTurbines)
-    .throttle(
-      elements = 100, //number of elements to be taken from bucket
-      per = 1.second,
-      maximumBurst = 100, //capacity of bucket
-      mode = ThrottleMode.shaping
-    )
-    .map { _ =>
-      val id = java.util.UUID.randomUUID.toString
+    val endpoint = "ws://127.0.0.1:8080"
+    val numberOfTurbines = 5
+    Source(1 to numberOfTurbines)
+      .throttle(
+        elements = 100, //number of elements to be taken from bucket
+        per = 1.second,
+        maximumBurst = 100, //capacity of bucket
+        mode = ThrottleMode.shaping
+      )
+      .map { _ =>
+        val id = java.util.UUID.randomUUID.toString
 
-      val supervisor = BackoffSupervisor.props(
-        BackoffOpts.onFailure(
-          WindTurbineSimulator.props(id, endpoint),
-          childName = id,
-          minBackoff = 1.second,
-          maxBackoff = 30.seconds,
-          randomFactor = 0.2
-        ))
+        val supervisor = BackoffSupervisor.props(
+          BackoffOpts.onFailure(
+            WindTurbineSimulator.props(id, endpoint),
+            childName = id,
+            minBackoff = 1.second,
+            maxBackoff = 30.seconds,
+            randomFactor = 0.2
+          ))
 
-      system.actorOf(supervisor, name = s"$id-backoff-supervisor")
-    }
-    .runWith(Sink.ignore)
+        system.actorOf(supervisor, name = s"$id-backoff-supervisor")
+      }
+      .runWith(Sink.ignore)
+  }
 }

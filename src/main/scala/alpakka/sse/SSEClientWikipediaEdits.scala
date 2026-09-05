@@ -33,66 +33,73 @@ case class Change(timestamp: Long, serverName: String, user: String, cmdType: St
   * Uses Alpakka SSE client, Doc: https://doc.akka.io/docs/alpakka/current/sse.html
   * Similar usage in [[alpakka.sse_to_elasticsearch.WikipediaEditsAnalyser]])
   */
-object SSEClientWikipediaEdits extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
-
-  val decider: Supervision.Decider = {
-    case NonFatal(e) =>
-      logger.warn(s"Stream failed with: $e, going to restart")
-      Supervision.Restart
+object SSEClientWikipediaEdits {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
   }
 
-  browserClient()
-  sseClient()
+  private class Application {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    implicit val system: ActorSystem = ActorSystem()
 
-  private def browserClient() = {
-    val os = System.getProperty("os.name").toLowerCase
-    if (os == "mac os x") Process("open src/main/resources/SSEClientWikipediaEdits.html").!
-    else if (os.startsWith("windows")) Seq("cmd", "/c", "start src/main/resources/SSEClientWikipediaEdits.html").!
-  }
-
-  private def sseClient() = {
-    val send: HttpRequest => Future[HttpResponse] = Http().singleRequest(_)
-
-    val eventSource: Source[ServerSentEvent, NotUsed] =
-      EventSource(
-        uri = Uri("https://stream.wikimedia.org/v2/stream/recentchange"),
-        send,
-        None,
-        retryDelay = 1.second
-      )
-
-    val printSink = Sink.foreach[Change] { each => logger.info(each.toString()) }
-
-    val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
-      serverSentEvent => {
-
-        def isNamedBot(bot: Boolean, user: String): Boolean = {
-          if (bot) user.toLowerCase().contains("bot") else false
-        }
-
-        val cursor = parse(serverSentEvent.data).getOrElse(Json.Null).hcursor
-        val timestamp: Long = cursor.get[Long]("timestamp").toOption.getOrElse(0)
-        val serverName = cursor.get[String]("server_name").toOption.getOrElse("")
-        val user = cursor.get[String]("user").toOption.getOrElse("")
-        val cmdType = cursor.get[String]("type").toOption.getOrElse("")
-        val bot = cursor.get[Boolean]("bot").toOption.getOrElse(false)
-
-        if (cmdType == "new" || cmdType == "edit") {
-          val length = cursor.downField("length")
-          val lengthNew = length.get[Int]("new").toOption.getOrElse(0)
-          val lengthOld = length.get[Int]("old").toOption.getOrElse(0)
-          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
-        } else {
-          Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
-        }
-      }
+    val decider: Supervision.Decider = {
+      case NonFatal(e) =>
+        logger.warn(s"Stream failed with: $e, going to restart")
+        Supervision.Restart
     }
 
-    eventSource
-      .throttle(elements = 1, per = 500.milliseconds, maximumBurst = 1, ThrottleMode.Shaping)
-      .via(parserFlow)
-      .runWith(printSink)
+    browserClient()
+    sseClient()
+
+    private def browserClient() = {
+      val os = System.getProperty("os.name").toLowerCase
+      if (os == "mac os x") Process("open src/main/resources/SSEClientWikipediaEdits.html").!
+      else if (os.startsWith("windows")) Seq("cmd", "/c", "start src/main/resources/SSEClientWikipediaEdits.html").!
+    }
+
+    private def sseClient() = {
+      val send: HttpRequest => Future[HttpResponse] = Http().singleRequest(_)
+
+      val eventSource: Source[ServerSentEvent, NotUsed] =
+        EventSource(
+          uri = Uri("https://stream.wikimedia.org/v2/stream/recentchange"),
+          send,
+          None,
+          retryDelay = 1.second
+        )
+
+      val printSink = Sink.foreach[Change] { each => logger.info(each.toString()) }
+
+      val parserFlow: Flow[ServerSentEvent, Change, NotUsed] = Flow[ServerSentEvent].map {
+        serverSentEvent => {
+
+          def isNamedBot(bot: Boolean, user: String): Boolean = {
+            if (bot) user.toLowerCase().contains("bot") else false
+          }
+
+          val cursor = parse(serverSentEvent.data).getOrElse(Json.Null).hcursor
+          val timestamp: Long = cursor.get[Long]("timestamp").toOption.getOrElse(0)
+          val serverName = cursor.get[String]("server_name").toOption.getOrElse("")
+          val user = cursor.get[String]("user").toOption.getOrElse("")
+          val cmdType = cursor.get[String]("type").toOption.getOrElse("")
+          val bot = cursor.get[Boolean]("bot").toOption.getOrElse(false)
+
+          if (cmdType == "new" || cmdType == "edit") {
+            val length = cursor.downField("length")
+            val lengthNew = length.get[Int]("new").toOption.getOrElse(0)
+            val lengthOld = length.get[Int]("old").toOption.getOrElse(0)
+            Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
+          } else {
+            Change(timestamp, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
+          }
+        }
+      }
+
+      eventSource
+        .throttle(elements = 1, per = 500.milliseconds, maximumBurst = 1, ThrottleMode.Shaping)
+        .via(parserFlow)
+        .runWith(printSink)
+    }
   }
 }

@@ -71,13 +71,13 @@ import scala.util.{Failure, Success}
   * https://pekko.apache.org/docs/pekko-http/current//implications-of-streaming-http-entity.html
   * https://pekko.apache.org/docs/pekko-http/current///common/timeouts.html#request-timeout
   */
-object ReverseProxy extends App {
+object ReverseProxy {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+  implicit lazy val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val http: HttpExt = Http(system)
+  lazy val http: HttpExt = Http(system)
 
   val circuitBreakers = new ConcurrentHashMap[String, CircuitBreaker]()
   val requestCounter = new AtomicInteger(0)
@@ -103,18 +103,20 @@ object ReverseProxy extends App {
   //val responseCodes = List(200, 200, 200, 200, 200, 200, 200, 200, 500, 503)
   val responseCodes = List(200, 200, 500, 500, 500, 500, 503, 503, 503, 503)
 
-  localTargetServers(maxConnections = 100) // 1-1024
-  reverseProxy()
+  def main(args: Array[String]): Unit = {
+    localTargetServers(maxConnections = 100) // 1-1024
+    reverseProxy()
 
-  // Switch mode to let ReverseProxy forward client requests to local/remote target server(s)
-  // Note that the remote servers can not interpret the X-Correlation-ID header
-  val mode = Mode.local
-  clients(nbrOfClients = 10, requestsPerClient = 100, mode)
-  ReverseProxyMonitor.initializeWebUI(system, services(mode))
+    // Switch mode to let ReverseProxy forward client requests to local/remote target server(s)
+    // Note that the remote servers can not interpret the X-Correlation-ID header
+    val mode = Mode.local
+    clients(nbrOfClients = 10, requestsPerClient = 100, mode)
+    ReverseProxyMonitor.initializeWebUI(system, services(mode))
 
-  sys.addShutdownHook {
-    ReverseProxyMonitor.shutdown()
-    system.terminate()
+    sys.addShutdownHook {
+      ReverseProxyMonitor.shutdown()
+      system.terminate()
+    }
   }
 
   // HTTP client(s)
@@ -325,7 +327,7 @@ object Retry {
     promise.future
   }
 
-  private[this] def retryPromise[T](times: Int, promise: Promise[T], failure: Option[Throwable],
+  private def retryPromise[T](times: Int, promise: Promise[T], failure: Option[Throwable],
                                     f: => Future[T])(implicit ec: ExecutionContext): Unit = {
     (times, failure) match {
       case (0, Some(e)) => promise.tryFailure(e)

@@ -11,6 +11,7 @@ import org.apache.pekko.{Done, NotUsed}
 import scala.collection.parallel.CollectionConverters.*
 import scala.concurrent.Future
 import scala.concurrent.duration.*
+
 /**
   * A simple WebSocket chat system using only pekko streams with the help of MergeHub Source and BroadcastHub Sink
   * See also: [[WebsocketEcho]]
@@ -20,38 +21,40 @@ import scala.concurrent.duration.*
   * Doc:
   * http://doc.akka.io/docs/akka/current/scala/stream/stream-dynamic.html#dynamic-fan-in-and-fan-out-with-mergehub-and-broadcasthub
   */
-object WebsocketChatEcho extends App with ClientCommon {
+object WebsocketChatEcho extends ClientCommon {
+  val (address, port) = ("127.0.0.1", 6002)
+  val clients = List("Bob", "Alice")
 
-    val (address, port) = ("127.0.0.1", 6002)
-  // The heartbeat_echo endpoint is not implemented here
+  def main(args: Array[String]): Unit = {
+    // The heartbeat_echo endpoint is not implemented here
     chatServer(address, port)
     browserClient()
-    val clients = List("Bob", "Alice")
     clients.par.foreach(clientName => clientWebSocketClientFlow(clientName, address, port))
+  }
 
   private def chatServer(address: String, port: Int) = {
 
-   /*
-  clients -> Merge Hub -> Broadcast Hub -> clients
-  Visually
-                                                                                                         Akka Streams Flow
-               ________________________________________________________________________________________________________________________________________________________________________________________
-  c1 ----->\  |                                                                                                                                                                                        |  /->----------- c1
-            \ |                                                                                                                                                                                        | /
-  c2 -------->| Sink ========================(feeds data to)===========> MergeHub Source ->-->-->--> BroadcastHub Sink ======(feeds data to)===========> Source                                        |->->------------ c2
-             /| that comes from materializing the                                        connected to                                                    that comes from materializing the             | \
-            / | MergeHub Source                                                                                                                          BroadcastHub Sink                             |  \
-  c3 ----->/  |________________________________________________________________________________________________________________________________________________________________________________________|   \->---------- c3
+    /*
+   clients -> Merge Hub -> Broadcast Hub -> clients
+   Visually
+                                                                                                          Akka Streams Flow
+                ________________________________________________________________________________________________________________________________________________________________________________________
+   c1 ----->\  |                                                                                                                                                                                        |  /->----------- c1
+             \ |                                                                                                                                                                                        | /
+   c2 -------->| Sink ========================(feeds data to)===========> MergeHub Source ->-->-->--> BroadcastHub Sink ======(feeds data to)===========> Source                                        |->->------------ c2
+              /| that comes from materializing the                                        connected to                                                    that comes from materializing the             | \
+             / | MergeHub Source                                                                                                                          BroadcastHub Sink                             |  \
+   c3 ----->/  |________________________________________________________________________________________________________________________________________________________________________________________|   \->---------- c3
 
 
-  Runnable Flow (MergeHubSource -> BroadcastHubSink)
+   Runnable Flow (MergeHubSource -> BroadcastHubSink)
 
-  Materializing a MergeHub Source yields a Sink that collects all the emitted elements and emits them in the MergeHub Source (the emitted elements that are collected in the Sink are coming from all WebSocket clients)
-  Materializing a BroadcastHub Sink yields a Source that broadcasts all elements being collected by the MergeHub Sink (the elements that are emitted/broadcasted in the Source are going to all WebSocket clients)
-   */
+   Materializing a MergeHub Source yields a Sink that collects all the emitted elements and emits them in the MergeHub Source (the emitted elements that are collected in the Sink are coming from all WebSocket clients)
+   Materializing a BroadcastHub Sink yields a Source that broadcasts all elements being collected by the MergeHub Sink (the elements that are emitted/broadcasted in the Source are going to all WebSocket clients)
+    */
 
     // To demonstrate the nature of the composition
-    val sampleProcessingFlow  = Flow[String].map(i => i.toUpperCase)
+    val sampleProcessingFlow = Flow[String].map(i => i.toUpperCase)
 
     val (inSink: Sink[String, NotUsed], outSource: Source[String, NotUsed]) = {
       MergeHub.source[String](1)
@@ -61,23 +64,22 @@ object WebsocketChatEcho extends App with ClientCommon {
     }
 
     val echoFlow: Flow[Message, Message, NotUsed] =
-    Flow[Message].mapAsync(1) {
-      case TextMessage.Strict(text) =>
-        logger.info(s"Server received: $text")
-        Future.successful(text)
-      case TextMessage.Streamed(textStream) =>
-        textStream.runReduce(_ + _).flatMap(Future.successful)
-      case bm: BinaryMessage => throw new Exception(s"Binary message: $bm cannot be handled")
-      case other => throw new Exception(s"Unhandled message type: $other cannot be handled")
-      }
-      .via(Flow.fromSinkAndSourceCoupled(inSink, outSource))
-      // Optional msg aggregation
-      .groupedWithin(10, 2.second)
-      .map { eachSeq =>
-        logger.info(s"Server aggregated: ${eachSeq.size} chat messages within 2 seconds")
-        eachSeq.mkString("; ")
-      }
-      .map[Message](string => TextMessage.Strict("Hello " + string + "!"))
+      Flow[Message].mapAsync(1) {
+          case TextMessage.Strict(text) =>
+            logger.info(s"Server received: $text")
+            Future.successful(text)
+          case TextMessage.Streamed(textStream) =>
+            textStream.runReduce(_ + _).flatMap(Future.successful)
+          case bm: BinaryMessage => throw new Exception(s"Binary message: $bm cannot be handled")
+        }
+        .via(Flow.fromSinkAndSourceCoupled(inSink, outSource))
+        // Optional msg aggregation
+        .groupedWithin(10, 2.second)
+        .map { eachSeq =>
+          logger.info(s"Server aggregated: ${eachSeq.size} chat messages within 2 seconds")
+          eachSeq.mkString("; ")
+        }
+        .map[Message](string => TextMessage.Strict("Hello " + string + "!"))
 
     def wsClientRoute: Route =
       path("echochat") {

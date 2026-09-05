@@ -45,19 +45,20 @@ trait JsonProtocol extends DefaultJsonProtocol with SprayJsonSupport {
   *  - Run with limited Heap, eg with -Xms256m -Xmx256m
   *  - Monitor Heap, eg with visualvm.github.io
   */
-object HttpFileEcho extends App with JsonProtocol {
+object HttpFileEcho extends JsonProtocol {
+  def main(args: Array[String]): Unit = {
+    server(address, port)
+    (1 to 50).par.foreach(each => roundtripClient(each, address, port))
+    browserClient()
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
   val resourceFileName = "testfile.jpg"
   val (address, port) = ("127.0.0.1", 6002)
   val chuckSizeBytes = 100 * 1024 // to handle large files
-
-  server(address, port)
-  (1 to 50).par.foreach(each => roundtripClient(each, address, port))
-  browserClient()
 
   def server(address: String, port: Int): Unit = {
 

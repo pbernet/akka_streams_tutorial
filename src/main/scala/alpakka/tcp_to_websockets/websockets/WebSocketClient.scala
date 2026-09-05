@@ -1,51 +1,43 @@
 package alpakka.tcp_to_websockets.websockets
 
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.{Connected, ConnectionFailure}
-import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorRef, ActorSystem}
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.model.ws.*
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueue}
-import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, MergeHub, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 object WebSocketClient {
   def apply(id: String, endpoint: String, websocketClientActor: ActorRef)
-           (implicit
+           (using
             system: ActorSystem,
             executionContext: ExecutionContext): WebSocketClient = {
-    new WebSocketClient(id, endpoint, websocketClientActor)(system, executionContext)
+    new WebSocketClient(id, endpoint, websocketClientActor)
   }
 }
 
 class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorRef)
-                     (implicit
+                     (using
                       system: ActorSystem,
                       executionContext: ExecutionContext) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val printSink: Sink[Message, Future[Done]] = createEchoPrintSink()
-  val sourceQueue: Future[SourceQueue[Message]] = singleWebSocketRequestSourceQueueClient(id, endpoint)
+  val sendToSocketSink: Sink[Message, NotUsed] = singleWebSocketRequestMergeHubClient(id, endpoint)
 
 
-  def singleWebSocketRequestSourceQueueClient(id: String, endpoint: String): Future[SourceQueue[Message]] = {
-
-    val (source, sourceQueue) = {
-      val p = Promise[SourceQueue[Message]]()
-      val s = Source.queue[Message](0, OverflowStrategy.backpressure, 1).mapMaterializedValue(m => {
-        p.trySuccess(m)
-        m
-      })
-      (s, p.future)
-    }
+  def singleWebSocketRequestMergeHubClient(id: String, endpoint: String): Sink[Message, NotUsed] = {
+    val source = MergeHub.source[Message](perProducerBufferSize = 16)
+      .watchTermination(Keep.both)
 
     val webSocketNonReusableFlow = Flow.fromSinkAndSourceMat(printSink, source)(Keep.right)
 
-    val (upgradeResponse, sourceQueueWithComplete) =
+    val (upgradeResponse, (sendToSocketSink, streamCompletion)) =
       Http().singleWebSocketRequest(WebSocketRequest(endpoint), webSocketNonReusableFlow)
 
     val connected = handleUpgrade(upgradeResponse)
@@ -58,7 +50,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
           websocketClientActor ! ConnectionFailure(ex)
       }
     })
-    sourceQueueWithComplete.watchCompletion().onComplete((closed: Try[Done]) => {
+    streamCompletion.onComplete((closed: Try[Done]) => {
       closed match {
         case Success(_) =>
           logger.info(s"Client $id: closed: $closed")
@@ -68,7 +60,7 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
           websocketClientActor ! ConnectionFailure(ex)
       }
     })
-    sourceQueue
+    sendToSocketSink
   }
 
 
@@ -85,14 +77,11 @@ class WebSocketClient(id: String, endpoint: String, websocketClientActor: ActorR
 
   def sendToWebsocket(messageText: String): Future[Unit] = {
     val message = TextMessage.Strict(messageText)
-    sourceQueue.flatMap { queue =>
-      queue.offer(message: Message).map {
-        case QueueOfferResult.Enqueued => logger.info(s"Enqueued: ${printableShort(message.text)}")
-        case QueueOfferResult.Dropped => logger.info(s"Dropped: ${printableShort(message.text)}")
-        case QueueOfferResult.Failure(ex) => logger.info(s"Offer failed: $ex")
-        case QueueOfferResult.QueueClosed => logger.info("Source queue closed")
-      }
-    }
+    Source.single(message: Message)
+      .watchTermination(Keep.right)
+      .toMat(sendToSocketSink)(Keep.left)
+      .run()
+      .map(_ => logger.info(s"Sent: ${printableShort(message.text)}"))
   }
 
 

@@ -15,7 +15,10 @@ import scala.concurrent.duration.*
   * Doc:
   * https://doc.akka.io/docs/akka/current/typed/fsm.html
   */
-object Buncher extends App {
+object Buncher {
+  def main(args: Array[String]): Unit = {
+    val _ = system
+  }
 
   val root = Behaviors.setup[Nothing] { context =>
     val buncherActor = context.spawn(Buncher(), "buncherActor")
@@ -33,7 +36,7 @@ object Buncher extends App {
     Behaviors.empty
   }
 
-  val system = ActorSystem[Nothing](root, "Buncher")
+  lazy val system: ActorSystem[Nothing] = ActorSystem[Nothing](root, "Buncher")
 
 
   // received events: the type of the message this Actor supports

@@ -9,6 +9,7 @@ import org.apache.pekko.http.scaladsl.server.directives.WebSocketDirectives
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -25,7 +26,7 @@ class WebsocketServer extends WebSocketDirectives {
   import system.dispatcher
 
   val (address, port) = ("127.0.0.1", 6002)
-  var serverBinding: Future[Http.ServerBinding] = _
+  var serverBinding: Future[Http.ServerBinding] = uninitialized
 
   def run(): Unit = {
     server(address, port)
@@ -76,9 +77,12 @@ class WebsocketServer extends WebSocketDirectives {
   }
 }
 
-object WebsocketServer extends App {
-  val server = new WebsocketServer()
-  server.run()
+object WebsocketServer {
+  lazy val server = new WebsocketServer()
+
+  def main(args: Array[String]): Unit = {
+    server.run()
+  }
 
   def apply() = new WebsocketServer()
 

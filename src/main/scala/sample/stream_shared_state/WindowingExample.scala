@@ -17,11 +17,11 @@ import scala.util.Random
   * https://softwaremill.com/windowing-data-in-akka-streams
   *
   * Thanks to the generic implementation this example may be run as:
-  * 1) Time-based sliding windows, eg with:
+  * 1) Time-based sliding windows, e.g. with:
   *     - WindowLength set to: 10 seconds
   *     - WindowStep   set to: 1 second
   *
-  * 2) Time-based tumbling windows, eg with:
+  * 2) Time-based tumbling windows, e.g. with:
   *     - WindowLength set to: 10 seconds
   *     - WindowStep   set to: 10 seconds
   *
@@ -33,129 +33,131 @@ import scala.util.Random
   *  - See also TumblingWindow example with Apache Flink:
   *    https://github.com/pbernet/flink-scala-3/blob/main/src/main/scala/com/custom/TumblingWindow.scala
   */
-object WindowingExample extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object WindowingExample {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  val maxSubstreams = 64
-  val random = new Random()
+    val maxSubstreams = 64
+    val random = new Random()
 
-  val delayFactor = 8
-  val acceptedMaxDelay = 4.seconds.toMillis // Lower value leads to dropping of events
+    val delayFactor = 8
+    val acceptedMaxDelay = 4.seconds.toMillis // Lower value leads to dropping of events
 
-  implicit val ordering: Ordering[MyEvent] = (x: MyEvent, y: MyEvent) => {
-    if (x.timestamp < y.timestamp) -1
-    else if (x.timestamp > y.timestamp) 1
-    else 0
-  }
-
-  Source
-    .tick(0.seconds, 1.second, "")
-    .map(_ => createEvent())
-    .statefulMap(
-      // state creation function
-      () => new CommandGenerator())(
-      // mapping function
-      (generator, nextElem) => (generator, generator.forEvent(nextElem)),
-      // cleanup function
-      generator => Some(generator.forEvent(createEvent())))
-    .mapConcat(identity) // flatten
-    .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
-    .takeWhile(!_.isInstanceOf[CloseWindow])
-    .fold(AggregateEventData(Window(0L, 0L), mutable.TreeSet[MyEvent]())) {
-      case (_, OpenWindow(window)) => AggregateEventData(w = window, new mutable.TreeSet[MyEvent])
-      // always filtered out by takeWhile above
-      case (agg, CloseWindow(_)) => agg
-      case (agg, AddToWindow(ev, _)) => agg.copy(events = agg.events += ev)
+    implicit val ordering: Ordering[MyEvent] = (x: MyEvent, y: MyEvent) => {
+      if (x.timestamp < y.timestamp) -1
+      else if (x.timestamp > y.timestamp) 1
+      else 0
     }
-    .async
-    .mergeSubstreams
-    .runForeach(println(_))
 
-  private def createEvent() = {
-    val now = System.currentTimeMillis()
-    val delay = random.nextInt(delayFactor)
-    val myEvent = MyEvent(now - delay * 1000L)
-    println(s"$myEvent")
-    myEvent
-  }
+    Source
+      .tick(0.seconds, 1.second, "")
+      .map(_ => createEvent())
+      .statefulMap(
+        // state creation function
+        () => new CommandGenerator())(
+        // mapping function
+        (generator, nextElem) => (generator, generator.forEvent(nextElem)),
+        // cleanup function
+        generator => Some(generator.forEvent(createEvent())))
+      .mapConcat(identity) // flatten
+      .groupBy(maxSubstreams, command => command.w, allowClosedSubstreamRecreation = true)
+      .takeWhile(!_.isInstanceOf[CloseWindow])
+      .fold(AggregateEventData(Window(0L, 0L), mutable.TreeSet[MyEvent]())) {
+        case (_, OpenWindow(window)) => AggregateEventData(w = window, new mutable.TreeSet[MyEvent])
+        // always filtered out by takeWhile above
+        case (agg, CloseWindow(_)) => agg
+        case (agg, AddToWindow(ev, _)) => agg.copy(events = agg.events += ev)
+      }
+      .async
+      .mergeSubstreams
+      .runForeach(println(_))
 
-  case class MyEvent(timestamp: Long) {
-    override def toString =
-      s"Event: ${tsToString(timestamp)}"
-  }
-
-  case class Window(startTs: Long, stopTs: Long) {
-    override def toString =
-      s"Window from: ${tsToString(startTs)} to: ${tsToString(stopTs)}"
-  }
-
-  object Window {
-    val WindowLength: Long = 10.seconds.toMillis
-    val WindowStep: Long = 10.seconds.toMillis
-    val WindowsPerEvent: Int = (WindowLength / WindowStep).toInt
-
-    def windowsFor(ts: Long): Set[Window] = {
-      val firstWindowStart = ts - ts % WindowStep - WindowLength + WindowStep
-      (for (i <- 0 until WindowsPerEvent) yield
-        Window(firstWindowStart + i * WindowStep,
-          firstWindowStart + i * WindowStep + WindowLength)
-        ).toSet
+    def createEvent() = {
+      val now = System.currentTimeMillis()
+      val delay = random.nextInt(delayFactor)
+      val myEvent = MyEvent(now - delay * 1000L)
+      println(s"$myEvent")
+      myEvent
     }
-  }
 
-  sealed trait WindowCommand {
-    def w: Window
-  }
+    case class MyEvent(timestamp: Long) {
+      override def toString =
+        s"Event: ${tsToString(timestamp)}"
+    }
 
-  case class OpenWindow(w: Window) extends WindowCommand
+    case class Window(startTs: Long, stopTs: Long) {
+      override def toString =
+        s"Window from: ${tsToString(startTs)} to: ${tsToString(stopTs)}"
+    }
 
-  case class CloseWindow(w: Window) extends WindowCommand
+    object Window {
+      val WindowLength: Long = 10.seconds.toMillis
+      val WindowStep: Long = 10.seconds.toMillis
+      val WindowsPerEvent: Int = (WindowLength / WindowStep).toInt
 
-  case class AddToWindow(ev: MyEvent, w: Window) extends WindowCommand
-
-  class CommandGenerator {
-    private var watermark = 0L
-    private val openWindows = mutable.Set[Window]()
-
-    def forEvent(ev: MyEvent): List[WindowCommand] = {
-      // watermark: the timestamp of the *newest* event minus acceptedMaxDelay
-      watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
-      if (ev.timestamp < watermark) {
-        println(s"Dropping event: $ev, watermark is at: ${tsToString(watermark)}")
-        Nil
-      } else {
-        val eventWindows = Window.windowsFor(ev.timestamp)
-
-        val closeCommands = openWindows.flatMap { ow =>
-          if (ow.stopTs < watermark) {
-            println(s"Close $ow")
-            openWindows.remove(ow)
-            Some(CloseWindow(ow))
-          } else None
-        }
-
-        val openCommands = eventWindows.flatMap { ew =>
-          if (!openWindows.contains(ew)) {
-            println(s"Open new $ew")
-            openWindows.add(ew)
-            Some(OpenWindow(ew))
-          } else None
-        }
-
-        val addCommands = eventWindows.map(w => AddToWindow(ev, w))
-
-        openCommands.toList ++ closeCommands.toList ++ addCommands.toList
+      def windowsFor(ts: Long): Set[Window] = {
+        val firstWindowStart = ts - ts % WindowStep - WindowLength + WindowStep
+        (for (i <- 0 until WindowsPerEvent) yield
+          Window(firstWindowStart + i * WindowStep,
+            firstWindowStart + i * WindowStep + WindowLength)
+          ).toSet
       }
     }
-  }
 
-  case class AggregateEventData(w: Window, events: mutable.TreeSet[MyEvent]) {
-    override def toString =
-      s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were: ${events.size} events. Details: $events"
-  }
+    sealed trait WindowCommand {
+      def w: Window
+    }
 
-  def tsToString(ts: Long) = OffsetDateTime
-    .ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault())
-    .toLocalTime
-    .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+    case class OpenWindow(w: Window) extends WindowCommand
+
+    case class CloseWindow(w: Window) extends WindowCommand
+
+    case class AddToWindow(ev: MyEvent, w: Window) extends WindowCommand
+
+    class CommandGenerator {
+      private var watermark = 0L
+      private val openWindows = mutable.Set[Window]()
+
+      def forEvent(ev: MyEvent): List[WindowCommand] = {
+        // watermark: the timestamp of the *newest* event minus acceptedMaxDelay
+        watermark = math.max(watermark, ev.timestamp - acceptedMaxDelay)
+        if (ev.timestamp < watermark) {
+          println(s"Dropping event: $ev, watermark is at: ${tsToString(watermark)}")
+          Nil
+        } else {
+          val eventWindows = Window.windowsFor(ev.timestamp)
+
+          val closeCommands = openWindows.flatMap { ow =>
+            if (ow.stopTs < watermark) {
+              println(s"Close $ow")
+              openWindows.remove(ow)
+              Some(CloseWindow(ow))
+            } else None
+          }
+
+          val openCommands = eventWindows.flatMap { ew =>
+            if (!openWindows.contains(ew)) {
+              println(s"Open new $ew")
+              openWindows.add(ew)
+              Some(OpenWindow(ew))
+            } else None
+          }
+
+          val addCommands = eventWindows.map(w => AddToWindow(ev, w))
+
+          openCommands.toList ++ closeCommands.toList ++ addCommands.toList
+        }
+      }
+    }
+
+    case class AggregateEventData(w: Window, events: mutable.TreeSet[MyEvent]) {
+      override def toString =
+        s"From: ${tsToString(w.startTs)} to: ${tsToString(w.stopTs)}, there were: ${events.size} events. Details: $events"
+    }
+
+    def tsToString(ts: Long) = OffsetDateTime
+      .ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault())
+      .toLocalTime
+      .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+  }
 }

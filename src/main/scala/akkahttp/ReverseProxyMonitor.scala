@@ -15,6 +15,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.Paths
 import java.time.Instant
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -82,8 +83,8 @@ object ReverseProxyMonitor {
   private val circuitBreakerStates = new ConcurrentHashMap[String, CircuitBreakerStatus]()
 
   // WebSocket broadcast hub for real-time updates
-  private var broadcastKillSwitch: SharedKillSwitch = _
-  private var eventSource: Source[String, NotUsed] = _
+  private var broadcastKillSwitch: SharedKillSwitch = uninitialized
+  private var eventSource: Source[String, NotUsed] = uninitialized
 
   def initializeWebUI(system: ActorSystem, targets: Seq[ReverseProxy.Target], port: Int = 9000): Future[Http.ServerBinding] = {
     implicit val actorSystem: ActorSystem = system
@@ -131,7 +132,8 @@ object ReverseProxyMonitor {
       method = request.method.value,
       uri = request.uri.toString(),
       headers = request.headers.map(h => h.name() -> h.value()).toMap,
-      clientHost = request.attribute(AttributeKeys.remoteAddress)
+      clientHost = request.attributes.get(AttributeKeys.remoteAddress)
+        .collect { case address: RemoteAddress => address }
         .map(_.toString).getOrElse("unknown"),
       targetUrl = targetUrl,
       correlationId = correlationId

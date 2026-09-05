@@ -42,78 +42,80 @@ import scala.util.{Failure, Success, Try}
   * https://letitcrash.com/post/20397701710/50-million-messages-per-second-on-a-single
   * https://shekhargulati.com/2017/09/30/understanding-akka-dispatchers/
   */
-object FlightDelayStreaming extends App {
-  implicit val system: ActorSystem = ActorSystem()
+object FlightDelayStreaming {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
+    import system.dispatcher
 
-  val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
-    .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
-      .map(_.utf8String))
+    val sourceOfLines = FileIO.fromPath(Paths.get("src/main/resources/2008_subset.csv"))
+      .via(Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 1024, allowTruncation = true)
+        .map(_.utf8String))
 
-  // Split csv into a string array and transform each array into a FlightEvent
-  val csvToFlightEvent: Flow[String, FlightEvent, NotUsed] = Flow[String]
-    .map(_.split(",").map(_.trim))
-    .map(stringArrayToFlightEvent)
-  // A custom dispatcher with fork/join executor may help on certain machines
-  //.withAttributes(ActorAttributes.dispatcher("custom-dispatcher-fork-join"))
+    // Split csv into a string array and transform each array into a FlightEvent
+    lazy val csvToFlightEvent: Flow[String, FlightEvent, NotUsed] = Flow[String]
+      .map(_.split(",").map(_.trim))
+      .map(stringArrayToFlightEvent)
+    // A custom dispatcher with fork/join executor may help on certain machines
+    //.withAttributes(ActorAttributes.dispatcher("custom-dispatcher-fork-join"))
 
-  def stringArrayToFlightEvent(cols: Array[String]) = FlightEvent(cols(0), cols(1), cols(2), cols(3), cols(4), cols(5), cols(6), cols(7), cols(8), cols(9), cols(10), cols(11), cols(12), cols(13), cols(14), cols(15), cols(16), cols(17), cols(18), cols(19), cols(20), cols(21), cols(22), cols(23), cols(24), cols(25), cols(26), cols(27), cols(28))
+    def stringArrayToFlightEvent(cols: Array[String]) = FlightEvent(cols(0), cols(1), cols(2), cols(3), cols(4), cols(5), cols(6), cols(7), cols(8), cols(9), cols(10), cols(11), cols(12), cols(13), cols(14), cols(15), cols(16), cols(17), cols(18), cols(19), cols(20), cols(21), cols(22), cols(23), cols(24), cols(25), cols(26), cols(27), cols(28))
 
-  // Transform FlightEvent to FlightDelayRecord (only for records with a delay)
-  // Note that with this approach the average is calculated across delayed flights only
-  val filterAndConvert: Flow[FlightEvent, FlightDelayRecord, NotUsed] =
-  Flow[FlightEvent]
-    .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
-    .mapAsyncUnordered(parallelism = 100_000) { r =>
-      Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
+    // Transform FlightEvent to FlightDelayRecord (only for records with a delay)
+    // Note that with this approach the average is calculated across delayed flights only
+    val filterAndConvert: Flow[FlightEvent, FlightDelayRecord, NotUsed] =
+      Flow[FlightEvent]
+        .filter(r => Try(r.arrDelayMins.toInt).getOrElse(-1) > 0) // convert arrival delays to ints, filter out non delays
+        .mapAsyncUnordered(parallelism = 100_000) { r =>
+          Future(FlightDelayRecord(r.year, r.month, r.dayOfMonth, r.flightNum, r.uniqueCarrier, r.arrDelayMins))
+        }
+
+    // Aggregate number of delays and totalMins
+    val averageCarrierDelay: Flow[FlightDelayRecord, FlightDelayAggregate, NotUsed] =
+      Flow[FlightDelayRecord]
+        // maxSubstreams must be larger than the number of UniqueCarrier in the file
+        .groupBy(100, _.uniqueCarrier, allowClosedSubstreamRecreation = true)
+        //.wireTap(each => println(s"Processing FlightDelayRecord: $each"))
+        .fold(FlightDelayAggregate("", 0, 0)) {
+          (x: FlightDelayAggregate, y: FlightDelayRecord) =>
+            val count = x.count + 1
+            val totalMins = x.totalMins + Try(y.arrDelayMins.toInt).getOrElse(0)
+            FlightDelayAggregate(y.uniqueCarrier, count, totalMins)
+        }
+        .mergeSubstreams
+
+    def averageSink[A](avg: A): Unit = {
+      avg match {
+        case aggregate@FlightDelayAggregate(_, _, _) => println(aggregate)
+        case x => println("no idea what " + x + "is!")
       }
-
-  // Aggregate number of delays and totalMins
-  val averageCarrierDelay: Flow[FlightDelayRecord, FlightDelayAggregate, NotUsed] =
-    Flow[FlightDelayRecord]
-      // maxSubstreams must be larger than the number of UniqueCarrier in the file
-      .groupBy(100, _.uniqueCarrier, allowClosedSubstreamRecreation = true)
-      //.wireTap(each => println(s"Processing FlightDelayRecord: $each"))
-      .fold(FlightDelayAggregate("", 0, 0)) {
-        (x: FlightDelayAggregate, y: FlightDelayRecord) =>
-          val count = x.count + 1
-          val totalMins = x.totalMins + Try(y.arrDelayMins.toInt).getOrElse(0)
-          FlightDelayAggregate(y.uniqueCarrier, count, totalMins)
-      }
-      .mergeSubstreams
-
-  def averageSink[A](avg: A): Unit = {
-    avg match {
-      case aggregate@FlightDelayAggregate(_, _, _) => println(aggregate)
-      case x => println("no idea what " + x + "is!")
     }
-  }
 
-  val sink: Sink[FlightDelayAggregate, Future[Done]] = Sink.foreach(averageSink[FlightDelayAggregate])
+    val sink: Sink[FlightDelayAggregate, Future[Done]] = Sink.foreach(averageSink[FlightDelayAggregate])
 
-  var stats: List[Stats] = Nil
+    var stats: List[Stats] = Nil
 
 
-  val done = sourceOfLines
-    .via(ThroughputMonitor(1000.millis, { st => stats = st :: stats }))
-    .via(csvToFlightEvent)
-    .via(filterAndConvert)
-    .via(averageCarrierDelay)
-    .runWith(sink)
+    val done = sourceOfLines
+      .via(ThroughputMonitor(1000.millis, { st => stats = st :: stats }))
+      .via(csvToFlightEvent)
+      .via(filterAndConvert)
+      .via(averageCarrierDelay)
+      .runWith(sink)
 
-  terminateWhen(done)
+    terminateWhen(done)
 
-  def terminateWhen(done: Future[Done]): Unit = {
-    done.onComplete {
-      case Success(_) =>
-        println(s"Run with: " + Runtime.getRuntime.availableProcessors + " cores")
-        ThroughputMonitor.avgThroughputReport(stats)
-        println("Flow Success. About to terminate...")
-        system.terminate()
-      case Failure(e) =>
-        println(s"Flow Failure: ${e.getMessage}. About to terminate...")
-        system.terminate()
+    def terminateWhen(done: Future[Done]): Unit = {
+      done.onComplete {
+        case Success(_) =>
+          println(s"Run with: " + Runtime.getRuntime.availableProcessors + " cores")
+          ThroughputMonitor.avgThroughputReport(stats)
+          println("Flow Success. About to terminate...")
+          system.terminate()
+        case Failure(e) =>
+          println(s"Flow Failure: ${e.getMessage}. About to terminate...")
+          system.terminate()
+      }
     }
   }
 }

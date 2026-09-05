@@ -10,12 +10,14 @@ import scala.concurrent.duration.*
   * http://blog.colinbreck.com/integrating-akka-streams-and-akka-actors-part-ii
   *
   */
-object EncapsulateStreamWithActor extends App {
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+object EncapsulateStreamWithActor {
+  def main(args: Array[String]): Unit = {
+    implicit val system: ActorSystem = ActorSystem()
+    implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val actorRef = system.actorOf(Props(classOf[PrintMoreNumbers]))
-  system.scheduler.scheduleOnce(10.seconds) {
-    actorRef ! "stop"
+    val actorRef = system.actorOf(Props(classOf[PrintMoreNumbers]))
+    system.scheduler.scheduleOnce(10.seconds) {
+      actorRef ! "stop"
+    }
   }
 }

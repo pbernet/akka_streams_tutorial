@@ -2,7 +2,7 @@ package alpakka.tcp_to_websockets.websockets
 
 import alpakka.tcp_to_websockets.websockets.WebsocketClientActor.*
 import org.apache.commons.lang3.exception.ExceptionUtils
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import org.apache.pekko.actor.{Terminated, *}
 import org.apache.pekko.http.scaladsl.model.StatusCode
 
 import scala.concurrent.ExecutionContextExecutor
@@ -15,9 +15,11 @@ object WebsocketClientActor {
   def props(id: String, endpoint: String, websocketConnectionStatusActor: ActorRef): Props =
     Props(new WebsocketClientActor(id, endpoint, websocketConnectionStatusActor))
 
-  final case object Upgraded
-  final case object Connected
-  final case object Terminated
+  case object Upgraded
+
+  case object Connected
+
+  case object Terminated
   final case class ConnectionFailure(ex: Throwable)
   final case class FailedUpgrade(statusCode: StatusCode)
   final case class SendMessage(msg: String)

@@ -19,10 +19,9 @@ and [Pekko HTTP](https://pekko.apache.org/docs/pekko-http/current/) tutorials, b
 > [Apache Pekko](https://github.com/apache/incubator-pekko) is the open
 > source alternative. A BIG Thank you to the committed Pekko committers.
 >
-> For now the branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
-> contains the migration (with a few losses). Currently, this is the only maintained branch.
-> The plan is to move the content of this branch to a new `pekko_tutorial` repo and to support Scala 3 when Pekko
-> Connectors is ready.
+> The branch <a href="https://github.com/pbernet/akka_streams_tutorial/tree/migrate_pekko">migrate_pekko</a>
+> contains the migration (with a few losses). This is the only maintained branch.
+> Currently we tentatively migrate to Scala 3 and the Pekko 2.x milestone builds.
 
 ## Project Description
 

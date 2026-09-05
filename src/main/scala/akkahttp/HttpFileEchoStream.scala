@@ -9,24 +9,24 @@ import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.FileInfo
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.pattern.after
-import org.apache.pekko.stream.scaladsl.{FileIO, Keep, Sink, Source}
-import org.apache.pekko.stream.{OverflowStrategy, QueueOfferResult, ThrottleMode}
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl.{FileIO, Sink, Source}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Paths
 import java.time.LocalTime
 import scala.concurrent.duration.*
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
 /**
   * Differences to [[HttpFileEcho]]:
   *  - The upload client is processing a stream of [[FileHandle]]
-  *  - The download client is using the host-level API with a [[SourceQueue]]
+  *  - The download client is using the host-level API with a one-element source
   *
   * Doc:
-  * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html#using-the-host-level-api-with-a-queue
+  * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html
   * https://pekko.apache.org/docs/pekko-http/current/client-side/host-level.html#retrying-a-request
   *
   * Remarks:
@@ -36,17 +36,18 @@ import scala.util.{Failure, Success}
   *    are intentionally not retried by the host connection pool
   *  - Shows more robust behavior with large files than [[akkahttp.HttpFileEcho]]
   */
-object HttpFileEchoStream extends App with JsonProtocol {
+object HttpFileEchoStream extends JsonProtocol {
+  def main(args: Array[String]): Unit = {
+    server(address, port)
+    roundtripClient(address, port)
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
   val resourceFileName = "content/63MB.pdf"
   val (address, port) = ("127.0.0.1", 6000)
-  server(address, port)
-  roundtripClient(address, port)
-
   def server(address: String, port: Int): Unit = {
 
     def throwRndRuntimeException(operation: String): Unit = {
@@ -151,29 +152,20 @@ object HttpFileEchoStream extends App with JsonProtocol {
 
 
     def download(fileHandle: FileHandle): Future[Unit] = {
-      val queueSize = 1
-      val hostConnectionPoolDownload = Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port)
-      val queue =
-        Source.queue[(HttpRequest, Promise[HttpResponse])](queueSize, OverflowStrategy.backpressure, 10)
-          .via(hostConnectionPoolDownload)
-          .toMat(Sink.foreach({
-            case (Success(resp), p) => p.success(resp)
-            case (Failure(e), p) => p.failure(e)
-          }))(Keep.left)
-          .run()
+      val hostConnectionPoolDownload = Http().cachedHostConnectionPool[Unit](address, port)
 
-      def queueRequest(request: HttpRequest): Future[HttpResponse] = {
-        val responsePromise = Promise[HttpResponse]()
-        queue.offer(request -> responsePromise).flatMap {
-          case QueueOfferResult.Enqueued => responsePromise.future
-          case QueueOfferResult.Dropped => Future.failed(new RuntimeException("Queue overflowed. Try again later."))
-          case QueueOfferResult.Failure(ex) => Future.failed(ex)
-          case QueueOfferResult.QueueClosed => Future.failed(new RuntimeException("Queue was closed (pool shut down) while running the request. Try again later."))
-        }
+      def executeRequest(request: HttpRequest): Future[HttpResponse] = {
+        Source.single(request -> ())
+          .via(hostConnectionPoolDownload)
+          .runWith(Sink.head)
+          .flatMap {
+            case (Success(response), _) => Future.successful(response)
+            case (Failure(exception), _) => Future.failed(exception)
+          }
       }
 
       def downloadWithRetry(fileHandle: FileHandle, retriesRemaining: Int): Future[Unit] = {
-        queueRequest(createDownloadRequestBlocking(fileHandle)).flatMap { response =>
+        executeRequest(createDownloadRequestBlocking(fileHandle)).flatMap { response =>
           if (response.status.isSuccess()) {
             val localFile = File.createTempFile("downloadLocal", ".tmp.client")
             response.entity.dataBytes

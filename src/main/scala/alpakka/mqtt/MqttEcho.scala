@@ -1,12 +1,13 @@
 package alpakka.mqtt
 
 import org.apache.pekko.Done
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.ThrottleMode
 import org.apache.pekko.stream.connectors.mqtt.streaming.*
 import org.apache.pekko.stream.connectors.mqtt.streaming.scaladsl.{ActorMqttClientSession, Mqtt}
-import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source, SourceQueueWithComplete, Tcp}
-import org.apache.pekko.stream.{OverflowStrategy, ThrottleMode}
-import org.apache.pekko.util.ByteString
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source, Tcp}
+import org.apache.pekko.util.{ByteString, Timeout}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.parallel.CollectionConverters.ImmutableIterableIsParallelizable
@@ -35,133 +36,145 @@ import scala.util.{Failure, Success, Try}
   * Start the docker MQTT broker from: /docker/docker-compose.yml
   * eg by cmd line: docker-compose up -d mosquitto
   */
-object MqttEcho extends App {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  val systemClient1 = ActorSystem("MqttEchoClient1")
-  val systemClient2 = ActorSystem("MqttEchoClient2")
-
-  val (host, port) = ("127.0.0.1", 1883)
-
-  (1 to 1).par.foreach(each => clientPublisher(each, systemClient1, host, port))
-  (1 to 2).par.foreach(each => clientSubscriber(each, systemClient2, host, port))
-
-  def clientPublisher(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
-    implicit val sys: ActorSystem = system
-    implicit val ec: ExecutionContextExecutor = system.dispatcher
-
-    val topic = "myTopic"
-    val clientId = s"Pub-$id"
-    val connAckPromise = Promise[Unit]()
-
-    val pubClient = client(clientId, sys, host, port, connAckPromise)
-
-    // A received ConAck confirms that we are connected
-    connAckPromise.future.onComplete { (_: Try[Unit]) =>
-      logger.info(s"$clientId bound to: $host:$port")
-
-      Source(1 to 100)
-        .throttle(1, 1.second, 1, ThrottleMode.shaping)
-        .map(each => s"$id-$each")
-        .wireTap(each => logger.info(s"$clientId sending payload: $each"))
-        .map {
-          msg =>
-            // On the server each new retained message overwrites the previous one
-            val publish = Publish(ControlPacketFlags.RETAIN | ControlPacketFlags.QoSAtLeastOnceDelivery, topic, ByteString(msg))
-            pubClient.session ! Command(publish, None)
-        }.runWith(Sink.ignore)
-    }
-
-    pubClient.done.onComplete {
-      case Success(value) =>
-        logger.info(s"$clientId stopped with: $value. Probably lost tcp connection. Restarting...")
-        clientPublisher(id, system, host, port)
-      case Failure(exception) => logger.error(s"$clientId has no tcp connection on startup. Ex: ${exception.getMessage}. Restarting...")
-        Thread.sleep(1000)
-        clientPublisher(id, system, host, port)
-    }
+object MqttEcho {
+  def main(args: Array[String]): Unit = {
+    new Application();
+    ()
   }
 
-  def clientSubscriber(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
-    implicit val sys: ActorSystem = system
-    implicit val ec: ExecutionContextExecutor = system.dispatcher
+  private class Application {
+    val logger: Logger = LoggerFactory.getLogger(this.getClass)
+    val systemClient1 = ActorSystem("MqttEchoClient1")
+    val systemClient2 = ActorSystem("MqttEchoClient2")
 
-    val topic = "myTopic"
-    val clientId = s"Sub-$id"
-    val connAckPromise = Promise[Unit]()
-    val subClient = client(clientId, sys, host, port, connAckPromise)
+    val (host, port) = ("127.0.0.1", 1883)
 
-    // A received ConAck confirms that we are connected
-    connAckPromise.future.onComplete { (_: Try[Unit]) =>
-      logger.info(s"$clientId bound to: $host:$port")
+    (1 to 1).par.foreach(each => clientPublisher(each, systemClient1, host, port))
+    (1 to 2).par.foreach(each => clientSubscriber(each, systemClient2, host, port))
 
-      // Delay the subscription to get a "last known good value" eg 6
-      Thread.sleep(5000)
-      val topicFilters: Seq[(String, ControlPacketFlags)] = List((topic, ControlPacketFlags.QoSAtMostOnceDelivery))
-      logger.info(s"$clientId send Subscribe for topic: $topic")
-      subClient.commands.offer(Command(Subscribe(topicFilters)))
+    def clientPublisher(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
+      implicit val sys: ActorSystem = system
+      implicit val ec: ExecutionContextExecutor = system.dispatcher
+
+      val topic = "myTopic"
+      val clientId = s"Pub-$id"
+      val connAckPromise = Promise[Unit]()
+
+      val pubClient = client(clientId, sys, host, port, connAckPromise)
+
+      // A received ConAck confirms that we are connected
+      connAckPromise.future.onComplete { (_: Try[Unit]) =>
+        logger.info(s"$clientId bound to: $host:$port")
+
+        Source(1 to 100)
+          .throttle(1, 1.second, 1, ThrottleMode.shaping)
+          .map(each => s"$id-$each")
+          .wireTap(each => logger.info(s"$clientId sending payload: $each"))
+          .map {
+            msg =>
+              // On the server each new retained message overwrites the previous one
+              val publish = Publish(ControlPacketFlags.RETAIN | ControlPacketFlags.QoSAtLeastOnceDelivery, topic, ByteString(msg))
+              pubClient.session ! Command(publish, None)
+          }.runWith(Sink.ignore)
+      }
+
+      pubClient.done.onComplete {
+        case Success(value) =>
+          logger.info(s"$clientId stopped with: $value. Probably lost tcp connection. Restarting...")
+          clientPublisher(id, system, host, port)
+        case Failure(exception) => logger.error(s"$clientId has no tcp connection on startup. Ex: ${exception.getMessage}. Restarting...")
+          Thread.sleep(1000)
+          clientPublisher(id, system, host, port)
+      }
     }
 
-    subClient.done.onComplete {
-      case Success(value) =>
-        logger.info(s"$clientId stopped with: $value. Probably lost tcp connection. Restarting...")
-        Thread.sleep(2000)
-        clientSubscriber(id, system, host, port)
-      case Failure(exception) => logger.error(s"$clientId has no tcp connection on startup. Ex: ${exception.getMessage}. Restarting...")
-        Thread.sleep(2000)
-        clientSubscriber(id, system, host, port)
-    }
-  }
+    def clientSubscriber(id: Int, system: ActorSystem, host: String, port: Int): Unit = {
+      implicit val sys: ActorSystem = system
+      implicit val ec: ExecutionContextExecutor = system.dispatcher
+      implicit val timeout: Timeout = Timeout(30.seconds)
 
+      val topic = "myTopic"
+      val clientId = s"Sub-$id"
+      val connAckPromise = Promise[Unit]()
+      val subClient = client(clientId, sys, host, port, connAckPromise)
 
-  // Common client for Publisher/Subscriber
-  private def client(clientId: String, system: ActorSystem, host: String, port: Int, connAckPromise: Promise[Unit]): MqttClient = {
-    implicit val sys: ActorSystem = system
-    implicit val ec: ExecutionContextExecutor = system.dispatcher
+      // A received ConAck confirms that we are connected
+      connAckPromise.future.onComplete { (_: Try[Unit]) =>
+        logger.info(s"$clientId bound to: $host:$port")
 
-    logger.info(s"$clientId starting...")
+        // Delay the subscription to get a "last known good value" eg 6
+        Thread.sleep(5000)
+        val topicFilters: Seq[(String, ControlPacketFlags)] = List((topic, ControlPacketFlags.QoSAtMostOnceDelivery))
+        logger.info(s"$clientId send Subscribe for topic: $topic")
+        subClient.commands.ask(Command(Subscribe(topicFilters)))
+      }
 
-    val settings = MqttSessionSettings()
-    val clientSession = ActorMqttClientSession(settings)
-
-    val connection = Tcp().outgoingConnection(host, port)
-
-    val mqttFlow =
-      Mqtt
-        .clientSessionFlow(clientSession, ByteString(clientId))
-        .join(connection)
-
-    val (commands, done) = {
-      Source
-        .queue(10, OverflowStrategy.backpressure, 10)
-        .via(mqttFlow)
-        // Filter the Ack events
-        .filter {
-          case Right(Event(_: ConnAck, _)) =>
-            logger.info(s"$clientId received ConnAck")
-            connAckPromise.complete(Success(()))
-            false
-          case Right(Event(_: SubAck, _)) =>
-            logger.info(s"$clientId received SubAck")
-            false
-          case Right(Event(pa: PubAck, _)) =>
-            logger.info(s"$clientId received PubAck for: ${pa.packetId}")
-            false
-          case _ => true
-        }
-
-        // Only the Publish events are interesting for the subscriber
-        .collect { case Right(Event(p: Publish, _)) => p }
-        .wireTap(event => logger.info(s"$clientId received payload: ${event.payload.utf8String}"))
-        .toMat(Sink.ignore)(Keep.both)
-        .run()
+      subClient.done.onComplete {
+        case Success(value) =>
+          logger.info(s"$clientId stopped with: $value. Probably lost tcp connection. Restarting...")
+          Thread.sleep(2000)
+          clientSubscriber(id, system, host, port)
+        case Failure(exception) => logger.error(s"$clientId has no tcp connection on startup. Ex: ${exception.getMessage}. Restarting...")
+          Thread.sleep(2000)
+          clientSubscriber(id, system, host, port)
+      }
     }
 
-    logger.info(s"$clientId. About to send connect cmd...")
-    val connectCommand = Command(Connect(clientId, ConnectFlags.CleanSession))
-    commands.offer(connectCommand)
 
-    MqttClient(session = clientSession, commands = commands, done = done)
+    // Common client for Publisher/Subscriber
+    private def client(clientId: String, system: ActorSystem, host: String, port: Int, connAckPromise: Promise[Unit]): MqttClient = {
+      implicit val sys: ActorSystem = system
+      implicit val ec: ExecutionContextExecutor = system.dispatcher
+      implicit val timeout: Timeout = Timeout(30.seconds)
+
+      logger.info(s"$clientId starting...")
+
+      val settings = MqttSessionSettings()
+      val clientSession = ActorMqttClientSession(settings)
+
+      val connection = Tcp().outgoingConnection(host, port)
+
+      val mqttFlow =
+        Mqtt
+          .clientSessionFlow(clientSession, ByteString(clientId))
+          .join(connection)
+
+      val (commands, done) = {
+        Source
+          .actorRefWithBackpressure[Command[Nothing]](
+            ackMessage = "ack",
+            completionMatcher = PartialFunction.empty,
+            failureMatcher = PartialFunction.empty)
+          .via(mqttFlow)
+          // Filter the Ack events
+          .filter {
+            case Right(Event(_: ConnAck, _)) =>
+              logger.info(s"$clientId received ConnAck")
+              connAckPromise.complete(Success(()))
+              false
+            case Right(Event(_: SubAck, _)) =>
+              logger.info(s"$clientId received SubAck")
+              false
+            case Right(Event(pa: PubAck, _)) =>
+              logger.info(s"$clientId received PubAck for: ${pa.packetId}")
+              false
+            case _ => true
+          }
+
+          // Only the Publish events are interesting for the subscriber
+          .collect { case Right(Event(p: Publish, _)) => p }
+          .wireTap(event => logger.info(s"$clientId received payload: ${event.payload.utf8String}"))
+          .toMat(Sink.ignore)(Keep.both)
+          .run()
+      }
+
+      logger.info(s"$clientId. About to send connect cmd...")
+      val connectCommand = Command(Connect(clientId, ConnectFlags.CleanSession))
+      commands.ask(connectCommand)
+
+      MqttClient(session = clientSession, commands = commands, done = done)
+    }
   }
 }
 
-case class MqttClient(session: ActorMqttClientSession, commands: SourceQueueWithComplete[Command[Nothing]], done: Future[Done])
+case class MqttClient(session: ActorMqttClientSession, commands: ActorRef, done: Future[Done])

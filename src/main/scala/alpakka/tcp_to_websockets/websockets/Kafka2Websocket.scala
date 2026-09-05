@@ -17,6 +17,7 @@ import org.apache.pekko.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
@@ -41,7 +42,7 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   val webSocketEndpoint = "ws://127.0.0.1:6002/echo"
   val (websocketClientActor, websocketConnectionStatus) = websocketClient(clientID, webSocketEndpoint)
 
-  var streamControl: AtomicReference[Control] = _
+  var streamControl: AtomicReference[Control] = uninitialized
 
   def run(): Unit = {
     streamControl = createAndRunConsumer(clientID)
@@ -151,9 +152,12 @@ class Kafka2Websocket(mappedPortKafka: Int = 9092) {
   }
 }
 
-object Kafka2Websocket extends App {
-  val server = new Kafka2Websocket()
-  server.run()
+object Kafka2Websocket {
+  lazy val server = new Kafka2Websocket()
+
+  def main(args: Array[String]): Unit = {
+    server.run()
+  }
 
   def apply(mappedPortKafka: Int) = new Kafka2Websocket(mappedPortKafka)
 

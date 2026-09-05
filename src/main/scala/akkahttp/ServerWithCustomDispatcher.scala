@@ -19,11 +19,20 @@ import scala.util.{Failure, Success}
   * Full example for this answer:
   * https://stackoverflow.com/questions/79141989/executioncontext-issue-in-akka-http-server/79145603#79145603
   */
-object ServerWithCustomDispatcher extends App {
+object ServerWithCustomDispatcher {
+  def main(args: Array[String]): Unit = {
+    bindingFuture.onComplete {
+      case Success(b) =>
+        println("Server started, listening on: http://" + b.localAddress)
+      case Failure(e) =>
+        println(s"Server could not bind to... Exception message: ${e.getMessage}")
+        system.terminate()
+    }
+  }
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem = ActorSystem()
 
-  implicit val myExCon: ExecutionContextExecutor = system.dispatchers.lookup(
+  implicit lazy val myExCon: ExecutionContextExecutor = system.dispatchers.lookup(
     "custom-dispatcher-fork-join"
   )
 
@@ -37,20 +46,12 @@ object ServerWithCustomDispatcher extends App {
             val msg = s"Execution context: $myExCon with thread: ${Thread.currentThread.getName}"
             logger.info(msg)
             HttpResponse(StatusCodes.OK, entity = s"$msg")
-          }(myExCon)
+          }(using myExCon)
           complete(result)
         }
       }
     }
   }
 
-  val bindingFuture = Http().newServerAt("localhost", 9000).bindFlow(route)
-
-  bindingFuture.onComplete {
-    case Success(b) =>
-      println("Server started, listening on: http://" + b.localAddress)
-    case Failure(e) =>
-      println(s"Server could not bind to... Exception message: ${e.getMessage}")
-      system.terminate()
-  }
+  lazy val bindingFuture = Http().newServerAt("localhost", 9000).bindFlow(route)
 }

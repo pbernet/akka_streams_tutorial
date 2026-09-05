@@ -19,7 +19,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 /**
-  * An Alpakka JMS client which consumes text messages from either:
+  * A Pekko JMS client which consumes text messages from either:
   *  - Preferred:    Artemis JMS Broker on docker image, started from /docker/docker-compose.yml
   *  - Experimental: Embedded Artemis JMS Broker [[alpakka.env.JMSServerArtemis]], started from IDE
   *
@@ -81,10 +81,6 @@ object ProcessingApp {
 
   private val jmsErrorQueueSettings: JmsProducerSettings = JmsProducerSettings.create(system, connectionFactory).withQueue("test-queue-error")
   private val errorQueueSink: Sink[JmsTextMessage, Future[Done]] = JmsProducer.sink(jmsErrorQueueSettings)
-  private val errorQueue = Source
-    .queue[JmsTextMessage](100, OverflowStrategy.backpressure, 10)
-    .toMat(errorQueueSink)(Keep.left)
-    .run()
 
 
   // We may do a (blocking) retry in this method to handle recoverable conditions of the external system
@@ -123,12 +119,7 @@ object ProcessingApp {
       .withProperty("errorType", e.getClass.getName)
       .withProperty("errorMessage", e.getMessage + " | Cause: " + e.getCause)
 
-    errorQueue.offer(errorMessage).map {
-      case QueueOfferResult.Enqueued => logger.info(s"Enqueued Msg with TRACE_ID: $traceID in error queue")
-      case QueueOfferResult.Dropped => logger.error(s"Dropped Msg with TRACE_ID: $traceID from error queue")
-      case QueueOfferResult.Failure(ex) => logger.error(s"Offer failed: $ex")
-      case QueueOfferResult.QueueClosed => logger.error("Source Queue closed")
-    }
+    logWhen(Source.single(errorMessage).runWith(errorQueueSink))
   }
 
   private def pendingMessageWatcher(jmsConsumerControl: JmsConsumerControl): Unit = {
@@ -163,4 +154,3 @@ object ProcessingApp {
     }
   }
 }
-
