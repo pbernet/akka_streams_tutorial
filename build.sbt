@@ -119,7 +119,7 @@ libraryDependencies ++= Seq(
   "io.reactivex.rxjava3" % "rxjava" % "3.1.12",
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
-  "ch.qos.logback" % "logback-classic" % "1.5.18",
+  "ch.qos.logback" % "logback-classic" % "1.5.38",
   "com.crobox.clickhouse" %% "client" % "2.0.0",
   "com.clickhouse" % "clickhouse-jdbc" % "0.9.8" % Test,
 
