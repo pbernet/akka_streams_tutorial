@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk18on" % "1.81",
+  "org.bouncycastle" % "bcprov-jdk18on" % "1.86",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   // Kafka does not publish its Scala module for Scala 3.
