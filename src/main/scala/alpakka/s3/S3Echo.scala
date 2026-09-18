@@ -26,7 +26,7 @@ import scala.util.{Failure, Success}
   *
   * Run this class against your AWS account using the settings in application.conf
   * or
-  * Run via [[alpakka.s3.S3EchoMinioIT]] against local minio docker container
+  * Run via [[alpakka.s3.S3EchoIT]] against a local S3Proxy Docker container
   *
   * Doc:
   * https://doc.akka.io/docs/alpakka/current/s3.html

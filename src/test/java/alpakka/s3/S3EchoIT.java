@@ -15,25 +15,25 @@ import java.util.concurrent.ExecutionException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
-public class S3EchoMinioIT {
-    private static final Logger LOGGER = LoggerFactory.getLogger(S3EchoMinioIT.class);
+public class S3EchoIT {
+    private static final Logger LOGGER = LoggerFactory.getLogger(S3EchoIT.class);
 
     // Credentials for client access
-    private static final String ACCESS_KEY = "minio";
-    private static final String SECRET_KEY = "minio123";
+    private static final String ACCESS_KEY = "local-identity";
+    private static final String SECRET_KEY = "local-credential";
 
     @org.testcontainers.junit.jupiter.Container
-    private static final MinioContainer minioContainer = new MinioContainer(
-            new MinioContainer.CredentialsProvider(ACCESS_KEY, SECRET_KEY));
+    private static final S3ProxyContainer s3ProxyContainer = new S3ProxyContainer(
+            new S3ProxyContainer.CredentialsProvider(ACCESS_KEY, SECRET_KEY));
 
     @BeforeAll
     public static void beforeAll() {
-        LOGGER.info("Minio container started on host address: {}", minioContainer.getHostAddress());
+        LOGGER.info("S3Proxy container started on host address: {}", s3ProxyContainer.getHostAddress());
     }
 
     @Test
     public void testLocal() throws IOException, ExecutionException, InterruptedException {
-        S3Echo echo = new S3Echo(minioContainer.getHostAddress(), ACCESS_KEY, SECRET_KEY);
+        S3Echo echo = new S3Echo(s3ProxyContainer.getHostAddress(), ACCESS_KEY, SECRET_KEY);
 
         CompletionStage<Object> result = FutureConverters.asJava(echo.run());
 
