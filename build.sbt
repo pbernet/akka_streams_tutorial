@@ -1,5 +1,3 @@
-import sbt.Keys.libraryDependencies
-
 name := "pekko-tutorial"
 
 version := "1.0"
@@ -178,12 +176,6 @@ excludeDependencies += ExclusionRule("com.typesafe.scala-logging", "scala-loggin
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
-//see: https://github.com/sbt/sbt/issues/3618
-val workaround = {
-  sys.props += "packaging.type" -> "jar"
-  ()
-}
-
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"
 
@@ -193,13 +185,6 @@ Test / parallelExecution := false
 
 enablePlugins(GatlingPlugin)
 
-// Needed as long as "scala-java8-compat" is in the dependencies
-// https://eed3si9n.com/sbt-1.5.0
-// https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
-ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-java8-compat" % "always"
-
-// TODO  scoped eviction rules are required because Connectors/HTTP M1 target Pekko Core M1, while this build intentionally selects Core M4
-// Pekko 2.0.0-M1 modules depend on Core M1; use the requested Core M4 milestone consistently.
 ThisBuild / libraryDependencySchemes ++= Seq(
   "org.apache.pekko" %% "pekko-actor" % "always",
   "org.apache.pekko" %% "pekko-actor-typed" % "always",
