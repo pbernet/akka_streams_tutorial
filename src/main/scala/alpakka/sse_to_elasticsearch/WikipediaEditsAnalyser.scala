@@ -2,12 +2,11 @@ package alpakka.sse_to_elasticsearch
 
 import dev.langchain4j.data.document.Document
 import dev.langchain4j.data.document.splitter.DocumentSplitters
-import dev.langchain4j.data.message.UserMessage
+import dev.langchain4j.data.message.{SystemMessage, UserMessage}
 import dev.langchain4j.data.segment.TextSegment
 import dev.langchain4j.memory.chat.MessageWindowChatMemory
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel
 import dev.langchain4j.model.openai.OpenAiChatModel
-import dev.langchain4j.model.openai.OpenAiChatModelName.GPT_4_O_MINI
 import dev.langchain4j.rag.DefaultRetrievalAugmentor
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever
 import dev.langchain4j.rag.query.router.DefaultQueryRouter
@@ -47,7 +46,7 @@ import spray.json.RootJsonFormat
 import java.io.FileInputStream
 import java.net.URLEncoder
 import java.nio.file.Paths
-import java.time.{Duration, Instant, ZoneId}
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -60,13 +59,14 @@ import scala.util.{Failure, Success}
   * fetch the extract via Wikipedia API,
   * do local and remote NER processing for persons in EN
   * and then write the results to an Opensearch version 2.x server
-  * Also transform the content as embeddings to a local [[InMemoryEmbeddingStore]]
-  * to be able to RAG chat with them via a local [[Assistant]]
+  * Also transform the content and title as embeddings to a local [[InMemoryEmbeddingStore]]
+  * to be able to RAG chat against it via [[Assistant]]
   *
   * Remarks:
-  *  - Local means: Requests on local machine (Java NLP NER or GLiNER local Docker)
-  *  - Remote means: Requests to a remote OpenAI LLM accessed with API-Key
+  *  - Local NER means: NER processing on local machine (GLiNER service, with Java NLP as fallback)
+  *  - Remote NER means: NER processing via remote OpenAI LLM
   *  - We use [[spray.json]] because of the Elasticsearch pekko connector
+  *  - Env var: OPENAI_API_KEY
   *
   * Doc:
   * https://pekko.apache.org/docs/pekko-connectors/current/elasticsearch.html
@@ -96,9 +96,9 @@ object WikipediaEditsAnalyser {
         Supervision.Restart
     }
 
-    // Set to true to use local GLiNER service instead of local Java NLP NER
-    // Prerequisite: Start service gliner-ner in docker-compose.yml
-    private val useLocalGLiNER: Boolean = false
+    // Default local NER. Prerequisite: Start service gliner-ner in docker-compose.yml
+    // Local Java NLP NER is used as fallback, when the GLiNER service fails
+    private val glinerServiceUrl = "http://localhost:8085/extract-persons"
 
     // Switch off at runtime via UI to save costs
     private val isRemoteProcessingEnabled = new AtomicBoolean(true)
@@ -116,14 +116,19 @@ object WikipediaEditsAnalyser {
       .maxResults(2)
       .minScore(0.6)
       .build()
-    val OPENAI_API_KEY = "***"
+    private val openAiApiKey: String = sys.env.getOrElse("OPENAI_API_KEY", "")
+    private val openAiModelName = "gpt-6-luna"
+    private val openAiReasoningEffort = "none"
+    if (openAiApiKey.isEmpty) {
+      throw new IllegalStateException("OPENAI_API_KEY environment variable not set!")
+    }
 
-    case class Change(timestamp: Long, title: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
+    case class Change(timestamp: Long, title: String, wiki: String, serverName: String, user: String, cmdType: String, isBot: Boolean, isNamedBot: Boolean, lengthNew: Int = 0, lengthOld: Int = 0) {
       def traceId: String = title.hashCode.abs.toString
     }
 
     object Change {
-      implicit val formatChange: RootJsonFormat[Change] = jsonFormat9(Change.apply)
+      implicit val formatChange: RootJsonFormat[Change] = jsonFormat10(Change.apply)
     }
 
     // Helps to carry the data through the stages, although this violates functional principles
@@ -217,6 +222,7 @@ object WikipediaEditsAnalyser {
 
         val titleAsID = cursor.get[String]("title").toOption.getOrElse("")
         val timestamp: Long = cursor.get[Long]("timestamp").toOption.getOrElse(0)
+        val wiki = cursor.get[String]("wiki").toOption.getOrElse("")
         val serverName = cursor.get[String]("server_name").toOption.getOrElse("")
         val user = cursor.get[String]("user").toOption.getOrElse("")
         val cmdType = cursor.get[String]("type").toOption.getOrElse("")
@@ -226,9 +232,9 @@ object WikipediaEditsAnalyser {
           val length = cursor.downField("length")
           val lengthNew = length.get[Int]("new").toOption.getOrElse(0)
           val lengthOld = length.get[Int]("old").toOption.getOrElse(0)
-          Change(timestamp, titleAsID, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
+          Change(timestamp, titleAsID, wiki, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user), lengthNew, lengthOld)
         } else {
-          Change(timestamp, titleAsID, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
+          Change(timestamp, titleAsID, wiki, serverName, user, cmdType, isBot = bot, isNamedBot = isNamedBot(bot, user))
         }
       }
     }
@@ -319,14 +325,16 @@ object WikipediaEditsAnalyser {
         }
     }
 
-    private def findPersons(ctx: Ctx): Future[Ctx] = {
-      val localNERFuture = if (useLocalGLiNER) {
-        findPersonsLocalGLiNER(ctx)
-      } else {
-        findPersonsLocalNER(ctx)
+    private def findPersons(ctx: Ctx): Future[Ctx] =
+      findPersonsLocal(ctx).flatMap(localResult => findPersonsRemoteNER(localResult))
+
+    private def findPersonsLocal(ctx: Ctx): Future[Ctx] =
+      if (ctx.content.isEmpty) Future(ctx)
+      else findPersonsLocalGLiNER(ctx).recoverWith {
+        case NonFatal(ex) =>
+          logger.warn(s"[${ctx.traceId}] Local GLiNER NER failed (${ex.getMessage}) - falling back to Local Java NLP NER")
+          findPersonsLocalNER(ctx)
       }
-      localNERFuture.flatMap(localResult => findPersonsRemoteNER(localResult))
-    }
 
     private def logNERResults(ctx: Ctx): Ctx = {
       val localPersons = ctx.personsFoundLocal
@@ -337,17 +345,14 @@ object WikipediaEditsAnalyser {
       val localOnly = localPersons.diff(remotePersons)
       val remoteOnly = remotePersons.diff(localPersons)
       val both = localPersons.intersect(remotePersons)
-      val localLabel = if (useLocalGLiNER) "Local GLiNER NER only" else "Local Java NLP NER only"
-      val bothLabel = if (useLocalGLiNER) "Found by GLiNER & Remote" else "Found by Java NLP & Remote"
-
       def row(label: String, names: List[String]): Option[Array[String]] =
         Option.when(names.nonEmpty)(Array(label, names.size.toString, names.mkString(", ")))
 
       val rows = List(
         row("Total Persons", allPersons),
-        row(localLabel, localOnly),
+        row("Local NER only", localOnly),
         row("Remote NER only", remoteOnly),
-        row(bothLabel, both)
+        row("Found by Local & Remote", both)
       ).flatten.toArray
 
       val table = formatAsAsciiTable(s"NER results for '${ctx.change.title}'", Array("Category", "Count", "Names"), rows)
@@ -389,6 +394,33 @@ object WikipediaEditsAnalyser {
       }
     }
 
+    private lazy val remoteNerModel = OpenAiChatModel.builder()
+      .apiKey(openAiApiKey)
+      .modelName(openAiModelName)
+      .reasoningEffort(openAiReasoningEffort)
+      .temperature(0)
+      .timeout(Duration.ofSeconds(30))
+      .logRequests(true)
+      .build()
+
+    private val remoteNerInstructions = SystemMessage.from(
+      """Extract the names of all real persons mentioned in the text provided by the user.
+        |
+        |Include:
+        |- Full names (e.g. "Marie Curie") and single names that clearly refer to a person (e.g. "Shakespeare")
+        |
+        |Exclude:
+        |- Fictional characters
+        |- Roles, job titles and groups of persons without a name (e.g. "the prime minister", "missionaries")
+        |- Organizations, places, products and titles of works (books, films, songs)
+        |
+        |Output:
+        |- One name per line, without numbering, bullets, quotes or explanations
+        |- Omit titles and honorifics (e.g. "Dr. Johnson" -> "Johnson")
+        |- List each person once, using the most complete form of the name found in the text
+        |- If a name is also given in another script, return only the English form
+        |- If there are no persons, return NONE""".stripMargin)
+
     private def findPersonsRemoteNER(ctx: Ctx): Future[Ctx] = {
       if (!isRemoteProcessingEnabled.get()) {
         logger.debug(s"[${ctx.traceId}] Remote processing disabled - skipping remote NER")
@@ -402,82 +434,26 @@ object WikipediaEditsAnalyser {
         return Future(ctx)
       }
 
-      val model = OpenAiChatModel.builder()
-        .apiKey(OPENAI_API_KEY)
-        .modelName(GPT_4_O_MINI)
-        .temperature(0)
-        .timeout(Duration.ofSeconds(30))
-        .logRequests(true)
-        .build()
-
-      val promptPersons =
-        """You are an expert Named Entity Recognition (NER) system specialized in identifying person names.
-          |
-          |Task: Extract all person names from the provided text. Follow these rules strictly:
-          |
-          |INCLUDE:
-          |- Full names of real people (e.g., "John Smith", "Marie Curie")
-          |- Single names when clearly referring to people (e.g., "Einstein", "Shakespeare")
-          |- Historical figures and public personalities
-          |- Names with titles when referring to people (e.g., "Dr. Johnson", "President Lincoln")
-          |
-          |EXCLUDE:
-          |- Organizations, companies, institutions
-          |- Places, cities, countries, geographical locations
-          |- Products, brands, software names
-          |- Book titles, movie titles, song titles
-          |- Abstract concepts or general terms
-          |
-          |OUTPUT FORMAT:
-          |- Return each person name on a separate line
-          |- Use the exact form as it appears in the text
-          |- If no person names are found, return exactly: "NONE"
-          |- Do not include explanations or additional text
-          |
-          |TEXT TO ANALYZE:
-          |{{content}}
-          |
-          |PERSON NAMES:""".stripMargin
-
-      val message = UserMessage.from(promptPersons.replace("{{content}}", content))
-
-      try {
-        val response = model.chat(message)
-        val personsFoundText = response.aiMessage().text().trim()
-
-        val personsFoundList = if (personsFoundText.isEmpty || personsFoundText.equalsIgnoreCase("NONE")) {
-          List.empty[String]
-        } else {
-          val rawNames = personsFoundText.split("\n")
-            .map(_.trim)
-            .filter(_.nonEmpty)
-            .filter(!_.equalsIgnoreCase("NONE"))
-            .toList
-          sanitizePersonNames(rawNames)
+      Future {
+        val reply = remoteNerModel.chat(remoteNerInstructions, UserMessage.from(content)).aiMessage().text()
+        // Filter NONE after sanitizing, which also removes quotes around it
+        sanitizePersonNames(reply.linesIterator.toList).filterNot(_.equalsIgnoreCase("NONE")).distinct
+      }.map { personsFound =>
+        if (personsFound.isEmpty) ctx
+        else {
+          logger.info(s"[${ctx.traceId}] Remote NER found persons: $personsFound from content: $content")
+          ctx.copy(personsFoundRemote = personsFound)
         }
-
-        if (personsFoundList.isEmpty) {
-          Future(ctx)
-        } else {
-          logger.info(s"[${ctx.traceId}] Remote NER found persons: $personsFoundList from content: $content")
-          Future(ctx.copy(personsFoundRemote = personsFoundList))
-        }
-      } catch {
-        case e: Exception =>
+      }.recover {
+        case NonFatal(e) =>
           logger.error(s"[${ctx.traceId}] Error during remote LLM call: ${e.getMessage}", e)
-          Future(ctx)
+          ctx
       }
     }
 
     private def findPersonsLocalGLiNER(ctx: Ctx): Future[Ctx] = {
       logger.info(s"[${ctx.traceId}] Local GLiNER NER: About to find person names in: ${ctx.change.title}")
       val content = ctx.content
-
-      if (content.isEmpty) {
-        return Future(ctx)
-      }
-
-      val glinerServiceUrl = "http://localhost:8085/extract-persons"
       val request = GLiNERExtractionRequest(text = content)
       val requestJson = request.asJson.noSpaces
 
@@ -495,39 +471,26 @@ object WikipediaEditsAnalyser {
               Unmarshal(response.entity).to[String].map { jsonString =>
                 logger.debug(s"[${ctx.traceId}] GLiNER API response: $jsonString")
 
-                parse(jsonString) match {
-                  case Right(json) =>
-                    json.as[GLiNERExtractionResponse] match {
-                      case Right(glinerResponse) =>
-                        val personsFound = glinerResponse.persons.map(_.text).distinct
+                decode[GLiNERExtractionResponse](jsonString) match {
+                  case Right(glinerResponse) =>
+                    val personsFound = glinerResponse.persons.map(_.text).distinct
 
-                        if (personsFound.isEmpty) {
-                          logger.debug(s"[${ctx.traceId}] GLiNER found no persons in content")
-                          ctx
-                        } else {
-                          val personsFoundCleaned = sanitizePersonNames(personsFound)
-                          logger.info(s"[${ctx.traceId}] Local GLiNER NER found persons: $personsFoundCleaned from content: ${content.take(100)}...")
-                          ctx.copy(personsFoundLocal = personsFoundCleaned)
-                        }
-                      case Left(decodingError) =>
-                        logger.error(s"[${ctx.traceId}] Failed to decode GLiNER response: $decodingError")
-                        ctx
+                    if (personsFound.isEmpty) {
+                      logger.debug(s"[${ctx.traceId}] GLiNER found no persons in content")
+                      ctx
+                    } else {
+                      val personsFoundCleaned = sanitizePersonNames(personsFound)
+                      logger.info(s"[${ctx.traceId}] Local GLiNER NER found persons: $personsFoundCleaned from content: ${content.take(100)}...")
+                      ctx.copy(personsFoundLocal = personsFoundCleaned)
                     }
-                  case Left(parsingError) =>
-                    logger.error(s"[${ctx.traceId}] Failed to parse GLiNER JSON response: $parsingError")
-                    ctx
+                  case Left(error) =>
+                    throw new IllegalStateException(s"Invalid GLiNER response: $error")
                 }
               }
             case statusCode =>
               response.discardEntityBytes()
-              logger.error(s"[${ctx.traceId}] GLiNER service returned error status: $statusCode")
-              Future.successful(ctx)
+              Future.failed(new IllegalStateException(s"GLiNER service returned error status: $statusCode"))
           }
-        }
-        .recover {
-          case ex: Exception =>
-            logger.error(s"[${ctx.traceId}] Error calling GLiNER service: ${ex.getMessage}", ex)
-            ctx
         }
     }
 
@@ -579,6 +542,9 @@ object WikipediaEditsAnalyser {
         keep
       }
 
+    private val englishWikipediaFilterFlow: Flow[Change, Change, NotUsed] =
+      Flow[Change].filter(_.wiki == "enwiki")
+
     private val nerProcessingFlow: Flow[Change, Ctx, NotUsed] = Flow[Change]
       .filter(change => !change.isBot)
       .map(change => Ctx(change))
@@ -594,25 +560,22 @@ object WikipediaEditsAnalyser {
 
     private val embeddingStoreSink = Flow[Ctx]
       .filter(ctx => ctx.content.nonEmpty)
-      .map(ctx => addToEmbeddingStore(ctx.content))
+      .map(ctx => addToEmbeddingStore(ctx.change.title, ctx.content))
       .to(Sink.ignore)
 
 
     logger.info(s"Opensearch container listening on: ${searchContainer.getHttpHostAddress}")
-    logger.info(s"NER Configuration - Using Local GLiNER NER: $useLocalGLiNER")
-    if (useLocalGLiNER) {
-      logger.info("GLiNER service expected at: http://localhost:8085")
-    } else {
-      logger.info("Using local Java NLP models for NER extraction")
-    }
+    logger.info(s"Local NER: GLiNER service expected at: $glinerServiceUrl (fallback: Local Java NLP NER)")
     logger.info("About to start processing flow...")
 
     restartSource
       .via(parserFlow)
+      .via(englishWikipediaFilterFlow)
       .via(titleFilterFlow)
       .via(nerProcessingFlow)
       .alsoTo(embeddingStoreSink)
-      .map(ctx => createIndexMessage(dateTimeFormatted(ctx.change.timestamp), ctx))
+      // One document per article: a new edit of the same article replaces the previous document
+      .map(ctx => createIndexMessage(ctx.change.title, ctx))
       .wireTap(each => logger.debug(s"Add to index: $each"))
       .withAttributes(ActorAttributes.supervisionStrategy(decider))
       .runWith(elasticsearchSink)
@@ -634,7 +597,7 @@ object WikipediaEditsAnalyser {
     private def createAssistant() = {
       val queryRouter = new DefaultQueryRouter(contentRetriever)
       val retrievalAugmentor = DefaultRetrievalAugmentor.builder.queryRouter(queryRouter).build
-      val model = OpenAiChatModel.builder.apiKey(OPENAI_API_KEY).modelName(GPT_4_O_MINI).logRequests(true).build
+      val model = OpenAiChatModel.builder.apiKey(openAiApiKey).modelName(openAiModelName).reasoningEffort(openAiReasoningEffort).logRequests(true).build
 
       AiServices
         .builder(classOf[Assistant])
@@ -684,6 +647,24 @@ object WikipediaEditsAnalyser {
     }
 
 
+    // A search hit is an article, which may mention other persons too
+    // Rank names matching the query first (lower is better), so the searched person is on top
+    private def matchRank(name: String, query: String): Int = {
+      val nameLower = name.toLowerCase
+      val queryLower = query.trim.toLowerCase
+      val nameWords = nameLower.split("\\s+")
+      val queryWords = queryLower.split("\\s+").filter(_.nonEmpty)
+
+      def startsAWord(queryWord: String) = nameWords.exists(_.startsWith(queryWord))
+
+      if (nameLower == queryLower) 0
+      else if (nameLower.startsWith(queryLower)) 1
+      else if (queryWords.forall(nameWords.contains)) 2
+      else if (queryWords.forall(startsAWord)) 3
+      else if (queryWords.exists(startsAWord)) 4
+      else 5
+    }
+
     // Doc:
     // https://pekko.apache.org/docs/pekko-connectors/current/opensearch.html
     // https://docs.opensearch.org/docs/latest/query-dsl/full-text/simple-query-string/#simple-query-string-syntax
@@ -710,12 +691,13 @@ object WikipediaEditsAnalyser {
         }
     }"""
       } else {
-        s"""{
-        "simple_query_string": {
-          "fields": [ "personsFoundLocal", "personsFoundRemote" ],
-          "query": "$query*"
-        }
-    }"""
+        // Build via circe, so that user input such as " or \ is JSON escaped
+        Json.obj(
+          "simple_query_string" -> Json.obj(
+            "fields" -> List("personsFoundLocal", "personsFoundRemote").asJson,
+            "query" -> s"$query*".asJson
+          )
+        ).noSpaces
       }
 
       val searchSource = ElasticsearchSource
@@ -729,12 +711,9 @@ object WikipediaEditsAnalyser {
         .runWith(Sink.seq)
         .map { results =>
           val allPersonsFound = results.flatMap { readResult =>
-            val localPersons = readResult.source.personsFoundLocal
-            val remotePersons = readResult.source.personsFoundRemote
-            (localPersons ++ remotePersons).sorted
+            readResult.source.personsFoundLocal ++ readResult.source.personsFoundRemote
           }.distinct
-          allPersonsFound.map(Person(_)).toList
-
+          allPersonsFound.sortBy(name => (matchRank(name, query), name)).map(Person(_)).toList
         }
         .recover {
           case ex =>
@@ -743,7 +722,13 @@ object WikipediaEditsAnalyser {
         }
     }
 
-    private final case class QueryRequest(query: String)
+    private final case class QueryRequest(query: String, selectedPerson: Option[Person] = None) {
+      // Name the selected person in the text, so that both retrieval and the LLM know who a follow-up is about
+      def queryWithPerson: String = selectedPerson match {
+        case Some(person) if !query.toLowerCase.contains(person.name.toLowerCase) => s"About ${person.name}: $query"
+        case _ => query
+      }
+    }
 
     private final case class QueryResponse(answer: String)
 
@@ -758,14 +743,14 @@ object WikipediaEditsAnalyser {
     private final case class SearchIndexUrlResponse(url: String)
 
     private def startConversationWith(assistant: Assistant): Unit = {
+      def remoteNerStatus(enabled: Boolean): String =
+        if (enabled) "Remote NER enabled" else "Remote NER paused"
+
       def setProcessing(enable: Boolean): ProcessingControlResponse = {
-        val state = if (enable) "enabled" else "disabled"
-        val changedMsg =
-          if (enable) "Remote processing enabled - resuming remote LLM calls and indexing"
-          else "Remote processing disabled - suspending remote LLM calls and indexing (local NER continues)"
         val changed = isRemoteProcessingEnabled.getAndSet(enable) != enable
-        if (changed) logger.info(changedMsg)
-        ProcessingControlResponse(enable, if (changed) changedMsg else s"Remote processing already $state")
+        val status = remoteNerStatus(enable)
+        if (changed) logger.info(status)
+        ProcessingControlResponse(enable, status)
       }
 
       val route: Route =
@@ -811,7 +796,7 @@ object WikipediaEditsAnalyser {
                 entity(as[String]) { jsonString =>
                   decode[QueryRequest](jsonString) match {
                     case Right(queryRequest) =>
-                      val answer = assistant.answer(queryRequest.query)
+                      val answer = assistant.answer(queryRequest.queryWithPerson)
                       val response = QueryResponse(answer)
                       complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
                     case Left(error) =>
@@ -834,15 +819,15 @@ object WikipediaEditsAnalyser {
                   }
                 },
                 get {
-                  val response = ProcessingControlResponse(isRemoteProcessingEnabled.get(),
-                    if (isRemoteProcessingEnabled.get()) "Remote processing enabled" else "Remote processing disabled (only local NER active)")
+                  val enabled = isRemoteProcessingEnabled.get()
+                  val response = ProcessingControlResponse(enabled, remoteNerStatus(enabled))
                   complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
                 }
               )
             },
             path("searchIndexUrl") {
               get {
-                val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFoundLocal:*&size=100&pretty=true"
+                val url = s"http://localhost:${searchContainer.getMappedPort(9200)}/$indexName/_search?q=personsFoundLocal:*%20OR%20personsFoundRemote:*&size=100&pretty=true"
                 val response = SearchIndexUrlResponse(url)
                 complete(HttpEntity(ContentTypes.`application/json`, response.asJson.noSpaces))
               }
@@ -867,10 +852,6 @@ object WikipediaEditsAnalyser {
       else logger.info(s"Please open a browser at: $url")
     }
 
-    private def dateTimeFormatted(timestamp: Long) = {
-      Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault).toLocalDateTime.toString
-    }
-
     // Note that the size of the collection can also be fetched via a GET request, e.g.
     // http://localhost:57321/wikipediaedits/_count
     private def query(): Unit = {
@@ -884,10 +865,19 @@ object WikipediaEditsAnalyser {
       }
     }
 
-    private def addToEmbeddingStore(text: String) = {
-      val document = Document.from(text)
+    private def addToEmbeddingStore(title: String, content: String): Unit = {
+      val document = Document.from(content)
       val splitter = DocumentSplitters.recursive(300, 0)
-      val segments = splitter.split(document)
+      val segments = splitter
+        .split(document)
+        .stream()
+        .map(segment =>
+          TextSegment.from(
+            s"Title: $title\n\n${segment.text()}",
+            segment.metadata()
+          )
+        )
+        .toList
       val embeddings = embeddingModel.embedAll(segments).content()
       embeddingStore.addAll(embeddings, segments)
     }

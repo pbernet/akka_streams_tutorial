@@ -1,462 +1,1077 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Assistant</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WikipediaEditsChat</title>
     <style>
+        :root {
+            --bg: #020617;
+            --surface: #0f172a;
+            --surface-hover: #1e293b;
+            --fg: #f1f5f9;
+            --muted: #94a3b8;
+            --dim: #64748b;
+            --line: #1e293b;
+            --border: #334155;
+            --up: #34d399;
+            --down: #fb7185;
+            --flat: #94a3b8;
+            --bot: #fcd34d;
+            --focus: #34d399;
+            --info: #60a5fa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2.5rem 2rem;
+            background: var(--bg);
+            color: var(--fg);
+            font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
         }
 
-        #chat-container {
-            max-width: 800px;
-            margin: 0 auto;
+        .page-header,
+        .workspace {
+            width: min(100%, 1600px);
+            margin-inline: auto;
         }
 
-        .section {
-            max-width: 800px;
-            margin: 0 auto;
+        h1 {
+            margin: 0;
+            font-size: clamp(1.75rem, 4vw, 2.25rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        h3 {
+            margin: 0 0 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .tagline {
+            margin: 0.5rem 0 0;
+            color: var(--muted);
+            font-size: 1.125rem;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+            align-items: start;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 0.75rem;
+            background: rgba(15, 23, 42, 0.72);
+            padding: 1.25rem;
+        }
+
+        .assistant-column {
+            display: grid;
+            gap: 1rem;
         }
 
         #messages {
-            height: 400px;
-            border: 1px solid #ccc;
+            height: 320px;
+            border: 1px solid var(--line);
+            border-radius: 0.375rem;
+            background: var(--bg);
             overflow-y: auto;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 0.75rem;
+            margin: 1rem 0;
         }
 
-        #input-container {
+        #messages:empty::before {
+            content: "👋 Pick a person above, then ask what the processed Wikipedia edits say about them.";
+            color: var(--dim);
+        }
+
+        #messages > div + div {
+            margin-top: 0.75rem;
+        }
+
+        .chat-header {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
         #persons-container {
-            position: relative;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.5rem;
+        }
+
+        .input-with-clear {
+            position: relative;
+            display: flex;
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .input-with-clear input {
+            padding-right: 2.5rem;
+        }
+
+        .input-clear-btn {
+            position: absolute;
+            top: 50%;
+            right: 0.375rem;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--muted);
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .input-clear-btn:hover {
+            background: var(--surface-hover);
+            color: var(--fg);
+        }
+
+        .input-clear-btn[hidden] {
+            display: none;
+        }
+
+        .thinking::after {
+            content: "";
+            animation: thinking-dots 1.2s steps(4, end) infinite;
+        }
+
+        @keyframes thinking-dots {
+            0% {
+                content: "";
+            }
+            25% {
+                content: ".";
+            }
+            50% {
+                content: "..";
+            }
+            75% {
+                content: "...";
+            }
         }
 
         #query-container {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.5rem;
         }
 
-        #persons-input {
-            flex-grow: 1;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
+        #persons-input,
         #query-input {
             flex-grow: 1;
-            padding: 8px;
-            margin-right: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            min-width: 0;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            background: var(--bg);
+            color: var(--fg);
+            padding: 0.625rem 0.75rem;
+            font: inherit;
+        }
+
+        #persons-input::placeholder,
+        #query-input::placeholder {
+            color: var(--dim);
         }
 
         #autocomplete-list {
             position: absolute;
             top: 100%;
             left: 0;
-            right: 100px;
-            background: white;
-            border: 1px solid #ccc;
-            border-top: none;
+            right: 0;
+            margin-top: 0.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
             max-height: 200px;
             overflow-y: auto;
             z-index: 1000;
-            display: none;
+        }
+
+        .autocomplete-item,
+        .autocomplete-empty {
+            padding: 0.625rem 0.75rem;
         }
 
         .autocomplete-item {
-            padding: 10px;
             cursor: pointer;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .autocomplete-empty {
+            color: var(--dim);
         }
 
         .autocomplete-item:hover {
-            background-color: #f0f0f0;
+            background: var(--surface-hover);
         }
 
         .autocomplete-item.selected {
-            background-color: #e6f3ff;
+            background: #164e63;
         }
 
         button {
-            padding: 8px 15px;
-            background: #4CAF50;
-            color: white;
-            border: none;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            background: var(--surface);
+            color: var(--fg);
+            padding: 0.5rem 0.9rem;
+            font: inherit;
             cursor: pointer;
-            border-radius: 4px;
         }
 
         button:hover {
-            background: #45a049;
+            background: var(--surface-hover);
+        }
+
+        :is(button, a, input):focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
         }
 
         .clear-btn {
-            background: #f44336;
-            padding: 8px 12px;
+            border-color: #7f1d1d;
+            color: #fecdd3;
         }
 
         .clear-btn:hover {
-            background: #da190b;
+            background: #450a0a;
+        }
+
+        .clear-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+            background: var(--surface);
         }
 
         .user-message {
-            color: blue;
+            color: var(--info);
         }
 
         .assistant-message {
-            color: green;
+            color: var(--up);
         }
 
         .error {
-            color: red;
-        }
-
-        pre {
-            white-space: pre-wrap;
-            background: #f5f5f5;
-            padding: 10px;
-            border-radius: 5px;
+            color: var(--down);
         }
 
         label {
             font-weight: bold;
-            min-width: 100px;
+            min-width: 6.5rem;
             flex-shrink: 0;
         }
 
         .control-section {
-            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
-        .control-section button {
-            margin-right: 10px;
-            padding: 8px 16px;
+        .remote-ner-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.625rem;
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .remote-ner-toggle input {
+            width: 1.125rem;
+            height: 1.125rem;
+            margin: 0;
+            accent-color: var(--up);
+            cursor: pointer;
+        }
+
+        .remote-ner-toggle input:disabled {
+            cursor: wait;
         }
 
         #statusResult {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 4px;
+            flex-basis: 100%;
+            border-radius: 0.375rem;
+            padding: 0.625rem 0.75rem;
+        }
+
+        #statusResult[data-state='enabled'] {
+            color: var(--up);
+            background: #052e2b;
+        }
+
+        #statusResult[data-state='disabled'] {
+            color: var(--bot);
+            background: #422006;
+        }
+
+        #statusResult[data-state='error'] {
+            color: var(--down);
+            background: #450a0a;
         }
 
         .search-index-btn {
-            background: #2196F3;
-            padding: 8px 16px;
+            border-color: #1d4ed8;
+            color: #bfdbfe;
         }
 
         .search-index-btn:hover {
-            background: #1976D2;
+            background: #172554;
         }
 
-        .links-section {
-            margin: 20px 0;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 4px;
+        .firehose-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1.5rem;
         }
 
-        .links-section h3 {
-            margin-top: 0;
+        .firehose-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 3rem;
+            margin: 0;
+        }
+
+        .firehose-metrics dt {
+            color: var(--dim);
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .firehose-metrics dd {
+            margin: 0;
+            font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+            font-size: 2.25rem;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.1;
+        }
+
+        #firehose-rate {
+            color: var(--up);
+        }
+
+        .firehose-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.75rem;
+        }
+
+        .firehose-connection {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+            color: #cbd5e1;
+        }
+
+        .firehose-dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background: var(--dim);
+        }
+
+        .firehose-dot[data-state='live'] {
+            background: var(--up);
+        }
+
+        .firehose-dot[data-state='reconnecting'] {
+            background: var(--bot);
+        }
+
+        .firehose-dot[data-state='disconnected'] {
+            background: #f43f5e;
+        }
+
+        .firehose-paused {
+            margin: 1rem 0 0;
+            color: var(--bot);
+        }
+
+        .firehose-waiting {
+            margin: 2rem 0 0;
+            color: var(--muted);
+        }
+
+        #firehose-feed {
+            max-height: 650px;
+            margin: 1.5rem 0 0;
+            padding: 0;
+            overflow-y: auto;
+            list-style: none;
+        }
+
+        #firehose-feed li {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            padding: 0.45rem 0;
+            border-bottom: 1px solid var(--line);
+            animation: firehose-row-enter 220ms ease-out;
+        }
+
+        @keyframes firehose-row-enter {
+            from {
+                opacity: 0;
+                transform: translateY(-0.75rem);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .firehose-delta {
+            flex: none;
+            min-width: 4.5rem;
+            color: var(--flat);
+            text-align: right;
+            font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+            font-size: 0.95rem;
+            font-variant-numeric: tabular-nums;
+            text-decoration: none;
+        }
+
+        .firehose-delta[data-dir='up'] {
+            color: var(--up);
+        }
+
+        .firehose-delta[data-dir='down'] {
+            color: var(--down);
+        }
+
+        .firehose-title {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            color: var(--fg);
+            font-size: 0.95rem;
+            text-decoration: none;
+        }
+
+        .firehose-title:hover,
+        .firehose-delta:hover {
+            border-radius: 0.125rem;
+            background: var(--surface-hover);
+        }
+
+        .firehose-title:hover {
+            text-decoration: underline;
+        }
+
+        .firehose-editor {
+            color: var(--muted);
+            font-size: 0.825rem;
+        }
+
+        .firehose-bot-badge {
+            border-radius: 0.125rem;
+            background: rgba(252, 211, 77, 0.15);
+            padding: 0.1rem 0.4rem;
+            color: var(--bot);
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #firehose-feed li {
+                animation: none;
+            }
+        }
+
+        @media (max-width: 960px) {
+            body {
+                padding: 1.5rem 1rem;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            #firehose-feed {
+                max-height: 500px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            #persons-container,
+            #query-container {
+                align-items: stretch;
+                flex-wrap: wrap;
+            }
+
+            #persons-container label,
+            #query-container label {
+                flex-basis: 100%;
+            }
+
+            #firehose-feed li {
+                flex-wrap: wrap;
+            }
         }
     </style>
 </head>
 <body>
-<div id="chat-container">
-    <h3>Chat with currently edited Wikipedia pages</h3>
-    <div id="messages"></div>
-    <div id="input-container">
-        <div id="persons-container">
-            <label for="persons-input">Select Person</label>
-            <input type="text" id="persons-input" placeholder="Start typing to search for persons (or **)">
-            <button class="clear-btn" onclick="clearPersonSelection()">Clear</button>
-            <div id="autocomplete-list"></div>
+<header class="page-header">
+    <h1>WikipediaEditsChat</h1>
+    <p class="tagline">Follow English Wikipedia edits and chat with the edits being processed.</p>
+</header>
+
+<main class="workspace">
+    <section class="panel" aria-labelledby="firehose-heading">
+        <div class="firehose-header">
+            <div>
+                <h2 id="firehose-heading">Live edit firehose</h2>
+                <p class="tagline">English Wikipedia edits as they happen.</p>
+            </div>
+            <dl class="firehose-metrics">
+                <div>
+                    <dt id="firehose-rate-label">Edits per second</dt>
+                    <dd id="firehose-rate" aria-labelledby="firehose-rate-label">0.0</dd>
+                </div>
+                <div>
+                    <dt id="firehose-total-label">Edits this session</dt>
+                    <dd id="firehose-total" aria-labelledby="firehose-total-label">0</dd>
+                </div>
+            </dl>
+            <div class="firehose-controls">
+                <p class="firehose-connection" role="status" aria-label="Stream connection">
+                    <span class="firehose-dot" id="firehose-dot" data-state="connecting" aria-hidden="true"></span>
+                    <span id="firehose-connection-label">Connecting</span>
+                </p>
+                <button type="button" id="firehose-pause" aria-pressed="false">Pause</button>
+            </div>
         </div>
-        <div id="query-container">
-            <label for="query-input">Query</label>
-            <input type="text" id="query-input" placeholder="What do you know about the selected person?">
-            <button onclick="sendQuery()">Send</button>
-        </div>
+
+        <p class="firehose-paused" id="firehose-paused" role="status" aria-label="Feed status" hidden>
+            Paused — the feed is frozen. The counters above are still live.
+        </p>
+        <p class="firehose-waiting" id="firehose-waiting">Connecting to Wikipedia — waiting for the first edit…</p>
+        <ul id="firehose-feed" aria-label="Recent English Wikipedia edits"></ul>
+    </section>
+
+    <div class="assistant-column">
+        <section class="panel" aria-labelledby="chat-heading">
+            <div class="chat-header">
+                <h2 id="chat-heading">Chat with content of edited pages</h2>
+                <button type="button" class="clear-btn" id="clear-chat" disabled>Clear chat</button>
+            </div>
+            <div id="persons-container">
+                <label for="persons-input">Person</label>
+                <div class="input-with-clear">
+                    <input type="text" id="persons-input" placeholder="Type to search persons (or ** for all)"
+                           autocomplete="off">
+                    <button type="button" class="input-clear-btn" id="persons-clear"
+                            aria-label="Clear person" title="Clear person" hidden>×
+                    </button>
+                    <div id="autocomplete-list" hidden></div>
+                </div>
+            </div>
+            <div id="messages" aria-live="polite"></div>
+            <div id="query-container">
+                <label for="query-input">Question</label>
+                <input type="text" id="query-input" placeholder="What do you know about the selected person?">
+                <button type="button" id="send-query">Send</button>
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="processing-heading">
+            <h3 id="processing-heading">NER Processing Control</h3>
+            <div class="control-section">
+                <label class="remote-ner-toggle" for="remote-ner-enabled">
+                    <input type="checkbox" id="remote-ner-enabled" disabled>
+                    <span>Enable remote LLM NER</span>
+                </label>
+                <div id="statusResult" role="status" aria-live="polite">Loading status…</div>
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="links-heading">
+            <h3 id="links-heading">Search Index: <span id="index-count">…</span> Documents</h3>
+            <button type="button" class="search-index-btn" id="open-search-index">Open Search Index</button>
+        </section>
     </div>
-</div>
-<div class="section">
-    <h3>Processing Control</h3>
-    <div class="control-section">
-        <button id="statusBtn" onclick="getProcessingStatus()">Get Status</button>
-        <button id="startBtn" onclick="startProcessing()">Enable Processing</button>
-        <button id="stopBtn" onclick="stopProcessing()">Disable Processing</button>
-        <div id="statusResult"></div>
-        <div id="countResult"></div>
-    </div>
-</div>
-<div class="section">
-    <div class="links-section">
-        <h3>External Links</h3>
-        <button class="search-index-btn" onclick="openSearchIndex()">Search Index</button>
-        <p><small>Opens the Elasticsearch/OpenSearch index in a new tab to browse raw data</small></p>
-    </div>
-</div>
+</main>
 
 <script>
+    const personsInput = document.getElementById('persons-input');
+    const personsClearBtn = document.getElementById('persons-clear');
+    const autocompleteList = document.getElementById('autocomplete-list');
+    const messagesDiv = document.getElementById('messages');
+    const clearChatBtn = document.getElementById('clear-chat');
+    const queryInput = document.getElementById('query-input');
+    const sendQueryBtn = document.getElementById('send-query');
+    const remoteNerToggle = document.getElementById('remote-ner-enabled');
+    const statusDiv = document.getElementById('statusResult');
+    const indexHeading = document.getElementById('links-heading');
+    const indexCountEl = document.getElementById('index-count');
+    const openSearchIndexBtn = document.getElementById('open-search-index');
+
+    const DEFAULT_QUESTION_PLACEHOLDER = queryInput.placeholder;
+    const questionAbout = (name) => `What do you know about ${name}?`;
+
     let selectedPerson = null;
     let autocompleteData = [];
     let currentSelection = -1;
+    let indexCountRequestPending = false;
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const personsInput = document.getElementById('persons-input');
-        const autocompleteList = document.getElementById('autocomplete-list');
-
-        personsInput.addEventListener('input', function () {
-            const query = this.value.trim();
-            if (query.length >= 2) {
-                searchPersons(query);
-            } else {
-                hideAutocomplete();
-            }
-        });
-
-        personsInput.addEventListener('keydown', function (event) {
-            const items = autocompleteList.querySelectorAll('.autocomplete-item');
-
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                currentSelection = Math.min(currentSelection + 1, items.length - 1);
-                updateSelection(items);
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                currentSelection = Math.max(currentSelection - 1, -1);
-                updateSelection(items);
-            } else if (event.key === 'Enter') {
-                event.preventDefault();
-                if (currentSelection >= 0 && items[currentSelection]) {
-                    selectPerson(items[currentSelection].dataset.person);
-                }
-            } else if (event.key === 'Escape') {
-                hideAutocomplete();
-            }
-        });
-
-        document.addEventListener('click', function (event) {
-            if (!personsInput.contains(event.target) && !autocompleteList.contains(event.target)) {
-                hideAutocomplete();
-            }
-        });
-    });
-
-    function searchPersons(query) {
-        fetch('/assistant/personsSearch', {
+    async function fetchJson(url, body) {
+        const options = body === undefined ? {} : {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({query: query}),
-        })
-            .then(response => response.json())
-            .then(data => {
-                autocompleteData = data.persons || [];
-                showAutocomplete(autocompleteData);
-            })
-            .catch(error => {
-                console.error('Error searching persons:', error);
-                hideAutocomplete();
-            });
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        };
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
     }
 
-    function showAutocomplete(persons) {
-        const autocompleteList = document.getElementById('autocomplete-list');
-        autocompleteList.innerHTML = '';
+    // Person selection
+
+    async function searchPersons(query) {
+        try {
+            const data = await fetchJson('/assistant/personsSearch', {query});
+            autocompleteData = data.persons || [];
+            showAutocomplete();
+        } catch (error) {
+            console.error('Error searching persons:', error);
+            hideAutocomplete();
+        }
+    }
+
+    function showAutocomplete() {
+        autocompleteList.replaceChildren();
         currentSelection = -1;
 
-        if (persons.length === 0) {
-            const noResultsItem = document.createElement('div');
-            noResultsItem.className = 'autocomplete-item';
-            noResultsItem.textContent = 'No persons found';
-            noResultsItem.style.color = '#999';
-            autocompleteList.appendChild(noResultsItem);
-        } else {
-            persons.forEach((person) => {
-                const item = document.createElement('div');
-                item.className = 'autocomplete-item';
-                item.textContent = person.name;
-                item.dataset.person = JSON.stringify(person);
-                item.addEventListener('click', () => selectPerson(person));
-                autocompleteList.appendChild(item);
-            });
+        if (autocompleteData.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'autocomplete-empty';
+            empty.textContent = 'No persons found';
+            autocompleteList.append(empty);
         }
 
-        autocompleteList.style.display = 'block';
+        autocompleteData.forEach((person) => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.textContent = person.name;
+            item.addEventListener('click', () => selectPerson(person));
+            autocompleteList.append(item);
+        });
+
+        autocompleteList.hidden = false;
     }
 
     function hideAutocomplete() {
-        const autocompleteList = document.getElementById('autocomplete-list');
-        autocompleteList.style.display = 'none';
+        autocompleteList.hidden = true;
         currentSelection = -1;
     }
 
-    function updateSelection(items) {
-        items.forEach((item, index) => {
+    function updateSelection() {
+        autocompleteList.querySelectorAll('.autocomplete-item').forEach((item, index) => {
             item.classList.toggle('selected', index === currentSelection);
         });
     }
 
-    function selectPerson(person) {
-        if (typeof person === 'string') {
-            person = JSON.parse(person);
-        }
+    function updatePersonsClearButton() {
+        personsClearBtn.hidden = personsInput.value === '';
+    }
 
+    function selectPerson(person) {
         selectedPerson = person;
-        const personsInput = document.getElementById('persons-input');
         personsInput.value = person.name;
+        updatePersonsClearButton();
         hideAutocomplete();
 
-        const queryInput = document.getElementById('query-input');
-        const placeholder = `What do you know about ${person.name}?`;
-        queryInput.placeholder = placeholder;
-        queryInput.value = placeholder;
+        queryInput.placeholder = questionAbout(person.name);
+        queryInput.value = questionAbout(person.name);
+        queryInput.focus();
     }
 
     function clearPersonSelection() {
+        if (selectedPerson && queryInput.value === questionAbout(selectedPerson.name)) {
+            queryInput.value = '';
+        }
         selectedPerson = null;
-        const personsInput = document.getElementById('persons-input');
-        const queryInput = document.getElementById('query-input');
-
         personsInput.value = '';
-        queryInput.placeholder = 'What do you know about the selected person?';
+        queryInput.placeholder = DEFAULT_QUESTION_PLACEHOLDER;
+        updatePersonsClearButton();
         hideAutocomplete();
+        personsInput.focus();
     }
 
-    function sendQuery() {
-        const queryInput = document.getElementById('query-input');
-        const query = queryInput.value.trim();
+    personsInput.addEventListener('input', () => {
+        updatePersonsClearButton();
+        const query = personsInput.value.trim();
+        if (query.length >= 2) {
+            searchPersons(query);
+        } else {
+            hideAutocomplete();
+        }
+    });
 
-        if (query === '') return;
+    personsInput.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            currentSelection = Math.min(currentSelection + 1, autocompleteData.length - 1);
+            updateSelection();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            currentSelection = Math.max(currentSelection - 1, -1);
+            updateSelection();
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (currentSelection >= 0) {
+                selectPerson(autocompleteData[currentSelection]);
+            }
+        } else if (event.key === 'Escape') {
+            hideAutocomplete();
+        }
+    });
 
-        // Include selected person in the query context
-        const queryContext = {
-            query: query,
-            selectedPerson: selectedPerson
-        };
+    personsClearBtn.addEventListener('click', clearPersonSelection);
 
-        const displayQuery = selectedPerson
-            ? `You: ${query} (about ${selectedPerson.name})`
-            : `You: ${query}`;
+    document.addEventListener('click', (event) => {
+        if (!personsInput.contains(event.target) && !autocompleteList.contains(event.target)) {
+            hideAutocomplete();
+        }
+    });
 
-        addMessage(displayQuery, 'user-message');
-        queryInput.value = '';
-
-        fetch('/assistant/query', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(queryContext),
-        })
-            .then(response => response.json())
-            .then(data => {
-                addMessage('Assistant: ' + data.answer, 'assistant-message');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                addMessage('Error: Failed to get response', 'error');
-            });
-    }
+    // Chat
 
     function addMessage(message, className) {
-        const messagesDiv = document.getElementById('messages');
         const messageElement = document.createElement('div');
         messageElement.className = className;
         messageElement.textContent = message;
-        messagesDiv.appendChild(messageElement);
+        messagesDiv.append(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        clearChatBtn.disabled = false;
+        return messageElement;
     }
 
-    document.getElementById('query-input').addEventListener('keypress', function (event) {
+    function clearChat() {
+        messagesDiv.replaceChildren();
+        clearChatBtn.disabled = true;
+        clearPersonSelection();
+    }
+
+    async function sendQuery() {
+        const query = queryInput.value.trim();
+        if (query === '') return;
+
+        addMessage(selectedPerson ? `You: ${query} (about ${selectedPerson.name})` : `You: ${query}`, 'user-message');
+        queryInput.value = '';
+        const thinking = addMessage('Assistant is thinking', 'assistant-message thinking');
+
+        try {
+            const data = await fetchJson('/assistant/query', {query, selectedPerson});
+            thinking.remove();
+            addMessage(`Assistant: ${data.answer}`, 'assistant-message');
+        } catch (error) {
+            console.error('Error sending query:', error);
+            thinking.remove();
+            addMessage('Error: Failed to get response', 'error');
+        }
+    }
+
+    queryInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             sendQuery();
         }
     });
+    sendQueryBtn.addEventListener('click', sendQuery);
+    clearChatBtn.addEventListener('click', clearChat);
+
+    // NER processing control
+
+    function displayStatus(text, state) {
+        statusDiv.textContent = text;
+        statusDiv.dataset.state = state;
+    }
+
+    // Without `enabled` only reads the current status
+    async function syncRemoteNer(enabled) {
+        remoteNerToggle.disabled = true;
+        try {
+            const result = await fetchJson('/assistant/control', enabled === undefined ? undefined : {enabled});
+            remoteNerToggle.checked = result.enabled;
+            displayStatus(`Status: ${result.message}`, result.enabled ? 'enabled' : 'disabled');
+        } catch (error) {
+            if (enabled !== undefined) remoteNerToggle.checked = !enabled;
+            displayStatus(`Error: ${error.message}`, 'error');
+        } finally {
+            remoteNerToggle.disabled = false;
+        }
+    }
+
+    remoteNerToggle.addEventListener('change', () => syncRemoteNer(remoteNerToggle.checked));
+
+    // Search index
 
     async function getIndexCount() {
+        if (indexCountRequestPending) return;
+        indexCountRequestPending = true;
         try {
-            const response = await fetch('/assistant/indexCount');
-            const result = await response.json();
-            displayIndexCount(result.count);
+            const result = await fetchJson('/assistant/indexCount');
+            indexCountEl.textContent = Number(result.count).toLocaleString('en-US');
+            indexHeading.removeAttribute('title');
         } catch (error) {
-            document.getElementById('countResult').innerHTML = `<p style="color: red;">Error fetching index count: ${error.message}</p>`;
+            indexHeading.title = `Unable to update index count: ${error.message}`;
+        } finally {
+            indexCountRequestPending = false;
         }
     }
 
-    function displayIndexCount(count) {
-        const countDiv = document.getElementById('countResult');
-        countDiv.innerHTML = `<p style="color: blue;">Index contains: ${count} documents</p>`;
-        countDiv.style.backgroundColor = '#e6f3ff';
-        countDiv.style.padding = '10px';
-        countDiv.style.borderRadius = '4px';
-        countDiv.style.marginTop = '10px';
-    }
-
-    async function getProcessingStatus() {
+    async function openSearchIndex() {
         try {
-            const response = await fetch('/assistant/control');
-            const result = await response.json();
-            displayStatus(result);
-            await getIndexCount();
+            const data = await fetchJson('/assistant/searchIndexUrl');
+            window.open(data.url, '_blank');
         } catch (error) {
-            document.getElementById('statusResult').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            console.error('Error getting search index URL:', error);
+            indexHeading.title = `Unable to open search index: ${error.message}`;
         }
     }
 
-    async function startProcessing() {
-        await controlProcessing(true);
-    }
+    openSearchIndexBtn.addEventListener('click', openSearchIndex);
 
-    async function stopProcessing() {
-        await controlProcessing(false);
-    }
+    syncRemoteNer();
+    getIndexCount();
+    setInterval(getIndexCount, 1000);
+</script>
+<script>
+    (() => {
+        'use strict';
 
-    async function controlProcessing(enabled) {
-        try {
-            const response = await fetch('/assistant/control', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({enabled: enabled})
-            });
-            const result = await response.json();
-            displayStatus(result);
-        } catch (error) {
-            document.getElementById('statusResult').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        const STREAM_URL = 'https://stream.wikimedia.org/v2/stream/recentchange';
+        const WIKI = 'enwiki';
+        const FEED_CAP = 100;
+        const FLUSH_INTERVAL_MS = 250;
+        const RATE_WINDOW_MS = 10000;
+        const ANONYMOUS = 'Anonymous';
+
+        const feedEl = document.getElementById('firehose-feed');
+        const waitingEl = document.getElementById('firehose-waiting');
+        const rateEl = document.getElementById('firehose-rate');
+        const totalEl = document.getElementById('firehose-total');
+        const dotEl = document.getElementById('firehose-dot');
+        const connectionLabelEl = document.getElementById('firehose-connection-label');
+        const pauseEl = document.getElementById('firehose-pause');
+        const pausedNoticeEl = document.getElementById('firehose-paused');
+
+        let pending = [];
+        let acceptedAt = [];
+        let totalReceived = 0;
+        let isPaused = false;
+
+        const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+        const IPV6_CHARS = /^[0-9a-f:]+$/i;
+
+        function isIpAddress(user) {
+            if (IPV4.test(user)) return true;
+            return user.includes(':') && IPV6_CHARS.test(user);
         }
-    }
 
-    function displayStatus(result) {
-        const statusDiv = document.getElementById('statusResult');
-        const color = result.enabled ? 'green' : 'orange';
-        statusDiv.innerHTML = `<p style="color: ${color};">Status: ${result.message}</p>`;
-        statusDiv.style.backgroundColor = result.enabled ? '#e8f5e8' : '#fff3cd';
-    }
+        function toEditorLabel(user) {
+            return isIpAddress(user) ? ANONYMOUS : user;
+        }
 
-    function openSearchIndex() {
-        fetch('/assistant/searchIndexUrl')
-            .then(response => response.json())
-            .then(data => {
-                window.open(data.url, '_blank');
-            })
-            .catch(error => {
-                console.error('Error getting search index URL:', error);
-                const fallbackUrl = `http://localhost:9200/wikipediaedits/_search?q=personsFoundLocal:*&size=100`;
-                window.open(fallbackUrl, '_blank');
-            });
-    }
+        function formatDelta(delta) {
+            if (delta === 0) return '0';
+            const sign = delta > 0 ? '+' : '−';
+            return sign + Math.abs(delta).toLocaleString('en-US');
+        }
+
+        function toArticleUrl(event) {
+            if (typeof event.meta?.uri === 'string' && event.meta.uri.startsWith('http')) {
+                return event.meta.uri;
+            }
+            if (typeof event.server_url === 'string' && typeof event.title === 'string') {
+                return event.server_url + '/wiki/' + encodeURIComponent(event.title.replace(/ /g, '_'));
+            }
+            return null;
+        }
+
+        function toDiffUrl(event) {
+            const oldRev = event.revision?.old;
+            const newRev = event.revision?.new;
+            if (typeof event.server_url !== 'string') return null;
+            if (typeof oldRev !== 'number' || typeof newRev !== 'number') return null;
+            const scriptPath = typeof event.server_script_path === 'string'
+                ? event.server_script_path
+                : '/w';
+            return `${event.server_url}${scriptPath}/index.php?diff=${newRev}&oldid=${oldRev}`;
+        }
+
+        function parseEditEvent(payload) {
+            if (typeof payload !== 'object' || payload === null) return null;
+            if (payload.wiki !== WIKI || payload.type !== 'edit') return null;
+            if (typeof payload.title !== 'string' || payload.title.length === 0) return null;
+            if (typeof payload.user !== 'string' || payload.user.length === 0) return null;
+
+            const oldLength = payload.length?.old;
+            const newLength = payload.length?.new;
+            if (typeof oldLength !== 'number' || typeof newLength !== 'number') return null;
+
+            const articleUrl = toArticleUrl(payload);
+            const diffUrl = toDiffUrl(payload);
+            if (articleUrl === null || diffUrl === null) return null;
+
+            return {
+                title: payload.title,
+                editor: toEditorLabel(payload.user),
+                delta: newLength - oldLength,
+                isBot: payload.bot === true,
+                articleUrl,
+                diffUrl
+            };
+        }
+
+        function buildRow(row) {
+            const li = document.createElement('li');
+
+            const delta = document.createElement('a');
+            delta.className = 'firehose-delta';
+            delta.href = row.diffUrl;
+            delta.target = '_blank';
+            delta.rel = 'noopener';
+            delta.dataset.dir = row.delta > 0 ? 'up' : row.delta < 0 ? 'down' : 'flat';
+            delta.setAttribute('aria-label', 'Open diff for ' + row.title);
+            delta.textContent = formatDelta(row.delta);
+
+            const title = document.createElement('a');
+            title.className = 'firehose-title';
+            title.href = row.articleUrl;
+            title.target = '_blank';
+            title.rel = 'noopener';
+            title.setAttribute('aria-label', 'Open article ' + row.title);
+            title.textContent = row.title;
+
+            const editor = document.createElement('span');
+            editor.className = 'firehose-editor';
+            editor.textContent = row.editor;
+
+            li.append(delta, title, editor);
+
+            if (row.isBot) {
+                const badge = document.createElement('span');
+                badge.className = 'firehose-bot-badge';
+                badge.textContent = 'bot';
+                li.append(badge);
+            }
+
+            return li;
+        }
+
+        function writeBatch(batch) {
+            const fragment = document.createDocumentFragment();
+            for (let i = batch.length - 1; i >= 0; i -= 1) {
+                fragment.append(buildRow(batch[i]));
+            }
+            feedEl.prepend(fragment);
+
+            while (feedEl.children.length > FEED_CAP) {
+                feedEl.lastElementChild.remove();
+            }
+
+            if (!waitingEl.hidden) waitingEl.hidden = true;
+        }
+
+        setInterval(() => {
+            const cutoff = Date.now() - RATE_WINDOW_MS;
+            acceptedAt = acceptedAt.filter((at) => at > cutoff);
+            rateEl.textContent = (acceptedAt.length / (RATE_WINDOW_MS / 1000)).toFixed(1);
+            totalEl.textContent = totalReceived.toLocaleString('en-US');
+
+            if (pending.length === 0) return;
+            const batch = pending;
+            pending = [];
+            writeBatch(batch);
+        }, FLUSH_INTERVAL_MS);
+
+        pauseEl.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseEl.textContent = isPaused ? 'Resume' : 'Pause';
+            pauseEl.setAttribute('aria-pressed', String(isPaused));
+            pausedNoticeEl.hidden = !isPaused;
+        });
+
+        const CONNECTION_LABELS = {
+            connecting: 'Connecting',
+            live: 'Live',
+            reconnecting: 'Reconnecting',
+            disconnected: 'Disconnected'
+        };
+
+        function setConnectionState(state) {
+            dotEl.dataset.state = state;
+            connectionLabelEl.textContent = CONNECTION_LABELS[state];
+        }
+
+        function handlePayload(payload) {
+            const row = parseEditEvent(payload);
+            if (row === null) return;
+
+            totalReceived += 1;
+            acceptedAt.push(Date.now());
+            if (isPaused) return;
+            pending.push(row);
+        }
+
+        const source = new EventSource(STREAM_URL);
+
+        source.addEventListener('open', () => {
+            setConnectionState('live');
+        });
+
+        source.addEventListener('message', (event) => {
+            try {
+                handlePayload(JSON.parse(event.data));
+            } catch {
+                // Ignore unparseable or incomplete stream events.
+            }
+        });
+
+        source.addEventListener('error', () => {
+            setConnectionState(source.readyState === EventSource.CLOSED ? 'disconnected' : 'reconnecting');
+        });
+
+        window.firehose = {
+            inject: handlePayload,
+            setConnectionState,
+            state: () => ({totalReceived, isPaused, rows: feedEl.children.length})
+        };
+    })();
 </script>
 </body>
 </html>

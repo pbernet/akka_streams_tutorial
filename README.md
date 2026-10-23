@@ -181,33 +181,33 @@ test [AlpakkaTrophySpec](src/test/scala/alpakka/tcp_to_websockets/AlpakkaTrophyS
 
 ## Analyse Wikipedia edits live stream ##
 
-> **Respect new Wikimedia API rate limits**  
-> As of beginning of 2026 there are new [rate limits](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)
-> See `WikipediaEditsAnalyser#nerProcessingFlow` how pekko-streams can handle this gracefully
+> **Respect the Wikimedia API [rate limits](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)**.
+> `WikipediaEditsAnalyser#nerProcessingFlow` throttles to 180 requests/min and drops the oldest edits when the backlog
+> grows.
 
-Find out whose Wikipedia articles were changed in (near) real time by consuming
-the [Wikipedia Edits stream provided via SSE](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams).
-The class [WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/WikipediaEditsAnalyser.scala) implements
-the following workflow:
+See which persons appear in English Wikipedia articles while they are being edited, and chat about them.
+[WikipediaEditsAnalyser](src/main/scala/alpakka/sse_to_elasticsearch/WikipediaEditsAnalyser.scala) consumes the
+[Wikipedia edits SSE stream](https://wikitech.wikimedia.org/wiki/Event_Platform/EventStreams), finds persons with two
+NER
+engines and makes the results searchable and chattable.
 
-Use the `title` as identifier to fetch the `extract` from the Wikipedia API,
-e.g.
-for [Douglas Adams](https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exlimit=max&explaintext&exintro&titles=Douglas_Adams).
+```mermaid
+flowchart LR
+  SSE["Wikipedia edits<br/>SSE stream"] --> F["Filter<br/>enwiki, no bots"]
+  F --> T["Throttle<br/>180/min"]
+  T --> W["Fetch extract<br/>Wikipedia API"]
+  W --> L["Local NER<br/>GLiNER, fallback OpenNLP"]
+  L --> R["Remote NER<br/>OpenAI<br/>gpt-6-luna"]
+  R --> OS[("OpenSearch<br/>one doc per article")]
+  R --> E[("Embeddings<br/>in-memory")]
+  OS <-- person search --> GUI["Web GUI<br/>http://localhost:8080/assistant"]
+  E <-- RAG chat --> GUI
+  click GUI href "http://localhost:8080/assistant" _blank
+```
 
-NER processing on the `extract` / `content`
-
-* Local using [opennlp](https://opennlp.apache.org/docs/2.3.3/manual/opennlp.html) / GLiNER -> `personsFoundLocal`
-* Remote using OpenAI `GPT_4_O_MINI` -> `personsFoundRemote`
-
-processed content is added to the `wikipediaedits` Opensearch Index.
-
-All persons found (local and remote) can be viewed in the Index with a Browser, e.g.
-`http://localhost:{mappedPort}/wikipediaedits/_search?q=personsFoundLocal:*`
-
-Also, all `content` is transformed into embeddings using [LangChain4j](https://docs.langchain4j.dev)
-`BgeSmallEnV15QuantizedEmbeddingModel` to a local
-`InMemoryEmbeddingStore` to be able to RAG chat against the `content` of the currently edited Wikipedia pages via a
-local AI Assistant `http://localhost:8080/assistant`
+1. Start Docker and the GLiNER service: `docker compose up -d gliner-ner` in `docker/`
+2. Set the environment variable `OPENAI_API_KEY`
+3. Run `WikipediaEditsAnalyser` and wait 20s until the [Web GUI](http://localhost:8080/assistant) opens
 
 ## Movie subtitle translation via LLMs ##
 
