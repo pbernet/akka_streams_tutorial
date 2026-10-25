@@ -69,4 +69,43 @@ class SubtitleTranslatorSpec extends AnyFunSuite with Matchers with BeforeAndAft
     val b2 = block(3000, 4000) // gap = 2000 ms < 5000 ms
     group(maxGap = 5000, b1, b2) shouldBe Seq(List(b1, b2))
   }
+
+  private val scene = List(
+    SubtitleBlock(60000, 62000, Seq("Where are you going?")),
+    SubtitleBlock(62300, 63500, Seq("Home.")),
+    SubtitleBlock(63800, 65000, Seq("Wait for me!")))
+
+  private val sceneTranslated = Seq(
+    (60000, 62000, "Wohin gehst du?"),
+    (62300, 63500, "Nach Hause."),
+    (63800, 65000, "Warte auf mich!"))
+
+  private val correctResponse = "Wohin gehst du?\n\nNach Hause.\n\nWarte auf mich!"
+  // The LLM merged "Home." into the first line
+  private val tooFewLinesResponse = "Wohin gehst du? Nach Hause.\n\nWarte auf mich!"
+  // The LLM added a preamble despite the output rules
+  private val tooManyLinesResponse = "Hier ist die Übersetzung:\n\n" + correctResponse
+
+  private def translate(defaultResponse: String, fallbackModel: String => String): Seq[(Long, Long, String)] =
+    SubtitleTranslator.translateAligned(scene, "prompt", _ => defaultResponse, fallbackModel)
+      .map { case (b, line) => (b.start, b.end, line) }
+
+  test("translate: one line per block from default model is used, fallback model is not called") {
+    translate(correctResponse, _ => fail("fallback model must not be called")) shouldBe sceneTranslated
+  }
+
+  test("translate: fewer lines from default model fall back to fallback model") {
+    translate(tooFewLinesResponse, _ => correctResponse) shouldBe sceneTranslated
+  }
+
+  test("translate: more lines from default model fall back to fallback model") {
+    translate(tooManyLinesResponse, _ => correctResponse) shouldBe sceneTranslated
+  }
+
+  test("translate: no plausible translation from both models keeps the original scene") {
+    translate(tooFewLinesResponse, _ => tooManyLinesResponse) shouldBe Seq(
+      (60000, 62000, "Where are you going?"),
+      (62300, 63500, "Home."),
+      (63800, 65000, "Wait for me!"))
+  }
 }

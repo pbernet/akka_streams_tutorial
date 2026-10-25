@@ -1,5 +1,6 @@
 package tools
 
+import org.apache.commons.lang3.tuple.ImmutablePair
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{FileIO, Flow, Source}
 import org.apache.pekko.stream.{IOResult, ThrottleMode}
@@ -32,6 +33,8 @@ import scala.util.{Failure, Success}
   * Similar to: [[sample.stream.SessionWindow]]
   */
 object SubtitleTranslator {
+  private val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
   private[tools] def groupByScene(maxGap: Int) =
     Flow[SubtitleBlock].statefulMap(() => List.empty[SubtitleBlock])(
       (scene, next) => {
@@ -42,8 +45,37 @@ object SubtitleTranslator {
       scene => Some(scene)
     ).filter(_.nonEmpty)
 
+  /**
+    * Translate a scene and pair each translated line with the original block at the same position, whose timestamps it takes.
+    * A translation is only used when it has one line per block:
+    *  - first with the default model
+    *  - then with the fallback model
+    *  - else the original scene is kept, so that no block is lost or duplicated
+    *
+    * @param defaultModel  prompt => response text
+    * @param fallbackModel prompt => response text
+    */
+  private[tools] def translateAligned(sceneOrig: List[SubtitleBlock], prompt: String,
+                                      defaultModel: String => String, fallbackModel: String => String): Seq[(SubtitleBlock, String)] = {
+    def plausibleLines(model: String => String): Option[Seq[String]] =
+      Some(nonEmptyLines(model(prompt))).filter(_.size == sceneOrig.size)
+
+    plausibleLines(defaultModel)
+      .orElse {
+        logger.info("Translation with default model is not plausible, lines do not match. Fallback to fallback model")
+        plausibleLines(fallbackModel)
+      } match {
+      case Some(lines) => sceneOrig.zip(lines)
+      case None =>
+        logger.warn(s"Translation with fallback model is not plausible, lines do not match. Keep original text of scene: ${sceneOrig.head.startTime} --> ${sceneOrig.last.endTime}")
+        sceneOrig.map(block => (block, block.allLines))
+    }
+  }
+
+  private def nonEmptyLines(text: String): Seq[String] =
+    text.split("\n").toSeq.filterNot(_.isEmpty)
+
   def main(args: Array[String]): Unit = {
-    val logger: Logger = LoggerFactory.getLogger(this.getClass)
     implicit val system: ActorSystem = ActorSystem()
     implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
@@ -63,7 +95,6 @@ object SubtitleTranslator {
 
     // Tuning params
     val maxGap = 1000 // gap time in ms between two scenes (= session windows)
-    val endLineTag = "\n"
     val maxCharPerTranslatedLine = 40
     val conversationPrefix = "-"
 
@@ -95,25 +126,11 @@ object SubtitleTranslator {
       val toTranslate = generateTranslationPrompt(sceneOrig.map(_.allLinesEnd).mkString)
       logger.info(s"Translation prompt: $toTranslate")
 
-      val firstShot = defaultModel.runCompletions(toTranslate)
-      val translated =
-        if (isTranslationPlausible(firstShot.getLeft, sceneOrig.size)) firstShot
-        else {
-          logger.info(s"Translation with: $defaultModel is not plausible, lines do not match. Fallback to: $fallbackModel")
-          fallbackModel.runCompletions(toTranslate)
-        }
+      val aligned = translateAligned(sceneOrig, toTranslate,
+        prompt => responseText(defaultModel.runCompletions(prompt)),
+        prompt => responseText(fallbackModel.runCompletions(prompt)))
 
-      totalTokensUsed += translated.getRight
-      logger.debug("Response text: {}", translated.getLeft)
-
-      val sceneTranslated = nonEmptyLines(translated.getLeft).zipWithIndex.map { case (line, i) =>
-        val origBlock =
-          if (sceneOrig.isDefinedAt(i)) sceneOrig(i)
-          else {
-            // Root cause: No plausible translation e.g. due to added lines at beginning or at end of response
-            logger.warn(s"This should not happen: sceneOrig has size: ${sceneOrig.size} but access to element: $i requested. Fallback to last original block")
-            sceneOrig.last
-          }
+      val sceneTranslated = aligned.map { case (origBlock, line) =>
         val block = origBlock.copy(lines = massageResultText(line))
         logger.info(s"Translated block to: ${block.allLines}")
         block
@@ -123,11 +140,11 @@ object SubtitleTranslator {
       sceneTranslated
     }
 
-    def nonEmptyLines(text: String): Array[String] =
-      text.split(endLineTag).filterNot(_.isEmpty)
-
-    def isTranslationPlausible(rawResponseText: String, originalSize: Int) =
-      nonEmptyLines(rawResponseText).length == originalSize
+    def responseText(result: ImmutablePair[String, Integer]): String = {
+      totalTokensUsed += result.getRight
+      logger.debug("Response text: {}", result.getLeft)
+      result.getLeft
+    }
 
     def generateTranslationPrompt(text: String) =
       s"""
