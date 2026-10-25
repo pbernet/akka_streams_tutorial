@@ -22,8 +22,8 @@ import scala.util.{Failure, Success}
   *
   * Usage:
   *  - Wire Params, e.g. sourceFilePath
-  *  - Decide, whether to use optional context to streamline translation
-  *  - Add API_KEY in [[AnthropicCompletions]], [[OpenAICompletions]] and then run this class
+  *  - Decide, whether to use optional movie context to improve translation quality
+  *  - Env vars: OPENAI_API_KEY for [[OpenAICompletions]], ANTHROPIC_API_KEY for [[AnthropicCompletions]]
   *  - Scan log for WARN log messages and improve corresponding blocks in target file manually
   *
   * Remarks:
@@ -57,8 +57,9 @@ object SubtitleTranslator {
     val movieTitle = "Bob Marley - One Love"
     val movieReleaseYear = 2024
 
-    val defaultModel = if (useContext) OpenAICompletions.withContext(movieTitle, movieReleaseYear) else new OpenAICompletions()
-    val fallbackModel = if (useContext) AnthropicCompletions.withContext(movieTitle, movieReleaseYear) else new AnthropicCompletions()
+    val movieContext = Option.when(useContext)(OpenAICompletions.generateMovieContext(movieTitle, movieReleaseYear))
+    val defaultModel = movieContext.map(OpenAICompletions.withContext).getOrElse(new OpenAICompletions())
+    val fallbackModel = movieContext.map(AnthropicCompletions.withContext).getOrElse(new AnthropicCompletions())
 
     // Tuning params
     val maxGap = 1000 // gap time in ms between two scenes (= session windows)
@@ -215,7 +216,7 @@ object SubtitleTranslator {
         logger.info(s"Flow Success. Finished writing to target file: $targetFilePath. Around $totalTokensUsed tokens used. About to terminate...")
         system.terminate()
       case Failure(e) =>
-        logger.info(s"Flow Failure: $e. Partial translations are in target file: $targetFilePath About to terminate...")
+        logger.error(s"Flow Failure. Partial translations are in target file: $targetFilePath. About to terminate...", e)
         system.terminate()
     }
   }

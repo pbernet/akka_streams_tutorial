@@ -14,6 +14,8 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 
 /**
   * Run with a reasonably well formatted .srt file in UTF-8 encoding
+  * Line endings follow the file (LF or CRLF), not the platform,
+  * hence CR chars are dropped before framing
   *
   * @param sourceFilePath
   */
@@ -22,12 +24,10 @@ class SrtParser(sourceFilePath: String) {
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  val ls: String = sys.props("line.separator")
-
   private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss,SSS")
 
   private val frameByEmptyLine = Framing.delimiter(
-    ByteString(ls + ls),
+    ByteString("\n\n"),
     maximumFrameLength = 2048,
     allowTruncation = true)
 
@@ -35,13 +35,14 @@ class SrtParser(sourceFilePath: String) {
     LocalTime.parse(value, timeFormatter).toNanoOfDay / 1_000_000
 
   private def convertTo(raw: String) = {
-    val parts = raw.split(ls)
+    val parts = raw.split("\n")
     val times = parts(1).split("""\s*-->\s*""")
     SubtitleBlock(toMillisOfDay(times(0)), toMillisOfDay(times(1)), parts.drop(2).toList)
   }
 
   val source: Source[SubtitleBlock, Any] =
     StreamConverters.fromInputStream(() => new FileInputStream(sourceFilePath))
+      .map(_.filterNot(_ == '\r'))
       .via(frameByEmptyLine)
       .map(_.utf8String)
       .map(convertTo)
@@ -74,6 +75,12 @@ class SrtParser(sourceFilePath: String) {
 object SrtParser {
   def apply(sourceFilePath: String): SrtParser = new SrtParser(sourceFilePath)
 
+  /**
+    * Helper to fix a timing mismatch between the movie audio and the subtitle timestamps.
+    * Shifts all timestamps of sourceFilePath by shiftBy and writes the result to targetFilePath.
+    *
+    * @param shiftBy offset in milliseconds (positive = subtitles appear later, negative = earlier)
+    */
   def timeShift(sourceFilePath: String, targetFilePath: String, shiftBy: Long): Unit =
     new SrtParser(sourceFilePath).timeShift(targetFilePath, shiftBy)
 
@@ -90,7 +97,6 @@ object SrtParser {
 case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val endLineTag = "\n" // for openAI API
-  val ls: String = sys.props("line.separator") // for file IO
 
   def allLines: String = lines.mkString(" ")
 
@@ -98,8 +104,8 @@ case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
 
   def formatOutBlock(blockCounter: Long): String = {
     // Spec: https://wiki.videolan.org/SubRip
-    val out = s"$blockCounter$ls$startTime --> $endTime$ls${lines.mkString("\n")}$ls$ls"
-    logger.info(s"Writing block:$ls {}", out)
+    val out = s"$blockCounter\n$startTime --> $endTime\n${lines.mkString("\n")}\n\n"
+    logger.info("Writing block:\n{}", out)
     out
   }
 

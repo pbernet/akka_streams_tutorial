@@ -16,7 +16,7 @@ class SrtParserSpec extends AnyFunSuite with Matchers {
   }
 
   private def tempSrtWith(content: String): String = {
-    val p = tempPath("invalid")
+    val p = tempPath("tmp")
     Files.writeString(p, content)
     p.toString
   }
@@ -68,12 +68,45 @@ class SrtParserSpec extends AnyFunSuite with Matchers {
     }
   }
 
+  test("parse srt file with LF or CRLF line endings, independent of platform") {
+    def srtWith(nl: String) =
+      Seq("1", "00:00:01,000 --> 00:00:04,000", "First line", "Second line", "",
+        "2", "00:00:05,500 --> 00:00:06,000", "Last line", "").mkString(nl)
+
+    val expected = Seq(
+      SubtitleBlock(1000, 4000, Seq("First line", "Second line")),
+      SubtitleBlock(5500, 6000, Seq("Last line")))
+
+    new SrtParser(tempSrtWith(srtWith("\n"))).runSync() shouldBe expected
+    new SrtParser(tempSrtWith(srtWith("\r\n"))).runSync() shouldBe expected
+  }
+
   test("timeShift forward shifts all timestamps by positive offset") {
     assertTimeShift(5000L)
   }
 
   test("timeShift backward shifts all timestamps by negative offset") {
     assertTimeShift(-1000L)
+  }
+
+  test("timeShift helper writes shifted timestamps to target file, clamped at zero") {
+    val src = tempSrtWith(
+      "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n" +
+        "2\n00:59:58,800 --> 00:59:59,900\nWorld\n")
+
+    def shifted(shiftBy: Long) = {
+      val target = tempPath(s"helper_shifted_$shiftBy")
+      SrtParser.timeShift(src, target.toString, shiftBy)
+      Files.readString(target)
+    }
+
+    shifted(1500) shouldBe
+      "1\n00:00:02,500 --> 00:00:03,500\nHello\n\n" +
+        "2\n01:00:00,300 --> 01:00:01,400\nWorld\n\n"
+
+    shifted(-1500) shouldBe
+      "1\n00:00:00,000 --> 00:00:00,500\nHello\n\n" +
+        "2\n00:59:57,300 --> 00:59:58,400\nWorld\n\n"
   }
 
   private def assertTimeShift(shiftBy: Long): Unit = {

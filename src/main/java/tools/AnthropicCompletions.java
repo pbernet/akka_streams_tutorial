@@ -20,45 +20,39 @@ import java.time.Duration;
  */
 public class AnthropicCompletions {
     private static final Logger LOGGER = LoggerFactory.getLogger(AnthropicCompletions.class);
-    // Add your API key
-    public static final String API_KEY = "***";
 
     // https://docs.anthropic.com/en/docs/about-claude/models/overview#model-comparison-table
-    public static final String MODEL_NAME = "claude-sonnet-4-6";
+    public static final String MODEL_NAME = "claude-sonnet-5-5";
 
     private final ChatModel model;
-    private final String moviePlotContext;
+    private final String systemMessage;
 
     public AnthropicCompletions() {
         this(CompletionsUtil.DEFAULT_TRANSLATOR_SYSTEM_MESSAGE);
     }
 
-    private AnthropicCompletions(String moviePlotContext) {
+    private AnthropicCompletions(String systemMessage) {
         this.model = AnthropicChatModel.builder()
-                .apiKey(API_KEY)
+                .apiKey(apiKey())
                 .modelName(MODEL_NAME)
-                .temperature(0.2)
-                .cacheSystemMessages(true)
-                .cacheTools(true)
                 .maxTokens(8192)
                 .maxRetries(10)
                 .timeout(Duration.ofMinutes(5))
                 .build();
-        this.moviePlotContext = moviePlotContext;
+        this.systemMessage = systemMessage;
     }
 
     /**
-     * Creates a new AnthropicCompletions instance with movie context information.
+     * Generates movie context information to improve translation quality.
      *
      * @param movieTitle       The title of the movie
      * @param movieReleaseYear The release year of the movie
-     * @return A new AnthropicCompletions instance with the resolved movie plot context
+     * @return The generated movie context
      */
-    public static AnthropicCompletions withContext(String movieTitle, int movieReleaseYear) {
+    public static String generateMovieContext(String movieTitle, int movieReleaseYear) {
         ChatModel contextModel = AnthropicChatModel.builder()
-                .apiKey(API_KEY)
+                .apiKey(apiKey())
                 .modelName(MODEL_NAME)
-                .temperature(0.1)
                 .maxTokens(1024)
                 .build();
 
@@ -70,12 +64,30 @@ public class AnthropicCompletions {
         String movieContext = response.aiMessage().text();
         LOGGER.info("Generated movie context with: {} for: {} ({}):\n{}", MODEL_NAME, movieTitle, movieReleaseYear, movieContext);
 
-        return new AnthropicCompletions(movieContext);
+        return movieContext;
+    }
+
+    /**
+     * Creates a new AnthropicCompletions instance with movie context information.
+     *
+     * @param movieContext The movie context, e.g. from {@link #generateMovieContext(String, int)}
+     * @return A new AnthropicCompletions instance with the movie context in its system message
+     */
+    public static AnthropicCompletions withContext(String movieContext) {
+        return new AnthropicCompletions(CompletionsUtil.createTranslatorSystemMessage(movieContext));
+    }
+
+    private static String apiKey() {
+        String apiKey = System.getenv("ANTHROPIC_API_KEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("ANTHROPIC_API_KEY environment variable not set!");
+        }
+        return apiKey;
     }
 
     public ImmutablePair<String, Integer> runCompletions(String prompt) {
         ChatResponse response = model.chat(
-                SystemMessage.systemMessage(moviePlotContext),
+                SystemMessage.systemMessage(systemMessage),
                 UserMessage.from(prompt)
         );
         return new ImmutablePair<>(response.aiMessage().text(), response.tokenUsage().totalTokenCount());
@@ -87,7 +99,7 @@ public class AnthropicCompletions {
         ImmutablePair<String, Integer> result = new AnthropicCompletions().runCompletions(prompt);
         CompletionsUtil.logCompletionResult(result.getLeft(), result.getRight(), "Translation");
 
-        ImmutablePair<String, Integer> resultWithContext = AnthropicCompletions.withContext("The Hangover", 2009).runCompletions(prompt);
+        ImmutablePair<String, Integer> resultWithContext = AnthropicCompletions.withContext(AnthropicCompletions.generateMovieContext("The Hangover", 2009)).runCompletions(prompt);
         CompletionsUtil.logCompletionResult(resultWithContext.getLeft(), resultWithContext.getRight(), "Translation with context");
     }
 

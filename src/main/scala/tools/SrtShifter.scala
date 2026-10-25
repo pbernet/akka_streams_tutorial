@@ -24,6 +24,6 @@ object SrtShifter {
       logger.info(s"Using defaults: sourceFilePath=$sourceFilePath, targetFilePath=$targetFilePath, shiftBy=$shiftBy")
 
     logger.info(s"Shifting: '$sourceFilePath' by: $shiftBy ms -> '$targetFilePath'")
-    new SrtParser(sourceFilePath).timeShift(targetFilePath, shiftBy)
+    SrtParser.timeShift(sourceFilePath, targetFilePath, shiftBy)
 }
 }

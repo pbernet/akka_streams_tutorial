@@ -12,7 +12,17 @@ public class CompletionsUtil {
     /**
      * Default system message for translation tasks
      */
-    public static final String DEFAULT_TRANSLATOR_SYSTEM_MESSAGE = "You are a translator";
+    public static final String DEFAULT_TRANSLATOR_SYSTEM_MESSAGE = "You are a translator for movie subtitles. Only respond with translated text.";
+
+    /**
+     * Creates the translator system message enriched with movie context
+     *
+     * @param movieContext Movie context, as generated from {@link #createMovieContextPrompt(String, int)}
+     * @return Translator system message including the movie context
+     */
+    public static String createTranslatorSystemMessage(String movieContext) {
+        return DEFAULT_TRANSLATOR_SYSTEM_MESSAGE + "\n\nMovie context:\n" + movieContext;
+    }
 
     /**
      * Creates a translation prompt

@@ -20,43 +20,44 @@ import java.time.Duration;
  */
 public class OpenAICompletions {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenAICompletions.class);
-    // Add your API key, see: https://platform.openai.com/api-keys
-    public static final String API_KEY = "***";
 
-    public static final String MODEL_NAME = "gpt-4o";
+    public static final String MODEL_NAME = "gpt-6-luna";
+    public static final String REASONING_EFFORT = "none";
 
     private final ChatModel model;
-    private final String moviePlotContext;
+    private final String systemMessage;
 
     public OpenAICompletions() {
         this(CompletionsUtil.DEFAULT_TRANSLATOR_SYSTEM_MESSAGE);
     }
 
-    private OpenAICompletions(String moviePlotContext) {
+    private OpenAICompletions(String systemMessage) {
         this.model = OpenAiChatModel.builder()
-                .apiKey(API_KEY)
+                .apiKey(apiKey())
                 .modelName(MODEL_NAME)
+                .reasoningEffort(REASONING_EFFORT)
                 .temperature(0.2)
-                .maxTokens(4096)
+                .maxCompletionTokens(4096)
                 .maxRetries(10)
                 .timeout(Duration.ofMinutes(5))
                 .build();
-        this.moviePlotContext = moviePlotContext;
+        this.systemMessage = systemMessage;
     }
 
     /**
-     * Creates a new OpenAICompletions instance with movie context information.
+     * Generates movie context information to improve translation quality.
      *
      * @param movieTitle       The title of the movie
      * @param movieReleaseYear The release year of the movie
-     * @return A new OpenAICompletions instance with the resolved movie plot context
+     * @return The generated movie context
      */
-    public static OpenAICompletions withContext(String movieTitle, int movieReleaseYear) {
+    public static String generateMovieContext(String movieTitle, int movieReleaseYear) {
         ChatModel contextModel = OpenAiChatModel.builder()
-                .apiKey(API_KEY)
+                .apiKey(apiKey())
                 .modelName(MODEL_NAME)
+                .reasoningEffort(REASONING_EFFORT)
                 .temperature(0.2)
-                .maxTokens(1024)
+                .maxCompletionTokens(1024)
                 .build();
 
         String contextPrompt = CompletionsUtil.createMovieContextPrompt(movieTitle, movieReleaseYear);
@@ -67,12 +68,30 @@ public class OpenAICompletions {
         String movieContext = response.aiMessage().text();
         LOGGER.info("Generated movie context with: {} for: {} ({}):\n{}", MODEL_NAME, movieTitle, movieReleaseYear, movieContext);
 
-        return new OpenAICompletions(movieContext);
+        return movieContext;
+    }
+
+    /**
+     * Creates a new OpenAICompletions instance with movie context information.
+     *
+     * @param movieContext The movie context, e.g. from {@link #generateMovieContext(String, int)}
+     * @return A new OpenAICompletions instance with the movie context in its system message
+     */
+    public static OpenAICompletions withContext(String movieContext) {
+        return new OpenAICompletions(CompletionsUtil.createTranslatorSystemMessage(movieContext));
+    }
+
+    private static String apiKey() {
+        String apiKey = System.getenv("OPENAI_API_KEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("OPENAI_API_KEY environment variable not set!");
+        }
+        return apiKey;
     }
 
     public ImmutablePair<String, Integer> runCompletions(String prompt) {
         ChatResponse response = model.chat(
-                SystemMessage.systemMessage(moviePlotContext),
+                SystemMessage.systemMessage(systemMessage),
                 UserMessage.from(prompt)
         );
         return new ImmutablePair<>(response.aiMessage().text(), response.tokenUsage().totalTokenCount());
@@ -84,7 +103,7 @@ public class OpenAICompletions {
         ImmutablePair<String, Integer> result = new OpenAICompletions().runCompletions(prompt);
         CompletionsUtil.logCompletionResult(result.getLeft(), result.getRight(), "Translation");
 
-        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext("Bob Marley - One Love", 2024).runCompletions(prompt);
+        ImmutablePair<String, Integer> resultWithContext = OpenAICompletions.withContext(OpenAICompletions.generateMovieContext("Bob Marley - One Love", 2024)).runCompletions(prompt);
         CompletionsUtil.logCompletionResult(resultWithContext.getLeft(), resultWithContext.getRight(), "Translation with context");
     }
 
