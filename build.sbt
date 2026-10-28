@@ -20,7 +20,7 @@ val awsClientVersion = "2.47.4"
 val gatlingVersion = "3.14.9"
 val circeVersion = "0.14.14"
 
-val langchain4jVersion = "1.22.0"
+val langchain4jVersion = "1.23.0"
 val langchain4jEmbeddingsVersion = "1.22.0-beta32"
 val mcpSdkVersion = "2.0.0"
 val doclingJavaVersion = "0.5.1"
