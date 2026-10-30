@@ -110,9 +110,9 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-lang3" % "3.18.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "5.0.15",
 
-  "org.apache.camel" % "camel-core" % "4.16.0",
-  "org.apache.camel" % "camel-seda" % "4.16.0",
-  "org.apache.camel" % "camel-reactive-streams" % "4.16.0",
+  "org.apache.camel" % "camel-core" % "4.23.0",
+  "org.apache.camel" % "camel-seda" % "4.23.0",
+  "org.apache.camel" % "camel-reactive-streams" % "4.23.0",
   "io.projectreactor" % "reactor-core" % "3.8.7",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.12",
 
