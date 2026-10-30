@@ -26,7 +26,7 @@ val mcpSdkVersion = "2.0.0"
 val doclingJavaVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.3.0",
 
   "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
   "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
