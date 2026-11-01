@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SubtitleTranslator</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --surface: #0f172a;
+            --surface-hover: #1e293b;
+            --fg: #f1f5f9;
+            --muted: #94a3b8;
+            --dim: #64748b;
+            --line: #1e293b;
+            --border: #334155;
+            --up: #34d399;
+            --down: #fb7185;
+            --warn: #fcd34d;
+            --focus: #34d399;
+            --info: #60a5fa;
+            --mono: ui-monospace, "Cascadia Code", Menlo;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 2.5rem 2rem;
+            background: var(--bg);
+            color: var(--fg);
+            font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        .page-header,
+        .workspace {
+            width: min(100%, 1600px);
+            margin-inline: auto;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.75rem, 4vw, 2.25rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .tagline {
+            margin: 0.5rem 0 0;
+            color: var(--muted);
+            font-size: 1.125rem;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+            align-items: start;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 0.75rem;
+            background: rgba(15, 23, 42, 0.72);
+            padding: 1.25rem;
+        }
+
+        .panel-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            background: var(--surface);
+            color: var(--fg);
+            padding: 0.5rem 0.9rem;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--surface-hover);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: default;
+            background: var(--surface);
+        }
+
+        :is(button, a, input, select, textarea, .drop-zone):focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        .primary-btn {
+            border-color: #047857;
+            color: #a7f3d0;
+        }
+
+        .primary-btn:hover:not(:disabled) {
+            background: #052e2b;
+        }
+
+        input[type='text'],
+        input[type='number'],
+        select,
+        textarea {
+            min-width: 0;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            background: var(--bg);
+            color: var(--fg);
+            padding: 0.625rem 0.75rem;
+            font: inherit;
+        }
+
+        ::placeholder {
+            color: var(--dim);
+        }
+
+        label {
+            font-weight: bold;
+            min-width: 8.5rem;
+            flex-shrink: 0;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .form-row > input,
+        .form-row > select {
+            flex-grow: 1;
+        }
+
+        /* Translation */
+
+        .drop-zone {
+            display: grid;
+            place-items: center;
+            gap: 0.25rem;
+            min-height: 150px;
+            border: 2px dashed var(--border);
+            border-radius: 0.5rem;
+            background: var(--bg);
+            padding: 1.25rem;
+            text-align: center;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .drop-zone:hover,
+        .drop-zone[data-drag-over="true"] {
+            border-color: var(--up);
+            color: var(--fg);
+        }
+
+        .drop-zone[data-state='selected'] {
+            border-style: solid;
+            border-color: #047857;
+        }
+
+        .drop-zone strong {
+            color: var(--fg);
+            font-size: 1.125rem;
+            word-break: break-all;
+        }
+
+        .drop-zone .hint {
+            color: var(--dim);
+            font-size: 0.875rem;
+        }
+
+        .context-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.625rem;
+            margin-top: 1.25rem;
+            cursor: pointer;
+        }
+
+        .context-toggle input {
+            width: 1.125rem;
+            height: 1.125rem;
+            margin: 0;
+            accent-color: var(--up);
+        }
+
+        .context-fields {
+            border-left: 2px solid var(--line);
+            margin-left: 0.5rem;
+            padding-left: 1rem;
+        }
+
+        .context-fields[hidden] {
+            display: none;
+        }
+
+        #movie-year {
+            flex-grow: 0;
+            width: 8rem;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        #form-error {
+            color: var(--down);
+        }
+
+        /* Status */
+
+        .phase {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+            color: #cbd5e1;
+        }
+
+        .phase-dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background: var(--dim);
+        }
+
+        .phase-dot[data-phase='preparing'],
+        .phase-dot[data-phase='translating'] {
+            background: var(--info);
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        .phase-dot[data-phase='done'] {
+            background: var(--up);
+        }
+
+        .phase-dot[data-phase='failed'] {
+            background: #f43f5e;
+        }
+
+        @keyframes pulse {
+            50% {
+                opacity: 0.35;
+            }
+        }
+
+        .metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 3rem;
+            margin: 0;
+        }
+
+        .metrics dt {
+            color: var(--dim);
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .metrics dd {
+            margin: 0;
+            font-family: var(--mono), monospace;
+            font-size: 2.25rem;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.1;
+        }
+
+        #metric-scenes {
+            color: var(--up);
+        }
+
+        .progress {
+            height: 0.5rem;
+            margin-top: 1.25rem;
+            border-radius: 999px;
+            background: var(--line);
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0;
+            height: 100%;
+            background: var(--up);
+            transition: width 0.3s ease;
+        }
+
+        .job-info {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            gap: 0.25rem 1rem;
+            margin: 1.25rem 0 0;
+            font-size: 0.9375rem;
+        }
+
+        .job-info dt {
+            color: var(--dim);
+        }
+
+        .job-info dd {
+            margin: 0;
+            word-break: break-all;
+        }
+
+        #status-log {
+            max-height: 260px;
+            margin: 1.25rem 0 0;
+            padding: 0.75rem;
+            border: 1px solid var(--line);
+            border-radius: 0.375rem;
+            background: var(--bg);
+            overflow-y: auto;
+            list-style: none;
+            font-size: 0.9375rem;
+        }
+
+        #status-log:empty::before {
+            content: "👋 Drop an .srt file on the left and start the translation.";
+            color: var(--dim);
+        }
+
+        #status-log li + li {
+            margin-top: 0.375rem;
+        }
+
+        #status-log time {
+            margin-right: 0.75rem;
+            color: var(--dim);
+            font-family: var(--mono), monospace;
+            font-size: 0.8125rem;
+        }
+
+        #status-log [data-level='warn'] {
+            color: var(--warn);
+        }
+
+        #status-log [data-level='error'] {
+            color: var(--down);
+        }
+
+        /* Editing */
+
+        #editor {
+            grid-column: 1 / -1;
+            /* Start the translation column at the left edge of the Status panel above:
+               half of the 1.5rem workspace gap, after the paddings and borders of panel, scene and block */
+            --translation-col: calc(50% - 0.75rem);
+        }
+
+        #editor[hidden] {
+            display: none;
+        }
+
+        /* Summary and filter on the level of the tagline */
+        #editor .panel-header {
+            align-items: flex-end;
+        }
+
+        .editor-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            font-size: 1.125rem;
+            gap: 1.5rem;
+            color: var(--muted);
+        }
+
+        .scene {
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            background: var(--bg);
+        }
+
+        .scene + .scene {
+            margin-top: 1rem;
+        }
+
+        .scene[data-warning='true'] {
+            border-color: #854d0e;
+        }
+
+        .scene-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 1rem;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .scene-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .scene-time {
+            color: var(--dim);
+            font-family: var(--mono), monospace;
+            font-size: 0.8125rem;
+        }
+
+        .badge {
+            border-radius: 999px;
+            padding: 0.0625rem 0.625rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .badge[data-kind='warn'] {
+            background: #422006;
+            color: var(--warn);
+        }
+
+        .badge[data-kind='info'] {
+            background: #172554;
+            color: #bfdbfe;
+        }
+
+        .block {
+            display: grid;
+            grid-template-columns: 9.5rem minmax(0, 1fr) var(--translation-col);
+            gap: 1rem;
+            align-items: start;
+            padding: 0.75rem 1rem;
+        }
+
+        .block + .block {
+            border-top: 1px solid var(--line);
+        }
+
+        .block-meta {
+            color: var(--dim);
+            font-family: var(--mono), monospace;
+            font-size: 0.8125rem;
+            line-height: 1.6;
+        }
+
+        .block-meta strong {
+            color: var(--muted);
+        }
+
+        .original {
+            margin: 0;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid transparent;
+            color: var(--muted);
+            white-space: pre-wrap;
+        }
+
+        .translation {
+            display: grid;
+            gap: 0.25rem;
+        }
+
+        .translation textarea {
+            width: 100%;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .block[data-shortened='true'] textarea {
+            border-color: #854d0e;
+        }
+
+        .save-state {
+            min-height: 1.25rem;
+            color: var(--dim);
+            font-size: 0.8125rem;
+        }
+
+        .save-state[data-state='saved'] {
+            color: var(--up);
+        }
+
+        .save-state[data-state='error'] {
+            color: var(--down);
+        }
+
+        .column-heads {
+            display: grid;
+            grid-template-columns: 9.5rem minmax(0, 1fr) var(--translation-col);
+            gap: 1rem;
+            padding: 0 calc(1rem + 1px) 0.5rem; /* same as .block within the .scene border */
+            color: var(--dim);
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .phase-dot {
+                animation: none !important;
+            }
+        }
+
+        @media (max-width: 960px) {
+            body {
+                padding: 1.5rem 1rem;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            .block,
+            .column-heads {
+                grid-template-columns: 1fr;
+            }
+
+            .column-heads {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<header class="page-header">
+    <h1>SubtitleTranslator</h1>
+    <p class="tagline">Translate English .srt subtitles scene by scene with LLMs, then edit the result.</p>
+</header>
+
+<main class="workspace">
+    <section class="panel" aria-labelledby="translation-heading">
+        <div class="panel-header">
+            <h2 id="translation-heading">Translation</h2>
+        </div>
+
+        <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-describedby="drop-hint">
+            <span id="drop-label">Drop an English <strong>.srt</strong> file here</span>
+            <span class="hint" id="drop-hint">or click to choose a file</span>
+        </div>
+        <input type="file" id="file-input" accept=".srt" hidden>
+
+        <div class="form-row">
+            <label for="target-language">Target language</label>
+            <select id="target-language">
+                <option value="DE" selected>DE - German</option>
+                <option value="EN">EN - English</option>
+                <option value="FR">FR - French</option>
+                <option value="IT">IT - Italian</option>
+                <option value="ES">ES - Spanish</option>
+            </select>
+        </div>
+
+        <label class="context-toggle" for="use-context">
+            <input type="checkbox" id="use-context">
+            <span>Generate movie context to improve translation quality</span>
+        </label>
+        <div class="context-fields" id="context-fields" hidden>
+            <div class="form-row">
+                <label for="movie-title">Movie title</label>
+                <input type="text" id="movie-title" placeholder="e.g. Bob Marley - One Love">
+            </div>
+            <div class="form-row">
+                <label for="movie-year">Release year</label>
+                <input type="number" id="movie-year" min="1900" max="2100">
+            </div>
+        </div>
+
+        <div class="actions">
+            <button type="button" class="primary-btn" id="translate-btn" disabled>Translate</button>
+            <span id="form-error" role="alert"></span>
+        </div>
+    </section>
+
+    <section class="panel" aria-labelledby="status-heading">
+        <div class="panel-header">
+            <h2 id="status-heading">Status</h2>
+            <p class="phase" role="status">
+                <span class="phase-dot" id="phase-dot" data-phase="idle" aria-hidden="true"></span>
+                <span id="phase-label">Connecting</span>
+            </p>
+        </div>
+
+        <dl class="metrics">
+            <div>
+                <dt>Scenes</dt>
+                <dd id="metric-scenes">0/0</dd>
+            </div>
+            <div>
+                <dt>Blocks</dt>
+                <dd id="metric-blocks">0</dd>
+            </div>
+            <div>
+                <dt>Tokens</dt>
+                <dd id="metric-tokens">0</dd>
+            </div>
+        </dl>
+        <div class="progress" role="progressbar" aria-label="Translated scenes" aria-valuemin="0" aria-valuemax="100"
+             aria-valuenow="0" id="progress">
+            <div id="progress-bar"></div>
+        </div>
+
+        <dl class="job-info" id="job-info" hidden>
+            <dt>File</dt>
+            <dd id="info-file"></dd>
+            <dt>Language</dt>
+            <dd id="info-language"></dd>
+            <dt>Movie context</dt>
+            <dd id="info-movie"></dd>
+            <dt>Target file</dt>
+            <dd id="info-target"></dd>
+        </dl>
+
+        <ul id="status-log" aria-label="Translation log" aria-live="polite"></ul>
+    </section>
+
+    <section class="panel" id="editor" aria-labelledby="editor-heading" hidden>
+        <div class="panel-header">
+            <div>
+                <h2 id="editor-heading">Post-translation editing</h2>
+                <p class="tagline">Edits are saved to the target file automatically. Original text is read only.</p>
+            </div>
+            <div class="editor-controls">
+                <span id="editor-summary"></span>
+                <label class="context-toggle" for="only-warnings">
+                    <input type="checkbox" id="only-warnings">
+                    <span>Only scenes with warnings</span>
+                </label>
+            </div>
+        </div>
+        <div class="column-heads" aria-hidden="true">
+            <span>Block</span>
+            <span>Original</span>
+            <span>Translation</span>
+        </div>
+        <div id="scenes"></div>
+    </section>
+</main>
+
+<template id="scene-template">
+    <article class="scene">
+        <header class="scene-header">
+            <h3></h3>
+            <span class="scene-time"></span>
+            <span class="badge" data-kind="warn" data-badge="kept-original" hidden>Kept original</span>
+            <span class="badge" data-kind="info" data-badge="fallback" hidden>Fallback model</span>
+            <span class="badge" data-kind="warn" data-badge="shortened" hidden>Shortened</span>
+        </header>
+    </article>
+</template>
+
+<template id="block-template">
+    <div class="block">
+        <div class="block-meta">
+            <strong></strong><br><span data-field="start"></span><br><span data-field="end"></span>
+        </div>
+        <p class="original"></p>
+        <div class="translation">
+            <textarea spellcheck="true" aria-label="Translation"></textarea>
+            <span class="save-state"></span>
+        </div>
+    </div>
+</template>
+
+<script>
+    const BASE = '/subtitles';
+    const PHASE_LABELS = {
+        idle: 'Idle',
+        preparing: 'Preparing',
+        translating: 'Translating',
+        done: 'Done',
+        failed: 'Failed'
+    };
+
+    const byId = id => document.getElementById(id);
+    const dropZone = byId('drop-zone');
+    const fileInput = /** @type {HTMLInputElement} */ (byId('file-input'));
+    const translateBtn = byId('translate-btn');
+    const useContext = /** @type {HTMLInputElement} */ (byId('use-context'));
+    const formError = byId('form-error');
+    const onlyWarnings = /** @type {HTMLInputElement} */ (byId('only-warnings'));
+    const targetLanguage = /** @type {HTMLSelectElement} */ (byId('target-language'));
+    const movieTitle = /** @type {HTMLInputElement} */ (byId('movie-title'));
+    const movieYear = /** @type {HTMLInputElement} */ (byId('movie-year'));
+    movieYear.value = String(new Date().getFullYear());
+
+    // JSON of the server, see case classes in SubtitleTranslatorGui
+    /**
+     * @typedef {{time: string, level: string, message: string}} LogEntry
+     * @typedef {{phase: string, fileName: string, targetLanguage: string, movie: string, blocksTotal: number,
+     *   scenesTotal: number, scenesDone: number, tokensUsed: number, targetFile: string, log: LogEntry[]}} Status
+     * @typedef {{number: number, startTime: string, endTime: string, original: string[], translated: string[],
+     *   shortened: boolean}} Block
+     * @typedef {{startTime: string, endTime: string, fallbackUsed: boolean, keptOriginal: boolean,
+     *   blocks: Block[]}} Scene
+     */
+
+    let selectedFile = null;
+    let currentPhase = 'idle';
+    let loadedEditorFor = null;
+
+    // Translation form
+
+    function selectFile(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.srt')) {
+            formError.textContent = 'Please choose an .srt file';
+            return;
+        }
+        selectedFile = file;
+        formError.textContent = '';
+        dropZone.dataset.state = 'selected';
+        byId('drop-label').replaceChildren(Object.assign(document.createElement('strong'), {textContent: file.name}));
+        byId('drop-hint').textContent = `${(file.size / 1024).toFixed(1)} KB · click or drop to replace`;
+        updateTranslateButton();
+    }
+
+    function isRunning() {
+        return currentPhase === 'preparing' || currentPhase === 'translating';
+    }
+
+    function updateTranslateButton() {
+        translateBtn.disabled = !selectedFile || isRunning();
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+    fileInput.addEventListener('change', () => selectFile(fileInput.files[0]));
+    ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, e => {
+        e.preventDefault();
+        dropZone.dataset.dragOver = 'true';
+    }));
+    ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, e => {
+        e.preventDefault();
+        dropZone.dataset.dragOver = 'false';
+    }));
+    dropZone.addEventListener('drop', e => selectFile(e.dataTransfer.files[0]));
+    // Dropping a file next to the drop zone must not navigate away
+    window.addEventListener('dragover', e => e.preventDefault());
+    window.addEventListener('drop', e => e.preventDefault());
+
+    useContext.addEventListener('change', () => {
+        byId('context-fields').hidden = !useContext.checked;
+        if (useContext.checked) movieTitle.focus();
+    });
+
+    translateBtn.addEventListener('click', async () => {
+        formError.textContent = '';
+        const form = new FormData();
+        form.append('file', selectedFile, selectedFile.name);
+        form.append('targetLanguage', targetLanguage.value);
+        if (useContext.checked) {
+            const title = movieTitle.value.trim();
+            const year = movieYear.value.trim();
+            if (!title || !year) {
+                formError.textContent = 'Movie context needs title and release year';
+                return;
+            }
+            form.append('movieTitle', title);
+            form.append('movieReleaseYear', year);
+        }
+        translateBtn.disabled = true;
+        try {
+            const response = await fetch(`${BASE}/translate`, {method: 'POST', body: form});
+            if (!response.ok) formError.textContent = await response.text();
+        } catch (e) {
+            formError.textContent = `Upload failed: ${e.message}`;
+        }
+        updateTranslateButton();
+    });
+
+    // Status
+
+    /** @param {Status} status */
+    function renderStatus(status) {
+        currentPhase = status.phase;
+        byId('phase-dot').dataset.phase = status.phase;
+        byId('phase-label').textContent = PHASE_LABELS[status.phase] ?? status.phase;
+        byId('metric-scenes').textContent = `${status.scenesDone}/${status.scenesTotal}`;
+        byId('metric-blocks').textContent = String(status.blocksTotal);
+        byId('metric-tokens').textContent = status.tokensUsed.toLocaleString();
+        const percent = status.scenesTotal ? Math.round(100 * status.scenesDone / status.scenesTotal) : 0;
+        byId('progress-bar').style.width = `${percent}%`;
+        byId('progress').setAttribute('aria-valuenow', String(percent));
+
+        byId('job-info').hidden = !status.fileName;
+        byId('info-file').textContent = status.fileName;
+        byId('info-language').textContent = status.targetLanguage;
+        byId('info-movie').textContent = status.movie || 'none';
+        byId('info-target').textContent = status.targetFile || '…';
+
+        const log = byId('status-log');
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 20;
+        log.replaceChildren(...status.log.map(entry => {
+            const li = document.createElement('li');
+            li.dataset.level = entry.level;
+            const time = document.createElement('time');
+            time.textContent = entry.time;
+            li.append(time, entry.message);
+            return li;
+        }));
+        if (atBottom) log.scrollTop = log.scrollHeight;
+
+        updateTranslateButton();
+        if (status.phase === 'done' && loadedEditorFor !== status.targetFile) {
+            loadedEditorFor = status.targetFile;
+            loadEditor();
+        } else if (status.phase !== 'done') {
+            loadedEditorFor = null;
+            byId('editor').hidden = true;
+        }
+    }
+
+    function connect() {
+        const source = new EventSource(`${BASE}/events`);
+        source.onmessage = e => {
+            // Skip the heartbeat of the server, an event with empty data
+            if (e.data) renderStatus(JSON.parse(e.data));
+        };
+        source.onerror = () => {
+            byId('phase-label').textContent = 'Reconnecting';
+        };
+    }
+
+    // Post-translation editing
+
+    async function loadEditor() {
+        const response = await fetch(`${BASE}/scenes`);
+        /** @type {Scene[]} */
+        const scenes = await response.json();
+        byId('scenes').replaceChildren(...scenes.map(renderScene));
+        const warnings = scenes.filter(hasWarning).length;
+        const blocks = scenes.reduce((n, scene) => n + scene.blocks.length, 0);
+        byId('editor-summary').textContent = `${scenes.length} scenes · ${blocks} blocks · ${warnings} with warnings`;
+        applyWarningFilter();
+        byId('editor').hidden = false;
+    }
+
+    /** @param {Scene} scene */
+    function hasWarning(scene) {
+        return scene.keptOriginal || scene.blocks.some(block => block.shortened);
+    }
+
+    /**
+     * @param {string} id of a template
+     * @returns {HTMLElement} copy of the template content
+     */
+    function fromTemplate(id) {
+        const template = /** @type {HTMLTemplateElement} */ (byId(id));
+        return /** @type {HTMLElement} */ (template.content.firstElementChild.cloneNode(true));
+    }
+
+    /**
+     * @param {Scene} scene
+     * @param {number} sceneIdx
+     */
+    function renderScene(scene, sceneIdx) {
+        const article = fromTemplate('scene-template');
+        article.dataset.warning = String(hasWarning(scene));
+        article.querySelector('h3').textContent = `Scene ${sceneIdx + 1}`;
+        article.querySelector('.scene-time').textContent = `${scene.startTime} → ${scene.endTime}`;
+        article.querySelector('[data-badge="kept-original"]').hidden = !scene.keptOriginal;
+        article.querySelector('[data-badge="fallback"]').hidden = scene.keptOriginal || !scene.fallbackUsed;
+        article.querySelector('[data-badge="shortened"]').hidden = !scene.blocks.some(block => block.shortened);
+        article.append(...scene.blocks.map((block, blockIdx) => renderBlock(block, sceneIdx, blockIdx)));
+        return article;
+    }
+
+    /**
+     * @param {Block} block
+     * @param {number} sceneIdx
+     * @param {number} blockIdx position within the scene
+     */
+    function renderBlock(block, sceneIdx, blockIdx) {
+        const row = fromTemplate('block-template');
+        row.dataset.shortened = String(block.shortened);
+        row.querySelector('strong').textContent = `#${block.number}`;
+        row.querySelector('[data-field="start"]').textContent = block.startTime;
+        row.querySelector('[data-field="end"]').textContent = block.endTime;
+        row.querySelector('.original').textContent = block.original.join('\n');
+
+        const textarea = row.querySelector('textarea');
+        textarea.value = block.translated.join('\n');
+        textarea.rows = Math.max(2, block.translated.length);
+        textarea.setAttribute('aria-label', `Translation of block ${block.number}`);
+        const saveState = /** @type {HTMLElement} */ (row.querySelector('.save-state'));
+        if (block.shortened) saveState.textContent = 'Shortened by the LLM, check meaning';
+
+        let lastSaved = textarea.value;
+        let timer = null;
+        const save = async () => {
+            clearTimeout(timer);
+            const value = textarea.value;
+            if (value === lastSaved) return;
+            saveState.dataset.state = 'saving';
+            saveState.textContent = 'Saving…';
+            let error = null;
+            try {
+                const response = await fetch(`${BASE}/scenes/${sceneIdx}/blocks/${blockIdx}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({lines: value.split('\n')})
+                });
+                if (!response.ok) error = await response.text();
+            } catch (e) {
+                error = e.message;
+            }
+            if (error === null) lastSaved = value;
+            saveState.dataset.state = error === null ? 'saved' : 'error';
+            saveState.textContent = error === null ? 'Saved' : `Not saved: ${error}`;
+        };
+        textarea.addEventListener('input', () => {
+            clearTimeout(timer);
+            saveState.dataset.state = '';
+            saveState.textContent = 'Unsaved changes';
+            timer = setTimeout(save, 800);
+        });
+        textarea.addEventListener('blur', save);
+        return row;
+    }
+
+    function applyWarningFilter() {
+        const only = onlyWarnings.checked;
+        document.querySelectorAll('#scenes > .scene:not([data-warning="true"])')
+            .forEach(scene => scene.toggleAttribute('hidden', only));
+    }
+
+    onlyWarnings.addEventListener('change', applyWarningFilter);
+
+    connect();
+</script>
+</body>
+</html>

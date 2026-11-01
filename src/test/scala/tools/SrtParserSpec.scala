@@ -3,7 +3,10 @@ package tools
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path}
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 
 class SrtParserSpec extends AnyFunSuite with Matchers {
 
@@ -63,9 +66,12 @@ class SrtParserSpec extends AnyFunSuite with Matchers {
         |---> wrong separator
     """.stripMargin)
 
+    val parser = new SrtParser(src)
     assertThrows[java.time.format.DateTimeParseException] {
-      new SrtParser(src).runSync()
+      parser.runSync()
     }
+    // The actor system of the parser is terminated despite the failure
+    Await.result(parser.system.whenTerminated, 5.seconds)
   }
 
   test("parse srt file with LF or CRLF line endings, independent of platform") {
@@ -79,6 +85,7 @@ class SrtParserSpec extends AnyFunSuite with Matchers {
 
     new SrtParser(tempSrtWith(srtWith("\n"))).runSync() shouldBe expected
     new SrtParser(tempSrtWith(srtWith("\r\n"))).runSync() shouldBe expected
+    SrtParser(srtWith("\r\n").getBytes(UTF_8)).runSync() shouldBe expected
   }
 
   test("timeShift forward shifts all timestamps by positive offset") {

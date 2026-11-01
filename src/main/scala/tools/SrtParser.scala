@@ -5,7 +5,7 @@ import org.apache.pekko.stream.scaladsl.{FileIO, Framing, Sink, Source, StreamCo
 import org.apache.pekko.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
-import java.io.FileInputStream
+import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.nio.file.Paths
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalTime}
@@ -17,9 +17,13 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
   * Line endings follow the file (LF or CRLF), not the platform,
   * hence CR chars are dropped before framing
   *
-  * @param sourceFilePath
+  * @param openSource opens the .srt content, e.g. a file
   */
-class SrtParser(sourceFilePath: String) {
+class SrtParser(openSource: () => InputStream) {
+
+  /** @param sourceFilePath .srt file */
+  def this(sourceFilePath: String) = this(() => new FileInputStream(sourceFilePath))
+
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -41,17 +45,15 @@ class SrtParser(sourceFilePath: String) {
   }
 
   val source: Source[SubtitleBlock, Any] =
-    StreamConverters.fromInputStream(() => new FileInputStream(sourceFilePath))
+    StreamConverters.fromInputStream(openSource)
       .map(_.filterNot(_ == '\r'))
       .via(frameByEmptyLine)
       .map(_.utf8String)
       .map(convertTo)
 
-  def runSync(): Seq[SubtitleBlock] = {
-    val result = Await.result(source.runWith(Sink.seq), 10.seconds)
-    system.terminate()
-    result
-  }
+  def runSync(): Seq[SubtitleBlock] =
+    try Await.result(source.runWith(Sink.seq), 10.seconds)
+    finally system.terminate()
 
   /**
     * Shift all timestamps by the given offset and write the result to targetFilePath.
@@ -60,20 +62,23 @@ class SrtParser(sourceFilePath: String) {
     * @param shiftBy        offset in milliseconds (positive = forward, negative = backward)
     */
   def timeShift(targetFilePath: String, shiftBy: Long): Unit = {
-    val ioResult = Await.result(
-      source
-        .map(b => b.copy(start = Math.max(0, b.start + shiftBy), end = Math.max(0, b.end + shiftBy)))
-        .zipWithIndex
-        .map { case (block, idx) => ByteString(block.formatOutBlock(idx + 1), "UTF-8") }
-        .runWith(FileIO.toPath(Paths.get(targetFilePath))),
-      10.seconds)
-    system.terminate()
+    val ioResult =
+      try Await.result(
+        source
+          .map(b => b.copy(start = Math.max(0, b.start + shiftBy), end = Math.max(0, b.end + shiftBy)))
+          .zipWithIndex
+          .map { case (block, idx) => ByteString(block.formatOutBlock(idx + 1), "UTF-8") }
+          .runWith(FileIO.toPath(Paths.get(targetFilePath))),
+        10.seconds)
+      finally system.terminate()
     logger.info(s"Wrote: ${ioResult.count} bytes to: $targetFilePath")
   }
 }
 
 object SrtParser {
   def apply(sourceFilePath: String): SrtParser = new SrtParser(sourceFilePath)
+
+  def apply(content: Array[Byte]): SrtParser = new SrtParser(() => new ByteArrayInputStream(content))
 
   /**
     * Helper to fix a timing mismatch between the movie audio and the subtitle timestamps.
@@ -103,11 +108,14 @@ case class SubtitleBlock(start: Long, end: Long, lines: Seq[String]) {
   def allLinesEnd: String = allLines + endLineTag + endLineTag
 
   def formatOutBlock(blockCounter: Long): String = {
-    // Spec: https://wiki.videolan.org/SubRip
-    val out = s"$blockCounter\n$startTime --> $endTime\n${lines.mkString("\n")}\n\n"
+    val out = toSrt(blockCounter)
     logger.info("Writing block:\n{}", out)
     out
   }
+
+  // Spec: https://wiki.videolan.org/SubRip
+  def toSrt(blockCounter: Long): String =
+    s"$blockCounter\n$startTime --> $endTime\n${lines.mkString("\n")}\n\n"
 
   def startTime: String = toTime(start)
 

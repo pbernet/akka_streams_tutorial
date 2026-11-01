@@ -18,7 +18,7 @@ import java.time.Duration;
  * https://docs.anthropic.com/claude/reference/getting-started-with-the-api
  * https://github.com/langchain4j/langchain4j
  */
-public class AnthropicCompletions {
+public class AnthropicCompletions implements Completions {
     private static final Logger LOGGER = LoggerFactory.getLogger(AnthropicCompletions.class);
 
     // https://docs.anthropic.com/en/docs/about-claude/models/overview#model-comparison-table

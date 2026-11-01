@@ -18,10 +18,14 @@ class SubtitleTranslatorSpec extends AnyFunSuite with Matchers with BeforeAndAft
   private def block(start: Long, end: Long, line: String = "x"): SubtitleBlock =
     SubtitleBlock(start, end, Seq(line))
 
-  private def group(maxGap: Int, blocks: SubtitleBlock*): Seq[List[SubtitleBlock]] =
-    Await.result(
+  // Also checks that countScenes agrees with groupByScene for every grouping case
+  private def group(maxGap: Int, blocks: SubtitleBlock*): Seq[List[SubtitleBlock]] = {
+    val scenes = Await.result(
       Source(blocks.toList).via(SubtitleTranslator.groupByScene(maxGap)).runWith(Sink.seq),
       5.seconds)
+    SubtitleTranslator.countScenes(blocks, maxGap) shouldBe scenes.size
+    scenes
+  }
 
   test("empty input yields no scenes") {
     group(maxGap = 1000) shouldBe empty

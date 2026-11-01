@@ -18,7 +18,7 @@ import java.time.Duration;
  * https://platform.openai.com/docs/api-reference
  * https://github.com/langchain4j/langchain4j
  */
-public class OpenAICompletions {
+public class OpenAICompletions implements Completions {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenAICompletions.class);
 
     public static final String MODEL_NAME = "gpt-6-luna";
