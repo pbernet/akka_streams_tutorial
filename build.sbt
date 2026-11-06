@@ -5,12 +5,12 @@ version := "1.0"
 scalaVersion := "3.9.0"
 
 val pekkoVersion = "2.0.0-M4"
-val pekkoHTTPVersion = "2.0.0-M1"
+val pekkoHTTPVersion = "2.0.0-M2"
 val pekkoConnectorVersion = "2.0.0-M1"
 val pekkoConnectorKafkaVersion = "2.0.0-M1"
 
-val kafkaVersion = "4.3.1"
-val artemisVersion = "2.44.0"
+val kafkaVersion = "4.4.0"
+val artemisVersion = "2.57.0"
 val testContainersVersion = "1.21.4"
 val keycloakVersion = "26.3.2"
 val keycloakClientVersion = "26.0.6"
@@ -18,15 +18,15 @@ val sttpVersion = "3.11.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.47.4"
 val gatlingVersion = "3.14.9"
-val circeVersion = "0.14.14"
+val circeVersion = "0.14.17"
 
-val langchain4jVersion = "1.22.0"
-val langchain4jEmbeddingsVersion = "1.22.0-beta32"
+val langchain4jVersion = "1.23.0"
+val langchain4jEmbeddingsVersion = "1.23.0-beta33"
 val mcpSdkVersion = "2.0.0"
 val doclingJavaVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.3.0",
 
   "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
   "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
   "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
-  "org.bouncycastle" % "bcprov-jdk18on" % "1.81",
+  "org.bouncycastle" % "bcprov-jdk18on" % "1.86",
 
   "org.apache.pekko" %% "pekko-connectors-kafka" % pekkoConnectorKafkaVersion,
   // Kafka does not publish its Scala module for Scala 3.
@@ -68,7 +68,7 @@ libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
   // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
-  "com.hierynomus" % "sshj" % "0.40.0",
+  "com.hierynomus" % "sshj" % "0.41.2",
   "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-elasticsearch" % pekkoConnectorVersion,
@@ -100,20 +100,20 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.tika" % "tika-core" % "3.2.3",
-  "org.apache.tika" % "tika-parsers-standard-package" % "3.2.3",
+  "org.apache.tika" % "tika-core" % "3.3.3",
+  "org.apache.tika" % "tika-parsers-standard-package" % "3.3.3",
   "org.apache.pdfbox" % "pdfbox" % "3.0.7",
-  "org.apache.opennlp" % "opennlp-tools" % "2.5.6.1",
-  "org.apache.httpcomponents.client5" % "httpclient5" % "5.5",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.3.5",
+  "org.apache.opennlp" % "opennlp-tools" % "2.5.12",
+  "org.apache.httpcomponents.client5" % "httpclient5" % "5.6.5",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.4.4",
   "commons-io" % "commons-io" % "2.20.0",
-  "org.apache.commons" % "commons-lang3" % "3.18.0",
+  "org.apache.commons" % "commons-lang3" % "3.21.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "5.0.15",
 
-  "org.apache.camel" % "camel-core" % "4.16.0",
-  "org.apache.camel" % "camel-seda" % "4.16.0",
-  "org.apache.camel" % "camel-reactive-streams" % "4.16.0",
-  "io.projectreactor" % "reactor-core" % "3.8.7",
+  "org.apache.camel" % "camel-core" % "4.23.0",
+  "org.apache.camel" % "camel-seda" % "4.23.0",
+  "org.apache.camel" % "camel-reactive-streams" % "4.23.0",
+  "io.projectreactor" % "reactor-core" % "3.8.8",
   "io.reactivex.rxjava3" % "rxjava" % "3.1.12",
 
   "com.github.blemale" %% "scaffeine" % "5.3.0",
@@ -140,8 +140,8 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-core" % keycloakVersion,
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
 
-  "org.postgresql" % "postgresql" % "42.7.7",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0" % Test pomOnly(),
+  "org.postgresql" % "postgresql" % "42.7.14",
+  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.11.0" % Test pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.1.0" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,
@@ -190,5 +190,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.apache.pekko" %% "pekko-actor-typed" % "always",
   "org.apache.pekko" %% "pekko-stream" % "always",
   "org.apache.pekko" %% "pekko-stream-typed" % "always",
-  "org.apache.pekko" %% "pekko-http" % "always"
+  "org.apache.pekko" %% "pekko-http" % "always",
+  "org.apache.pekko" %% "pekko-http-xml" % "always",
+  "org.apache.pekko" %% "pekko-http-spray-json" % "always"
 )

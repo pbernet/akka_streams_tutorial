@@ -29,10 +29,10 @@ import scala.util.{Failure, Success}
   *
   * Prerequisite:
   *  - Start the docker SFTP server from: /docker/docker-compose.yml
-  *    eg by cmd line: docker-compose up -d atmoz_sftp
+  *    e.g. by cmd line: docker-compose up -d atmoz_sftp
   *
   * Remarks:
-  *  - Plain upload and download works fine, however in oder to not download forever,
+  *  - Plain upload and download works fine, however in order to not download forever,
   *    the original files need to be moved on the server.
   *    This move operation does not work as expected:
   *     - [[SftpEcho.processAndMove]] hangs
@@ -41,11 +41,11 @@ import scala.util.{Failure, Success}
   *  - Log noise from sshj lib is turned down in logback.xml
   *
   * Doc:
-  * https://doc.akka.io/docs/alpakka/current/ftp.html
+  * https://pekko.apache.org/docs/pekko-connectors/current/ftp.html
   */
 object SftpEcho {
   def main(args: Array[String]): Unit = {
-    new Application();
+    new Application()
     ()
   }
 
@@ -58,7 +58,7 @@ object SftpEcho {
     // Speed up random generation
     System.setProperty("java.security.egd", "file:/dev/./urandom")
 
-    // we need a sub folder due to permissions set on on the atmoz_sftp docker image
+    // we need a sub folder due to permissions set on the atmoz_sftp docker image
     val sftpRootDir = "echo"
     val processedDir = "processed"
 
@@ -93,7 +93,7 @@ object SftpEcho {
     def uploadClient() = {
       logger.info("Starting upload...")
 
-      // With the latest sshj lib explicitly included in build.sbt, we get a more robust behaviour on "large" data sets
+      // With the latest sshj lib pinned, we get a more robust behavior on "large" data sets
       Source(1 to 1000)
         .throttle(5, 1.second, 5, ThrottleMode.shaping)
         .mapAsync(parallelism = 5) { id =>
