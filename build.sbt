@@ -53,8 +53,6 @@ libraryDependencies ++= Seq(
   "jakarta.annotation" % "jakarta.annotation-api" % "3.0.0",
   "org.apache.activemq" % "artemis-jakarta-server" % artemisVersion,
   "org.apache.activemq" % "artemis-jakarta-client" % artemisVersion,
-  "org.apache.activemq" % "artemis-protocols" % artemisVersion pomOnly(),
-  "org.apache.activemq" % "artemis-openwire-protocol" % artemisVersion,
 
   "org.bouncycastle" % "bcprov-jdk18on" % "1.86",
 
@@ -141,7 +139,7 @@ libraryDependencies ++= Seq(
   "org.keycloak" % "keycloak-admin-client" % keycloakClientVersion,
 
   "org.postgresql" % "postgresql" % "42.7.14",
-  "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.11.0" % Test pomOnly(),
+  ("io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.11.0" % Test).pomOnly(),
   "io.zonky.test" % "embedded-postgres" % "2.1.0" % Test,
 
   "org.scalatest" %% "scalatest" % "3.2.18" % Test,
@@ -174,6 +172,9 @@ libraryDependencies ++= Seq(
 
 excludeDependencies += ExclusionRule("com.typesafe.scala-logging", "scala-logging_2.13")
 
+// sbt 2's Coursier otherwise resolves the javax-era 1.3.3 via artemis-pom
+dependencyOverrides += "jakarta.transaction" % "jakarta.transaction-api" % "2.0.1"
+
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
 scalacOptions += "-deprecation"
@@ -185,7 +186,7 @@ Test / parallelExecution := false
 
 enablePlugins(GatlingPlugin)
 
-ThisBuild / libraryDependencySchemes ++= Seq(
+libraryDependencySchemes ++= Seq(
   "org.apache.pekko" %% "pekko-actor" % "always",
   "org.apache.pekko" %% "pekko-actor-typed" % "always",
   "org.apache.pekko" %% "pekko-stream" % "always",
