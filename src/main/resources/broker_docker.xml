@@ -89,7 +89,9 @@ https://github.com/vromero/activemq-artemis-docker
                           "anycastPrefix=jms.queue.;multicastPrefix=jms.topic." to the acceptor url.
                           See https://issues.apache.org/jira/browse/ARTEMIS-1644 for more information. -->
             <!-- Acceptor for every supported protocol -->
-            <acceptor name="artemis">tcp://0.0.0.0:21616?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true</acceptor>
+            <acceptor name="artemis">
+                tcp://0.0.0.0:21616?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true
+            </acceptor>
             <!-- AMQP Acceptor.  Listens on default AMQP port for AMQP traffic.-->
             <acceptor name="amqp">tcp://0.0.0.0:5672?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=AMQP;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpMinLargeMessageSize=102400;amqpDuplicateDetection=true</acceptor>
             <!-- STOMP Acceptor. -->

@@ -65,7 +65,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.pekko" %% "pekko-connectors-sse" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-file" % pekkoConnectorVersion,
-  // With the latest sshj lib explicitly included, we get a more robust behaviour on "large" data sets in SftpEcho
+  // Pin latest sshj lib to get more robust behaviour on "large" data sets in SftpEcho
   "com.hierynomus" % "sshj" % "0.41.2",
   "org.apache.pekko" %% "pekko-connectors-xml" % pekkoConnectorVersion,
   "org.apache.pekko" %% "pekko-connectors-ftp" % pekkoConnectorVersion,
@@ -172,8 +172,10 @@ libraryDependencies ++= Seq(
 
 excludeDependencies += ExclusionRule("com.typesafe.scala-logging", "scala-logging_2.13")
 
-// sbt 2's Coursier otherwise resolves the javax-era 1.3.3 via artemis-pom
+// Pin because sbt 2 resolves the javax-era 1.3.3 via artemis-pom
 dependencyOverrides += "jakarta.transaction" % "jakarta.transaction-api" % "2.0.1"
+// Pin because sbt 2 otherwise resolves org.json 20231013 instead of 20250107
+dependencyOverrides += "org.json" % "json" % "20250107"
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 

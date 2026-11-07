@@ -33,16 +33,20 @@ exactly this feeling by offering a collection of runnable examples in Scala and 
 
 ### Prerequisites
 
-[Install Java 17 or higher](https://adoptium.net/temurin/releases) (
-recommended: [GraalVM](https://www.graalvm.org/downloads))
-
-Install [sbt](https://www.scala-sbt.org/download) and [Docker](https://www.docker.com/get-started/)
+* Java: Minimum is **Java 17**, we currently run on **Java 21**. Either distribution works:
+  [Temurin](https://adoptium.net/temurin/releases) or [GraalVM](https://www.graalvm.org/downloads).
+  CI builds and tests are on Java 17 (Temurin).
+* [sbt](https://www.scala-sbt.org/download): the build uses sbt 2.x. The version is pinned in
+  `project/build.properties`,
+  and any recent sbt runner downloads it automatically.
+* [Docker](https://www.docker.com/get-started/)
 
 ### Installation
 
 1. Clone the repository: `git clone https://github.com/pbernet/akka_streams_tutorial.git`
 2. Navigate to the project directory: `cd akka_streams_tutorial`
 3. Compile the project: `sbt compile`
+4. Run the tests: `sbt testFull`
 
 ### Running Examples
 

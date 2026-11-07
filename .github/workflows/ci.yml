@@ -6,19 +6,23 @@ on:
       - migrate_pekko
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       # define Java options for both official sbt and sbt-extras
       JAVA_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
       JVM_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-        # https://github.com/coursier/setup-action
+        uses: actions/checkout@v7
       - name: Set up JDK 17
-        uses: coursier/setup-action@v3
+        uses: actions/setup-java@v6
         with:
-          jvm: 17
-          apps: sbtn
+          distribution: temurin
+          java-version: 17
+          cache: sbt
+        # https://www.scala-sbt.org/2.x/docs/en/recipes/github-actions-setup.html
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
       - name: Build and Test
-        run: sbt -v +test
+        run: sbt -v testFull
