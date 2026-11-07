@@ -98,8 +98,8 @@ libraryDependencies ++= Seq(
   "ca.uhn.hapi" % "hapi-structures-v25" % "2.3",
   "ca.uhn.hapi" % "hapi-structures-v281" % "2.3",
 
-  "org.apache.tika" % "tika-core" % "3.3.3",
-  "org.apache.tika" % "tika-parsers-standard-package" % "3.3.3",
+  "org.apache.tika" % "tika-core" % "4.2.0",
+  "org.apache.tika" % "tika-parsers-standard-package" % "4.2.0",
   "org.apache.pdfbox" % "pdfbox" % "3.0.7",
   "org.apache.opennlp" % "opennlp-tools" % "2.5.12",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.6.5",
