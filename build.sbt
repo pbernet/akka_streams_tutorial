@@ -175,7 +175,7 @@ excludeDependencies += ExclusionRule("com.typesafe.scala-logging", "scala-loggin
 // Pin because sbt 2 resolves the javax-era 1.3.3 via artemis-pom
 dependencyOverrides += "jakarta.transaction" % "jakarta.transaction-api" % "2.0.1"
 // Pin because sbt 2 otherwise resolves org.json 20231013 instead of 20250107
-dependencyOverrides += "org.json" % "json" % "20250107"
+dependencyOverrides += "org.json" % "json" % "20260814"
 
 resolvers += "repository.jboss.org-public" at "https://repository.jboss.org/nexus/content/groups/public"
 
