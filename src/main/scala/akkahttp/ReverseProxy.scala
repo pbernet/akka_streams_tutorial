@@ -47,8 +47,8 @@ import scala.util.{Failure, Success}
   *
   * Remarks:
   *  - The target server selection is via the "Host" HTTP header
-  *  - Local/Remote target servers are designed to be faulty to show Retry/CircuitBreaker behavior
-  *    e.g. for mode Local adjust [[responseCodes]]
+  *  - Local/Remote target servers can be made faulty to show Retry/CircuitBreaker behavior:
+  *    use the "Fault injection" panel in [[ReverseProxyMonitor]] (healthy by default)
   *  - On top of the built-in client, you may also try other clients, see below
   *  - This PoC may not scale well, because the 'round robin' implementation
   *    with [[requestCounter]] means shared state
@@ -69,7 +69,7 @@ import scala.util.{Failure, Success}
   * Doc:
   * https://pekko.apache.org/docs/pekko/current/common/circuitbreaker.html
   * https://pekko.apache.org/docs/pekko-http/current//implications-of-streaming-http-entity.html
-  * https://pekko.apache.org/docs/pekko-http/current///common/timeouts.html#request-timeout
+  * https://pekko.apache.org/docs/pekko-http/current/common/timeouts.html#request-timeout
   */
 object ReverseProxy {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -98,10 +98,18 @@ object ReverseProxy {
     )
   )
 
-  // For Mode.local: Add more failure response codes to provoke more retries on ReverseProxy
-  // and thus provoke the CircuitBreaker to open
-  //val responseCodes = List(200, 200, 200, 200, 200, 200, 200, 200, 500, 503)
-  val responseCodes = List(200, 200, 500, 500, 500, 500, 503, 503, 503, 503)
+  // Set via the "Fault injection" panel in ReverseProxyMonitor
+  // Raise the failure rate to provoke retries on ReverseProxy and thus the CircuitBreaker to open
+  @volatile private var faults = FaultConfig(failureRate = 0, failureCodes = List(500, 503))
+
+  def faultConfig: FaultConfig = faults
+
+  def updateFaults(config: FaultConfig): Either[String, FaultConfig] =
+    config.validated.map { valid =>
+      faults = valid
+      logger.info(s"ReverseProxy: fault config changed to: $valid, responseCodes: ${valid.responseCodes}")
+      valid
+    }
 
   def main(args: Array[String]): Unit = {
     localTargetServers(maxConnections = 100) // 1-1024
@@ -111,7 +119,7 @@ object ReverseProxy {
     // Note that the remote servers can not interpret the X-Correlation-ID header
     val mode = Mode.local
     clients(nbrOfClients = 10, requestsPerClient = 100, mode)
-    ReverseProxyMonitor.initializeWebUI(system, services(mode))
+    ReverseProxyMonitor.initializeWebUI(system, mode, services(mode))
 
     sys.addShutdownHook {
       ReverseProxyMonitor.shutdown()
@@ -132,15 +140,16 @@ object ReverseProxy {
         msg.onComplete(msg => logger.info(s"[$id] Client: $clientId got response: ${response.status.intValue()} with msg: ${msg.getOrElse("N/A")}"))
       }
 
-      val fixedPath = mode match {
+      // Evaluated per request, so that changes in the "Fault injection" panel take effect immediately
+      def path: String = mode match {
         case Mode.local => ""
-        case Mode.remote => "status/200,201,501,502,503,504"
+        case Mode.remote => faultConfig.remotePath
       }
 
       Source(1 to nbrOfRequests)
         .throttle(1, 2.seconds, 10, ThrottleMode.shaping)
         .wireTap(each => logger.info(s"[$clientId-$each] Client: $clientId about to send request..."))
-        .mapAsync(1)(each => http.singleRequest(HttpRequest(uri = s"http://$proxyHost:$proxyPort/$fixedPath")
+        .mapAsync(1)(each => http.singleRequest(HttpRequest(uri = s"http://$proxyHost:$proxyPort/$path")
           .withHeaders(Seq(RawHeader("Host", targetHost.toString), RawHeader("X-Correlation-ID", s"$clientId-$each")))))
         .wireTap(response => logResponse(response))
         .runWith(Sink.ignore)
@@ -197,7 +206,7 @@ object ReverseProxy {
           val target = seq(index)
           logger.info(s"[$id] ReverseProxy: Forwarding request to $mode target server: ${target.url}")
 
-          val requestId = ReverseProxyMonitor.logRequest(request, target.url, id)
+          val requestId = ReverseProxyMonitor.logRequest(request, target.url, id, mode)
 
           val circuitBreaker = circuitBreakers.computeIfAbsent(target.url, _ => {
             val cb = new CircuitBreaker(
@@ -238,7 +247,7 @@ object ReverseProxy {
             case exception => errorResponseFor(exception)
           }
         case None =>
-          val requestId = ReverseProxyMonitor.logRequest(request, host, id)
+          val requestId = ReverseProxyMonitor.logRequest(request, host, id, mode)
           val notFoundResponse = errorResponse(StatusCodes.NotFound, id, s"$host not found")
           ReverseProxyMonitor.logResponse(requestId, notFoundResponse, System.currentTimeMillis() - startTime, id, Some("Host not found"))
           Future.successful(notFoundResponse)
@@ -263,6 +272,7 @@ object ReverseProxy {
           Thread.sleep(ThreadLocalRandom.current.nextInt(1, 20) * 100)
           val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
 
+          val responseCodes = faultConfig.responseCodes
           val randomResponseCode = responseCodes(new scala.util.Random().nextInt(responseCodes.length))
           logger.info(s"[$id] Target server: ${request.uri.authority.host}:${request.uri.effectivePort} got echo request, reply with: $randomResponseCode")
           (StatusCode.int2StatusCode(randomResponseCode), Seq(RawHeader("X-Correlation-ID", id)))
@@ -310,6 +320,34 @@ object ReverseProxy {
     def weighted(url: String, weight: Int): Target = {
       Target(url).copy(weight = weight)
     }
+  }
+
+  // failureRate: 0-100 in steps of 10, each step turns one of the 10 responseCodes into a failure code
+  // failureCodes: used in turn for the failing entries; 5xx are retried by ReverseProxy, 429 is passed through
+  case class FaultConfig(failureRate: Int, failureCodes: List[Int]) {
+    private def failingEntries: Int = failureRate / 10
+
+    def responseCodes: List[Int] =
+      List.fill(10 - failingEntries)(200) ++
+        (0 until failingEntries).map(i => failureCodes(i % failureCodes.size))
+
+    // For Mode.remote: httpbingo picks a random status per request, duplicates act as weights
+    // e.g. status/200,200,200,200,200,200,200,500,429,503
+    def remotePath: String = responseCodes.mkString("status/", ",", "")
+
+    def validated: Either[String, FaultConfig] =
+      if (failureRate < 0 || failureRate > 100 || failureRate % 10 != 0)
+        Left(s"failureRate must be 0-100 in steps of 10, got: $failureRate")
+      else if (failureCodes.isEmpty)
+        Left("failureCodes must not be empty")
+      else if (!failureCodes.forall(FaultConfig.allowedFailureCodes.contains))
+        Left(s"failureCodes must be a subset of: ${FaultConfig.allowedFailureCodes.mkString(", ")}")
+      else
+        Right(copy(failureCodes = failureCodes.distinct))
+  }
+
+  object FaultConfig {
+    val allowedFailureCodes: List[Int] = List(500, 502, 503, 504, 429)
   }
 
   object Mode extends Enumeration {

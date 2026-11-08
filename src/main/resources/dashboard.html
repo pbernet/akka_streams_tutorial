@@ -1,214 +1,542 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>ReverseProxy Monitor Dashboard</title>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReverseProxy Monitor</title>
     <style>
+        :root {
+            --bg: #020617;
+            --fg: #f1f5f9;
+            --muted: #94a3b8;
+            --dim: #64748b;
+            --line: #1e293b;
+            --up: #34d399;
+            --down: #fb7185;
+            --bot: #fcd34d;
+            --focus: #34d399;
+            --info: #60a5fa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2.5rem 2rem;
+            background: var(--bg);
+            color: var(--fg);
+            font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .page-header,
+        .workspace,
+        .traffic {
+            width: min(100%, 1600px);
+            margin-inline: auto;
         }
 
-        .header {
-            background: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        h1 {
+            margin: 0;
+            font-size: clamp(1.75rem, 4vw, 2.25rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px; 
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
         }
 
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        /* Monospace values */
+        #failure-rate-value,
+        .code-option,
+        .readout dd,
+        .cb-target,
+        .metrics dd,
+        td.mono {
+            font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+            font-variant-numeric: tabular-nums;
         }
 
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #3498db;
-        }
-
-        .stat-label {
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-
-        .traffic-table {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .traffic-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .traffic-table th, .traffic-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        .traffic-table th {
-            background-color: #34495e;
-            color: white;
+        /* Small uppercase labels: readout, statistics and table headers */
+        .readout dt,
+        .metrics dt,
+        th {
+            color: var(--dim);
+            font-size: 0.75rem;
             font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
         }
 
-        .status-ok {
-            color: #27ae60;
+        .panel-hint {
+            margin: 0.25rem 0 1.25rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .page-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem 2rem;
+        }
+
+        .header-status {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem 1.5rem;
+        }
+
+        .mode-badge {
+            border: 1px solid currentColor;
+            border-radius: 999px;
+            padding: 0.25rem 0.85rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+            white-space: nowrap;
+        }
+
+        /* Mode colours, used by the header badge and the traffic table */
+        [data-mode='local'] {
+            color: var(--info);
+        }
+
+        [data-mode='remote'] {
+            color: var(--bot);
+        }
+
+        .connection {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+            color: #cbd5e1;
+        }
+
+        .conn-dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background: var(--dim);
+        }
+
+        .conn-dot[data-state='live'] {
+            background: var(--up);
+        }
+
+        .conn-dot[data-state='reconnecting'] {
+            background: var(--bot);
+        }
+
+        .conn-dot[data-state='disconnected'] {
+            background: #f43f5e;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+            align-items: start;
+        }
+
+        .column {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 0.75rem;
+            background: rgba(15, 23, 42, 0.72);
+            padding: 1.25rem;
+        }
+
+        .traffic {
+            margin-top: 1.5rem;
+        }
+
+        :is(button, a, input):focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        label,
+        legend {
             font-weight: bold;
         }
 
-        .status-error {
-            color: #e74c3c;
-            font-weight: bold;
+        /* Fault injection */
+
+        .slider-row {
+            display: grid;
+            grid-template-columns: 7.5rem minmax(0, 1fr) 9.5rem;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .connection-status {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
+        #failure-rate {
+            width: 100%;
+            accent-color: var(--up);
+            cursor: pointer;
         }
 
-        .connected {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        #failure-rate[data-level='degraded'],
+        #failure-rate[data-level='flaky'] {
+            accent-color: var(--bot);
         }
 
-        .disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        #failure-rate[data-level='failing'],
+        #failure-rate[data-level='down'] {
+            accent-color: var(--down);
         }
 
-        .section {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        #failure-rate-value {
+            text-align: right;
         }
 
-        .refresh-link {
-            color: white;
-            text-decoration: none;
+        .scale {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.25rem 9.5rem 0 8.5rem;
+            color: var(--dim);
+            font-size: 0.75rem;
         }
+
+        .codes {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem 1.25rem;
+            margin: 1.25rem 0 0;
+            padding: 0;
+            border: none;
+        }
+
+        .codes legend {
+            float: left;
+            width: 7.5rem;
+            padding: 0;
+        }
+
+        .code-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+        }
+
+        .code-option input {
+            width: 1.125rem;
+            height: 1.125rem;
+            margin: 0;
+            accent-color: var(--up);
+            cursor: pointer;
+        }
+
+        .code-option[data-kind='4xx'] {
+            color: var(--bot);
+        }
+
+        .readout {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            gap: 0.5rem 1.5rem;
+            margin: 1.25rem 0 0;
+            border-radius: 0.375rem;
+            background: var(--bg);
+            padding: 0.75rem 1rem;
+        }
+
+        .readout dt {
+            line-height: 1.9;
+        }
+
+        .readout dd {
+            margin: 0;
+            font-size: 0.95rem;
+            overflow-wrap: anywhere;
+        }
+
+        .fault-note {
+            margin: 0.75rem 0 0;
+            color: var(--muted);
+            font-size: 0.875rem;
+        }
+
+        .fault-error {
+            margin: 0.75rem 0 0;
+            border-radius: 0.375rem;
+            background: #450a0a;
+            padding: 0.5rem 0.75rem;
+            color: var(--down);
+        }
+
+        /* Circuit breakers */
 
         .cb-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
         }
 
         .cb-item {
-            border: 1px solid #ecf0f1;
-            border-radius: 6px;
-            padding: 15px;
-            background: #fafafa;
+            border: 1px solid var(--line);
+            border-radius: 0.375rem;
+            background: var(--bg);
+            padding: 0.75rem 1rem;
         }
 
         .cb-header {
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
             align-items: center;
-            margin-bottom: 10px;
+            justify-content: space-between;
+            gap: 0.25rem 0.75rem;
         }
 
         .cb-target {
-            font-weight: bold;
+            font-size: 0.9rem;
         }
 
         .cb-status {
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border-radius: 0.125rem;
+            padding: 0.1rem 0.4rem;
+            white-space: nowrap;
         }
 
-        .cb-status.closed {
-            color: #27ae60;
+        .cb-status[data-state='CLOSED'] {
+            color: var(--up);
+            background: rgba(52, 211, 153, 0.15);
         }
 
-        .cb-status.opened {
-            color: #e74c3c;
+        .cb-status[data-state='OPENED'] {
+            color: var(--down);
+            background: rgba(251, 113, 133, 0.15);
         }
 
-        .cb-status.half-opened {
-            color: #f39c12;
+        .cb-status[data-state='HALF-OPENED'] {
+            color: var(--bot);
+            background: rgba(252, 211, 77, 0.15);
         }
 
         .cb-metrics {
-            font-size: 12px;
-            color: #7f8c8d;
+            margin-top: 0.35rem;
+            color: var(--muted);
+            font-size: 0.8rem;
         }
 
-        .cb-metrics span {
-            margin-right: 15px;
+        /* Statistics */
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5rem 2rem;
+            margin: 1.25rem 0 0;
+        }
+
+        .metrics dd {
+            margin: 0;
+            font-size: 2.25rem;
+            line-height: 1.1;
+        }
+
+        /* The "/1000" after the request and response counts */
+        .metrics dd span {
+            color: var(--dim);
+            font-size: 1.25rem;
+        }
+
+        #error-rate[data-bad='true'] {
+            color: var(--down);
+        }
+
+        /* Traffic table */
+
+        .table-wrap {
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        td {
+            font-size: 0.925rem;
+        }
+
+        [data-status] {
+            font-weight: bold;
+        }
+
+        [data-status='2xx'] {
+            color: var(--up);
+        }
+
+        [data-status='4xx'] {
+            color: var(--bot);
+        }
+
+        [data-status='5xx'] {
+            color: var(--down);
+        }
+
+        .empty {
+            color: var(--dim);
+        }
+
+        @media (max-width: 960px) {
+            body {
+                padding: 1.5rem 1rem;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .slider-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+            }
+
+            .slider-row label {
+                grid-column: 1 / -1;
+            }
+
+            .scale {
+                margin: 0.25rem 7rem 0 0;
+            }
+
+            .codes legend {
+                float: none;
+                width: 100%;
+            }
+
+            .metrics dd {
+                font-size: 1.75rem;
+            }
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1><a href="#" onclick="location.reload(); return false;" class="refresh-link">🔄</a> ReverseProxy Monitor</h1>
-        <p>Real-time traffic monitoring and statistics</p>
+<header class="page-header">
+    <h1>ReverseProxy Monitor</h1>
+    <div class="header-status">
+        <span class="mode-badge" id="mode-badge" data-mode="" title="Mode of the built-in clients">Mode: …</span>
+        <p class="connection" role="status" aria-label="Connection to ReverseProxy">
+            <span class="conn-dot" id="conn-dot" data-state="connecting" aria-hidden="true"></span>
+            <span id="conn-label">Connecting</span>
+        </p>
+    </div>
+</header>
+
+<main class="workspace">
+    <div class="column">
+        <section class="panel" aria-labelledby="faults-heading">
+            <h2 id="faults-heading">Fault injection</h2>
+            <p class="panel-hint">How often the target servers reply with a failure code.</p>
+
+            <div class="slider-row">
+                <label for="failure-rate">Failure rate</label>
+                <input type="range" id="failure-rate" min="0" max="100" step="10" value="0" data-level="healthy">
+                <output id="failure-rate-value" for="failure-rate">0% · Healthy</output>
+            </div>
+            <div class="scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+
+            <fieldset class="codes">
+                <legend>Failure codes</legend>
+                <label class="code-option" title="Internal Server Error – retried by ReverseProxy">
+                    <input type="checkbox" name="failure-code" value="500" checked>500</label>
+                <label class="code-option" title="Bad Gateway – retried by ReverseProxy">
+                    <input type="checkbox" name="failure-code" value="502">502</label>
+                <label class="code-option" title="Service Unavailable – retried by ReverseProxy">
+                    <input type="checkbox" name="failure-code" value="503" checked>503</label>
+                <label class="code-option" title="Gateway Timeout – retried by ReverseProxy">
+                    <input type="checkbox" name="failure-code" value="504">504</label>
+                <label class="code-option" data-kind="4xx"
+                       title="Too Many Requests – not retried, passed to the client, does not trip the circuit breaker">
+                    <input type="checkbox" name="failure-code" value="429">429</label>
+            </fieldset>
+
+            <dl class="readout">
+                <dt>Response codes</dt>
+                <dd id="response-codes">200 ×10</dd>
+                <dt>Per attempt</dt>
+                <dd id="attempt-failure">0% fail</dd>
+                <dt>To the client</dt>
+                <dd id="client-failure">≈ 0% fail</dd>
+            </dl>
+            <p class="fault-note">
+                ReverseProxy retries 5xx up to 3×; 429 is passed through to the client.
+                <span id="fault-scope">Applies to the local target servers.</span>
+            </p>
+            <p class="fault-error" id="fault-error" role="alert" hidden></p>
+        </section>
     </div>
 
-    <div id="connection-status" class="connection-status disconnected">
-        🔴 Disconnected from ReverseProxy
-    </div>
+    <div class="column">
+        <section class="panel" aria-labelledby="stats-heading">
+            <h2 id="stats-heading">Statistics</h2>
+            <dl class="metrics">
+                <div>
+                    <dt>Requests</dt>
+                    <dd id="total-requests">0</dd>
+                </div>
+                <div>
+                    <dt>Responses</dt>
+                    <dd id="total-responses">0</dd>
+                </div>
+                <div>
+                    <dt>Error rate</dt>
+                    <dd id="error-rate">0.0%</dd>
+                </div>
+                <div>
+                    <dt>Avg response time</dt>
+                    <dd id="avg-response-time">0 ms</dd>
+                </div>
+            </dl>
+        </section>
 
-    <div class="section">
-        <h3>🔧 Circuit Breakers</h3>
-        <div class="cb-grid" id="cb-grid">
-            <p>Loading circuit breaker status...</p>
-        </div>
+        <section class="panel" aria-labelledby="cb-heading">
+            <h2 id="cb-heading">Circuit breakers</h2>
+            <div class="cb-grid" id="cb-grid">
+                <p class="empty">Loading circuit breaker status…</p>
+            </div>
+        </section>
     </div>
+</main>
 
-    <div class="section">
-        <h3>📊 Statistics (max last 1000 requests)</h3>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="total-requests">0</div>
-                <div class="stat-label">Total Requests</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-responses">0</div>
-                <div class="stat-label">Total Responses</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="error-rate">0.0%</div>
-                <div class="stat-label">Error Rate</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avg-response-time">0ms</div>
-                <div class="stat-label">Avg Response Time</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="traffic-table">
-        <h3>🚦 Traffic data (last 100 requests)</h3>
+<section class="panel traffic" aria-labelledby="traffic-heading">
+    <h2 id="traffic-heading">Traffic</h2>
+    <p class="panel-hint">Last 100 requests.</p>
+    <div class="table-wrap">
         <table>
             <thead>
             <tr>
                 <th>Time</th>
+                <th>Mode</th>
                 <th>Method</th>
                 <th>Target URL</th>
                 <th>Status</th>
@@ -218,15 +546,123 @@
             </thead>
             <tbody id="traffic-tbody">
             <tr>
-                <td colspan="6">Loading traffic data...</td>
+                <td colspan="7" class="empty">Loading traffic data…</td>
             </tr>
             </tbody>
         </table>
     </div>
-</div>
+</section>
 
 <script>
+    const slider = document.getElementById('failure-rate');
+    const sliderValue = document.getElementById('failure-rate-value');
+    const codeInputs = [...document.querySelectorAll('input[name="failure-code"]')];
+    const faultError = document.getElementById('fault-error');
+    const faultScope = document.getElementById('fault-scope');
+
     let ws = null;
+
+    function levelOf(rate) {
+        if (rate === 0) return 'Healthy';
+        if (rate <= 20) return 'Flaky';
+        if (rate <= 50) return 'Degraded';
+        if (rate < 100) return 'Failing';
+        return 'Down';
+    }
+
+    function showSliderValue(rate) {
+        const level = levelOf(rate);
+        sliderValue.textContent = `${rate}% · ${level}`;
+        slider.dataset.level = level.toLowerCase();
+    }
+
+    // e.g. [200,200,200,200,200,200,200,500,429,503] -> "200 ×7, 500, 429, 503"
+    function formatResponseCodes(codes) {
+        const runs = [];
+        codes.forEach(code => {
+            const last = runs[runs.length - 1];
+            if (last && last.code === code) last.count++;
+            else runs.push({code, count: 1});
+        });
+        return runs.map(r => r.count > 1 ? `${r.code} ×${r.count}` : `${r.code}`).join(', ');
+    }
+
+    function formatPercent(fraction) {
+        const percent = Math.round(fraction * 1000) / 10;
+        return percent + '%';
+    }
+
+    // A request reaches the client as failure unless an attempt returns 200 before
+    // a 429 arrives (not retried) or the 3 attempts are used up by 5xx
+    function showReadout(responseCodes) {
+        const n = responseCodes.length;
+        const q5 = responseCodes.filter(c => c >= 500).length / n;
+        const q4 = responseCodes.filter(c => c >= 400 && c < 500).length / n;
+        const clientFailure = 1 - (1 - q5 - q4) * (1 + q5 + q5 * q5);
+        document.getElementById('response-codes').textContent = formatResponseCodes(responseCodes);
+        document.getElementById('attempt-failure').textContent = `${formatPercent(q5 + q4)} fail`;
+        document.getElementById('client-failure').textContent = `≈ ${formatPercent(clientFailure)} fail`;
+    }
+
+    function showFaults(faults, responseCodes) {
+        // Server updates must not move the slider while the user drags it
+        if (!slider.matches(':active')) {
+            slider.value = faults.failureRate;
+            showSliderValue(faults.failureRate);
+        }
+        codeInputs.forEach(input => input.checked = faults.failureCodes.includes(Number(input.value)));
+        showReadout(responseCodes);
+    }
+
+    async function sendFaults() {
+        const body = {
+            failureRate: Number(slider.value),
+            failureCodes: codeInputs.filter(input => input.checked).map(input => Number(input.value))
+        };
+        let problem = null;
+        try {
+            const response = await fetch('/api/faults', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            if (response.ok) updateStats(await response.json());
+            else problem = await response.text() || `HTTP ${response.status}`;
+        } catch (error) {
+            problem = error.message;
+        }
+        faultError.textContent = `Could not change faults: ${problem}`;
+        faultError.hidden = problem === null;
+    }
+
+    slider.addEventListener('input', () => showSliderValue(Number(slider.value)));
+    slider.addEventListener('change', sendFaults);
+
+    codeInputs.forEach(input => input.addEventListener('change', () => {
+        // At least one failure code must stay selected
+        if (!codeInputs.some(i => i.checked)) {
+            input.checked = true;
+            return;
+        }
+        sendFaults();
+    }));
+
+    function showMode(mode, targets) {
+        const badge = document.getElementById('mode-badge');
+        const where = targets.length === 1 ? new URL(targets[0]).hostname : `${targets.length} target servers`;
+        badge.textContent = `Mode: ${mode} · ${where}`;
+        badge.title = `Built-in clients send to: ${targets.join(', ')}`;
+        badge.dataset.mode = mode;
+        faultScope.textContent = mode === 'remote'
+            ? 'Applies to the built-in clients; curl/Gatling choose their own /status/… path.'
+            : 'Applies to the local target servers.';
+    }
+
+    function setConnectionState(state) {
+        const labels = {live: 'Live', reconnecting: 'Reconnecting', disconnected: 'Disconnected'};
+        document.getElementById('conn-dot').dataset.state = state;
+        document.getElementById('conn-label').textContent = labels[state];
+    }
 
     function formatTimestamp(timestamp) {
         return new Date(timestamp).toLocaleTimeString();
@@ -236,107 +672,97 @@
         return ms ? ms + ' ms' : '-';
     }
 
-    function setConnectionStatus(connected) {
-        const el = document.getElementById('connection-status');
-        el.textContent = connected ? '🟢 Connected to ReverseProxy' : '🔴 Disconnected from ReverseProxy';
-        el.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
-    }
-
     function formatStatus(status) {
         if (!status) return '-';
-        const className = status >= 400 ? 'status-error' : 'status-ok';
-        return `<span class="${className}">${status}</span>`;
+        const kind = status >= 500 ? '5xx' : status >= 400 ? '4xx' : '2xx';
+        return `<span data-status="${kind}">${status}</span>`;
     }
 
     function updateStats(stats) {
-        document.getElementById('total-requests').textContent = stats.totalRequests;
-        document.getElementById('total-responses').textContent = stats.totalResponses;
-        document.getElementById('error-rate').textContent = (stats.errorRate * 100).toFixed(1) + '%';
-        document.getElementById('avg-response-time').textContent = Math.round(stats.avgResponseTime) + 'ms';
+        const ofMax = `<span>/${stats.maxHistorySize}</span>`;
+        document.getElementById('total-requests').innerHTML = stats.totalRequests + ofMax;
+        document.getElementById('total-responses').innerHTML = stats.totalResponses + ofMax;
+        const errorRate = document.getElementById('error-rate');
+        errorRate.textContent = (stats.errorRate * 100).toFixed(1) + '%';
+        errorRate.dataset.bad = String(stats.errorRate > 0);
+        document.getElementById('avg-response-time').textContent = Math.round(stats.avgResponseTime) + ' ms';
         updateCircuitBreakers(stats.circuitBreakers);
+        showMode(stats.mode, stats.targets);
+        showFaults(stats.faults, stats.responseCodes);
     }
 
     function updateCircuitBreakers(circuitBreakers) {
         const container = document.getElementById('cb-grid');
 
         if (circuitBreakers.length === 0) {
-            container.innerHTML = '<p>No circuit breakers configured</p>';
+            container.innerHTML = '<p class="empty">No circuit breakers configured</p>';
             return;
         }
 
-        const items = circuitBreakers.map(cb => {
-            const closedSince = cb.closedSince
-                ? new Date(cb.closedSince).toLocaleString()
-                : '-';
-
+        container.innerHTML = circuitBreakers.map(cb => {
+            const closedSince = cb.closedSince ? new Date(cb.closedSince).toLocaleString() : '-';
             return `
-                    <div class="cb-item">
-                        <div class="cb-header">
-                            <span class="cb-target">${cb.target}</span>
-                            <span class="cb-status ${cb.state.toLowerCase()}">${cb.state}</span>
-                        </div>
-                        <div class="cb-metrics">
-                            <span>Closed since: ${closedSince}</span>
-                        </div>
+                <div class="cb-item">
+                    <div class="cb-header">
+                        <span class="cb-target">${cb.target}</span>
+                        <span class="cb-status" data-state="${cb.state}">${cb.state}</span>
                     </div>
-                `;
+                    <div class="cb-metrics">Closed since: ${closedSince}</div>
+                </div>`;
         }).join('');
-
-        container.innerHTML = items;
     }
 
+    /**
+     * @param {{
+     *   request: {timestamp: number, mode: string, method: string, targetUrl: string, correlationId: string},
+     *   response: ?{status: number},
+     *   duration: ?number
+     * }[]} traffic entries from /api/traffic
+     */
     function updateTrafficTable(traffic) {
         const tbody = document.getElementById('traffic-tbody');
         if (traffic.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No traffic data available</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">No traffic data available</td></tr>';
             return;
         }
 
-        const rows = traffic.reverse().map(entry => {
+        tbody.innerHTML = traffic.reverse().map(entry => {
             const req = entry.request;
             const resp = entry.response;
             return `
-                    <tr>
-                        <td>${formatTimestamp(req.timestamp)}</td>
-                        <td>${req.method}</td>
-                        <td>${req.targetUrl}</td>
-                        <td>${formatStatus(resp ? resp.status : null)}</td>
-                        <td>${formatDuration(entry.duration)}</td>
-                        <td>${req.correlationId}</td>
-                    </tr>
-                `;
+                <tr>
+                    <td class="mono">${formatTimestamp(req.timestamp)}</td>
+                    <td><span data-mode="${req.mode}">${req.mode}</span></td>
+                    <td>${req.method}</td>
+                    <td class="mono">${req.targetUrl}</td>
+                    <td class="mono">${formatStatus(resp ? resp.status : null)}</td>
+                    <td class="mono">${formatDuration(entry.duration)}</td>
+                    <td class="mono">${req.correlationId}</td>
+                </tr>`;
         }).join('');
-        tbody.innerHTML = rows;
     }
 
     function connectWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+        ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
 
-        ws = new WebSocket(wsUrl);
+        ws.onopen = () => setConnectionState('live');
 
-        ws.onopen = function () {
-            setConnectionStatus(true);
-        };
-
-        ws.onmessage = function (event) {
+        ws.onmessage = event => {
             try {
-                const stats = JSON.parse(event.data);
-                updateStats(stats);
+                updateStats(JSON.parse(event.data));
             } catch (e) {
                 console.error('Error parsing WebSocket message:', e);
             }
         };
 
-        ws.onclose = function () {
-            setConnectionStatus(false);
+        ws.onclose = () => {
+            setConnectionState('reconnecting');
             // Attempt to reconnect after 3 seconds
             setTimeout(connectWebSocket, 3000);
         };
 
-        ws.onerror = function (error) {
-            console.error('WebSocket error:', error);
-        };
+        ws.onerror = error => console.error('WebSocket error:', error);
     }
 
     function loadTrafficData() {
@@ -346,7 +772,7 @@
             .catch(error => {
                 console.error('Error loading traffic data:', error);
                 document.getElementById('traffic-tbody').innerHTML =
-                    '<tr><td colspan="6">Error loading traffic data</td></tr>';
+                    '<tr><td colspan="7" class="empty">Error loading traffic data</td></tr>';
             });
     }
 
@@ -354,16 +780,18 @@
         fetch('/api/stats')
             .then(response => response.json())
             .then(updateStats)
-            .catch(error => console.error('Error loading stats:', error));
+            .catch(error => {
+                console.error('Error loading stats:', error);
+                setConnectionState('disconnected');
+            });
     }
-
 
     // Auto-refresh interval
     setInterval(() => {
-            loadTrafficData();
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                loadStats();
-            }
+        loadTrafficData();
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            loadStats();
+        }
     }, 2000);
 
     // Initial load

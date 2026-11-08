@@ -1,6 +1,9 @@
 package akkahttp
 
+import akkahttp.ReverseProxy.FaultConfig
+import akkahttp.ReverseProxy.Mode.Mode
 import io.circe.generic.auto.*
+import io.circe.parser.decode
 import io.circe.syntax.*
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
@@ -27,13 +30,14 @@ import scala.util.{Failure, Success}
   *
   * Features:
   * - Real-time traffic monitoring via WebSockets
-  * - HTML dashboard to show traffic data and
-  * - Performance metrics (response times, error rates)
+  * - HTML dashboard to:
+  *   - Show traffic data
+  *   - Show performance metrics (response times, error rates)
+  *   - Fault injection: control the faultiness of the target servers
   */
 object ReverseProxyMonitor {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  // Data models for monitoring
   private case class RequestInfo(
                                   id: String,
                                   timestamp: Long,
@@ -42,7 +46,8 @@ object ReverseProxyMonitor {
                                   headers: Map[String, String],
                                   clientHost: String,
                                   targetUrl: String,
-                                  correlationId: String
+                                  correlationId: String,
+                                  mode: String
                                 )
 
   private case class ResponseInfo(
@@ -70,12 +75,17 @@ object ReverseProxyMonitor {
   private case class ProxyStats(
                                  totalRequests: Long,
                                  totalResponses: Long,
+                                 maxHistorySize: Int,
                                  errorRate: Double,
                                  avgResponseTime: Double,
-                                 circuitBreakers: List[CircuitBreakerStatus]
+                                 circuitBreakers: List[CircuitBreakerStatus],
+                                 mode: String,
+                                 targets: List[String],
+                                 faults: FaultConfig,
+                                 responseCodes: List[Int]
                                )
 
-  // In-memory storage for recent traffic (in production, consider using a proper time-series DB)
+  // In-memory storage for recent traffic (vs proper time-series DB)
   private val trafficHistory = new ConcurrentLinkedQueue[TrafficEntry]()
   private val maxHistorySize = 1000
 
@@ -86,9 +96,16 @@ object ReverseProxyMonitor {
   private var broadcastKillSwitch: SharedKillSwitch = uninitialized
   private var eventSource: Source[String, NotUsed] = uninitialized
 
-  def initializeWebUI(system: ActorSystem, targets: Seq[ReverseProxy.Target], port: Int = 9000): Future[Http.ServerBinding] = {
+  // Mode and targets of the built-in clients, shown in the dashboard header
+  @volatile private var clientMode: String = "N/A"
+  @volatile private var clientTargets: List[String] = Nil
+
+  def initializeWebUI(system: ActorSystem, mode: Mode, targets: Seq[ReverseProxy.Target], port: Int = 9000): Future[Http.ServerBinding] = {
     implicit val actorSystem: ActorSystem = system
     implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+
+    clientMode = mode.toString
+    clientTargets = targets.map(_.url).distinct.toList
 
     val sharedKillSwitch = KillSwitches.shared("websocket-broadcast")
     val source = Source
@@ -124,7 +141,7 @@ object ReverseProxyMonitor {
   }
 
 
-  def logRequest(request: HttpRequest, targetUrl: String, correlationId: String): String = {
+  def logRequest(request: HttpRequest, targetUrl: String, correlationId: String, mode: Mode): String = {
     val requestId = java.util.UUID.randomUUID().toString
     val requestInfo = RequestInfo(
       id = requestId,
@@ -136,7 +153,8 @@ object ReverseProxyMonitor {
         .collect { case address: RemoteAddress => address }
         .map(_.toString).getOrElse("unknown"),
       targetUrl = targetUrl,
-      correlationId = correlationId
+      correlationId = correlationId,
+      mode = mode.toString
     )
 
     val entry = TrafficEntry(requestInfo)
@@ -191,6 +209,7 @@ object ReverseProxyMonitor {
   }
 
   private def getCurrentStats: ProxyStats = {
+    val faults = ReverseProxy.faultConfig
     val entries = trafficHistory.asScala.toList
     val totalRequests = entries.size.toLong
     val responsesWithData = entries.filter(_.response.isDefined)
@@ -204,9 +223,14 @@ object ReverseProxyMonitor {
     ProxyStats(
       totalRequests = totalRequests,
       totalResponses = totalResponses,
+      maxHistorySize = maxHistorySize,
       errorRate = errorRate,
       avgResponseTime = avgResponseTime,
-      circuitBreakers = circuitBreakerStates.values().asScala.toList
+      circuitBreakers = circuitBreakerStates.values().asScala.toList,
+      mode = clientMode,
+      targets = clientTargets,
+      faults = faults,
+      responseCodes = faults.responseCodes
     )
   }
 
@@ -225,6 +249,18 @@ object ReverseProxyMonitor {
           get {
             complete {
               getCurrentStats.asJson.noSpaces
+            }
+          }
+        } ~
+        path("faults") {
+          post {
+            entity(as[String]) { json =>
+              decode[FaultConfig](json).left.map(_.getMessage).flatMap(ReverseProxy.updateFaults) match {
+                case Right(_) =>
+                  complete(HttpEntity(ContentTypes.`application/json`, getCurrentStats.asJson.noSpaces))
+                case Left(error) =>
+                  complete(StatusCodes.BadRequest, error)
+              }
             }
           }
         } ~
