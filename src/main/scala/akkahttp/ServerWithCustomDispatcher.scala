@@ -16,6 +16,8 @@ import scala.util.{Failure, Success}
   * it only makes the custom execution context available.
   * Wrapping a task in a Future explicitly runs the task on the custom execution context.
   *
+  * Custom dispatcher needs to be defined in application.conf
+  *
   * Full example for this answer:
   * https://stackoverflow.com/questions/79141989/executioncontext-issue-in-akka-http-server/79145603#79145603
   */
@@ -42,7 +44,7 @@ object ServerWithCustomDispatcher {
         extractRequest { request =>
           // Move the operation inside a Future to ensure it runs on the custom dispatcher
           val result = Future {
-            logger.info(s"Got request from client: ${request.getHeader("User-Agent")}")
+            logger.info(s"Got request from client: ${request.header("User-Agent").fold("N/A")(_.value())}")
             val msg = s"Execution context: $myExCon with thread: ${Thread.currentThread.getName}"
             logger.info(msg)
             HttpResponse(StatusCodes.OK, entity = s"$msg")
@@ -53,5 +55,5 @@ object ServerWithCustomDispatcher {
     }
   }
 
-  lazy val bindingFuture = Http().newServerAt("localhost", 9000).bindFlow(route)
+  lazy val bindingFuture = Http().newServerAt("localhost", 9000).bind(route)
 }

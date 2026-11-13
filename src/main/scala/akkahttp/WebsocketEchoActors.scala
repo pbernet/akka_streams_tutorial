@@ -109,13 +109,13 @@ object WebsocketEchoActors extends ClientCommon {
     val route: Route = {
       path("echo") {
         extractRequest { request =>
-          logger.info(s"Got echo request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo request from client: ${request.header("User-Agent").fold("N/A")(_.value())}")
           handleWebSocketMessages(websocketEchoFlow)
         }
       }
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
+    val bindingFuture = Http().newServerAt(address, port).bind(route)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info(s"Server started, listening on: ${b.localAddress}")

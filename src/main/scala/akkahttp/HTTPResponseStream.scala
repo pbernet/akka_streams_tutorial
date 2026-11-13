@@ -111,7 +111,7 @@ object HTTPResponseStream extends DefaultJsonProtocol with SprayJsonSupport {
       }
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
+    val bindingFuture = Http().newServerAt(address, port).bind(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("Server started, listening on: " + b.localAddress)

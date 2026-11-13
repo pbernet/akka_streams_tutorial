@@ -60,7 +60,7 @@ class WebsocketServer extends WebSocketDirectives {
         handleWebSocketMessages(echoFlow)
       }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(websocketRoute)
+    val bindingFuture = Http().newServerAt(address, port).bind(websocketRoute)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("WebsocketServer started, listening on: " + b.localAddress)

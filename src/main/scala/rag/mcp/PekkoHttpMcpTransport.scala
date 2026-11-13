@@ -137,7 +137,7 @@ class PekkoHttpMcpTransport(
     val acceptsRequiredTypes = Seq(MediaTypes.`application/json`, MediaTypes.`text/event-stream`).forall { mediaType =>
       acceptedMediaRanges.exists(mediaRange => mediaRange.qValue > 0.0f && mediaRange.matches(mediaType))
     }
-    val requestedVersion = request.headers.find(_.is("mcp-protocol-version")).map(_.value())
+    val requestedVersion = request.header("mcp-protocol-version").map(_.value())
     val supportedVersion = requestedVersion.forall(protocolVersions().contains)
 
     if (!isJson) {

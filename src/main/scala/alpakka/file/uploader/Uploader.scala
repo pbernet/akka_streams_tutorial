@@ -50,7 +50,7 @@ class Uploader(system: ActorSystem) {
       }
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
+    val bindingFuture = Http().newServerAt(address, port).bind(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("Mock server started, listening on: {}", b.localAddress)

@@ -10,8 +10,8 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.*
-import scala.compat.java8.StreamConverters.StreamHasToScala
 import scala.concurrent.Future
+import scala.jdk.StreamConverters.*
 
 /**
   * Detect (new/changed) files in `rootDir/upload` and send file paths to the upload sink
@@ -29,17 +29,20 @@ import scala.concurrent.Future
   */
 class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
-  implicit val system: ActorSystem = ActorSystem()
 
-  import system.dispatcher
-
-  val uploader: Uploader = Uploader(system)
-
+  // Validate before starting the ActorSystem and the Uploader (which binds its port),
+  // so that a failed construction does not leave them running
   if (!Files.exists(uploadDir)) {
     val errorMessage = s"Invalid upload directory path: $uploadDir"
     logger.error(errorMessage)
     throw new IllegalArgumentException(errorMessage)
   }
+
+  implicit val system: ActorSystem = ActorSystem()
+
+  import system.dispatcher
+
+  val uploader: Uploader = Uploader(system)
 
   private val uploadSink: Sink[Path, NotUsed] = MergeHub
     .source[Path](perProducerBufferSize = 1000)
@@ -58,7 +61,7 @@ class DirectoryWatcher(uploadDir: Path, processedDir: Path) {
     Files
       .walk(uploadDirPath)
       .filter(path => Files.isDirectory(path))
-      .toScala[List]
+      .toScala(List)
       .map(path => uploadAllFilesFrom(path))
   }
 

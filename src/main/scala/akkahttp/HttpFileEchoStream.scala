@@ -88,7 +88,7 @@ object HttpFileEchoStream extends JsonProtocol {
         }
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
+    val bindingFuture = Http().newServerAt(address, port).bind(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info(s"Server started, listening on: ${b.localAddress}")

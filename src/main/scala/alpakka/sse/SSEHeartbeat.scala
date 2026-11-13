@@ -70,7 +70,7 @@ object SSEHeartbeat {
         events
       }
 
-      val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
+      val bindingFuture = Http().newServerAt(address, port).bind(route)
       bindingFuture.onComplete {
         case Success(b) =>
           println("Server started, listening on: " + b.localAddress)

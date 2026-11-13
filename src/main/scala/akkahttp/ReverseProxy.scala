@@ -135,7 +135,7 @@ object ReverseProxy {
 
     def httpClient(clientId: Int, proxyHost: String, proxyPort: Int, targetHost: Mode, nbrOfRequests: Int) = {
       def logResponse(response: HttpResponse): Unit = {
-        val id = response.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
+        val id = response.header("X-Correlation-ID").fold("N/A")(_.value())
         val msg = response.entity.dataBytes.runReduce(_ ++ _).map(data => data.utf8String)
         msg.onComplete(msg => logger.info(s"[$id] Client: $clientId got response: ${response.status.intValue()} with msg: ${msg.getOrElse("N/A")}"))
       }
@@ -166,7 +166,7 @@ object ReverseProxy {
     def handlerWithCircuitBreaker(request: HttpRequest): Future[HttpResponse] = {
       val host = request.header[Host].map(_.host.address()).getOrElse("N/A")
       val mode = Mode.values.find(_.toString == host).getOrElse(Mode.local)
-      val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
+      val id = request.header("X-Correlation-ID").fold("N/A")(_.value())
 
       val startTime = System.currentTimeMillis()
 
@@ -270,7 +270,7 @@ object ReverseProxy {
       extractRequest { request =>
         complete {
           Thread.sleep(ThreadLocalRandom.current.nextInt(1, 20) * 100)
-          val id = request.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
+          val id = request.header("X-Correlation-ID").fold("N/A")(_.value())
 
           val responseCodes = faultConfig.responseCodes
           val randomResponseCode = responseCodes(new scala.util.Random().nextInt(responseCodes.length))
@@ -373,7 +373,7 @@ object Retry {
       case (_, _) =>
         f.onComplete {
           case Success(httpResponse: HttpResponse) if httpResponse.status.intValue() >= 500 =>
-            val id = httpResponse.getHeader("X-Correlation-ID").orElse(RawHeader("X-Correlation-ID", "N/A")).value()
+            val id = httpResponse.header("X-Correlation-ID").fold("N/A")(_.value())
             logger.info(s"[$id] ReverseProxy: got 5xx server error. Retries left: ${times - 1}")
             val exception = new RuntimeException(s"Received: ${httpResponse.status.intValue()} from target server")
             retryPromise[T](times - 1, promise, Some(exception), f)

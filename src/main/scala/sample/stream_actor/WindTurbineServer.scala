@@ -97,7 +97,7 @@ object WindTurbineServer {
     val httpPort = 8080
 
     logger.info(s"About ot bind to: $httpInterface and: $httpPort")
-    val bindingFuture: Future[ServerBinding] = Http().newServerAt(httpInterface, httpPort).bindFlow(route)
+    val bindingFuture: Future[ServerBinding] = Http().newServerAt(httpInterface, httpPort).bind(route)
 
     bindingFuture.map { serverBinding =>
       logger.info(s"Bound to: ${serverBinding.localAddress} ")

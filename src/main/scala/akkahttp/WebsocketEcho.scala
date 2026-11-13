@@ -119,7 +119,7 @@ object WebsocketEcho extends WebSocketDirectives with ClientCommon {
     def getEcho: Route = {
       path("echo") {
         extractRequest { request =>
-          logger.info(s"Got echo request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo request from client: ${request.header("User-Agent").fold("N/A")(_.value())}")
           handleWebSocketMessages(echoFlow)
         }
       }
@@ -128,7 +128,7 @@ object WebsocketEcho extends WebSocketDirectives with ClientCommon {
     def getEchoHeartbeat: Route = {
       path("echo_heartbeat") {
         extractRequest { request =>
-          logger.info(s"Got echo_heartbeat request from client: ${request.getHeader("User-Agent")}")
+          logger.info(s"Got echo_heartbeat request from client: ${request.header("User-Agent").fold("N/A")(_.value())}")
 
           // The inSink and the outSource are independent. By using fromSinkAndSourceCoupled
           // we kill the outSource once we get a terminate signal from the inSink
@@ -157,7 +157,7 @@ object WebsocketEcho extends WebSocketDirectives with ClientCommon {
       getEcho ~ getEchoHeartbeat
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(routes)
+    val bindingFuture = Http().newServerAt(address, port).bind(routes)
     bindingFuture.onComplete {
       case Success(b) =>
         logger.info("Server started, listening on: " + b.localAddress)

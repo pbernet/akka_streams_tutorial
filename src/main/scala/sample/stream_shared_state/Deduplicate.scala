@@ -6,7 +6,6 @@ import org.apache.pekko.stream.ActorAttributes.SupervisionStrategy
 import org.apache.pekko.stream.Supervision.Decider
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 
-import scala.compat.java8.FunctionConverters.*
 import scala.util.control.NonFatal
 
 object Deduplicate {
@@ -56,10 +55,10 @@ final class Deduplicate[T, U](key: T => U, duplicateCount: Long = Long.MaxValue,
       override def onPush(): Unit = {
         try {
           val elem = grab(in)
-          val counter = registry.merge(key(elem), MutableLong(1), asJavaBiFunction((old, _) => {
+          val counter = registry.merge(key(elem), MutableLong(1), (old, _) => {
             pull(in)
             if (old.increment() == duplicateCount) null else old
-          }))
+          })
           if (counter != null && counter.value == 1) {
             push(out, elem)
           }

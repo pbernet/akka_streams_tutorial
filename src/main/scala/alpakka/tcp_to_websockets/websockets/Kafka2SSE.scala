@@ -88,7 +88,7 @@ class Kafka2SSE(mappedPortKafka: Int = 9092) {
       events
     }
 
-    val bindingFuture = Http().newServerAt(address, port).bindFlow(route)
+    val bindingFuture = Http().newServerAt(address, port).bind(route)
     bindingFuture.onComplete {
       case Success(binding) =>
         logger.info(s"Server started, listening on: {}", binding.localAddress)
