@@ -105,7 +105,7 @@ libraryDependencies ++= Seq(
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.6.5",
   "org.apache.httpcomponents.core5" % "httpcore5" % "5.4.4",
   "commons-io" % "commons-io" % "2.20.0",
-  "org.apache.commons" % "commons-lang3" % "3.21.0",
+  "org.apache.commons" % "commons-lang3" % "3.22.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "5.0.15",
 
   "org.apache.camel" % "camel-core" % "4.23.0",
