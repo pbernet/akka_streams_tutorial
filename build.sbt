@@ -17,7 +17,7 @@ val keycloakClientVersion = "26.0.6"
 val sttpVersion = "3.11.0"
 val influxdbVersion = "7.1.0"
 val awsClientVersion = "2.47.4"
-val gatlingVersion = "3.14.9"
+val gatlingVersion = "3.16.1"
 val circeVersion = "0.14.17"
 
 val langchain4jVersion = "1.23.0"
