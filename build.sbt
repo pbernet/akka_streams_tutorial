@@ -103,7 +103,7 @@ libraryDependencies ++= Seq(
   "org.apache.pdfbox" % "pdfbox" % "3.0.7",
   "org.apache.opennlp" % "opennlp-tools" % "2.5.12",
   "org.apache.httpcomponents.client5" % "httpclient5" % "5.6.5",
-  "org.apache.httpcomponents.core5" % "httpcore5" % "5.4.4",
+  "org.apache.httpcomponents.core5" % "httpcore5" % "5.5",
   "commons-io" % "commons-io" % "2.20.0",
   "org.apache.commons" % "commons-lang3" % "3.21.0",
   "com.sksamuel.avro4s" %% "avro4s-core" % "5.0.15",
