@@ -38,6 +38,8 @@ import scala.util.{Failure, Success}
   *  - HTTP Header `X-Correlation-ID` for tracing (only for Mode.local)
   *  - HTTP Header `X-Content-Hash` as an example of an on-the-fly processing scenario
   *  - Visualize traffic with [[ReverseProxyMonitor]]
+  *  - Clients may use HTTP/1.1 or HTTP/2 (prior knowledge or h2c upgrade), targets are reached via HTTP/1.1
+  *  - HTTP/2 connections are protected by the default `frame-type-throttle` (RST_STREAM / empty DATA frame floods)
   *
   * Mode.local (default):
   * HTTP client(s) --> ReverseProxy --> local target server(s)
@@ -58,6 +60,8 @@ import scala.util.{Failure, Success}
   * curl client:
   * curl -H "Host: local" -H "X-Correlation-ID: 1-1" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/mypath
   * curl -H "Host: remote" -o - -i -w " %{time_total}\n" http://127.0.0.1:8080/status/200
+  * curl --http2-prior-knowledge -H "Host: remote" -i http://127.0.0.1:8080/status/200
+  * curl --http2 -H "Host: local" -i http://127.0.0.1:8080/mypath
   *
   * wrk perf clients:
   * wrk -t1 -c5 -d10s -H "Host: local" -H "X-Correlation-ID: wrk-t1" --latency http://127.0.0.1:8080/mypath &
@@ -81,6 +85,10 @@ object ReverseProxy {
 
   val circuitBreakers = new ConcurrentHashMap[String, CircuitBreaker]()
   val requestCounter = new AtomicInteger(0)
+
+  // Not forwarded in either direction: they describe one connection, not the message
+  val hopByHopRequestHeaders: Set[String] = Set("connection", "upgrade", "http2-settings")
+  val hopByHopResponseHeaders: Set[String] = Set("connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade")
 
   val proxyHost = "127.0.0.1"
   val proxyPort = 8080
@@ -164,7 +172,8 @@ object ReverseProxy {
     ).withHeaders(RawHeader("X-Correlation-ID", id))
 
     def handlerWithCircuitBreaker(request: HttpRequest): Future[HttpResponse] = {
-      val host = request.header[Host].map(_.host.address()).getOrElse("N/A")
+      // The effective URI has the host for HTTP/1.1 (from Host) and HTTP/2 (from :authority)
+      val host = request.uri.authority.host.address()
       val mode = Mode.values.find(_.toString == host).getOrElse(Mode.local)
       val id = request.header("X-Correlation-ID").fold("N/A")(_.value())
 
@@ -184,6 +193,11 @@ object ReverseProxy {
           RawHeader("X-Correlation-ID", id))
           // Filter Timeout-Access to avoid log noise, see: https://github.com/akka/akka-http/issues/64
           .filterNot(_.name() == "Timeout-Access")
+          // Hop-by-hop headers describe one connection, e.g. an h2c upgrade from the client
+          .filterNot(h => hopByHopRequestHeaders(h.lowercaseName()))
+
+      def withoutHopByHopHeaders(response: HttpResponse): HttpResponse =
+        response.withHeaders(response.headers.filterNot(h => hopByHopResponseHeaders(h.lowercaseName())))
 
       def uri(target: Target): Uri =
         request.uri.copy(
@@ -230,6 +244,7 @@ object ReverseProxy {
           hashFuture.flatMap { hashHeader =>
             val proxyReq = request
               .withUri(uri(target))
+              .withProtocol(HttpProtocols.`HTTP/1.1`) // the client pool to the targets speaks HTTP/1.1
               .withHeaders(headers(target) :+ hashHeader)
 
             // CircuitBreaker wraps the retry logic
@@ -238,7 +253,7 @@ object ReverseProxy {
                 http.singleRequest(proxyReq)
               }
             }
-          }.andThen {
+          }.map(withoutHopByHopHeaders).andThen {
             case Success(response) =>
               ReverseProxyMonitor.logResponse(requestId, response, System.currentTimeMillis() - startTime, id)
             case Failure(exception) =>
