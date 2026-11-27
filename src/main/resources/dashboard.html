@@ -245,6 +245,15 @@
             color: var(--bot);
         }
 
+        .code-option:has(input:disabled) {
+            opacity: 0.6;
+        }
+
+        .code-option:has(input:disabled),
+        .code-option input:disabled {
+            cursor: not-allowed;
+        }
+
         .readout {
             display: grid;
             grid-template-columns: max-content minmax(0, 1fr);
@@ -611,7 +620,19 @@
             showSliderValue(faults.failureRate);
         }
         codeInputs.forEach(input => input.checked = faults.failureCodes.includes(Number(input.value)));
+        lockLastCode();
         showReadout(responseCodes);
+    }
+
+    // At least one failure code must stay selected: disable the last checked one
+    function lockLastCode() {
+        const checked = codeInputs.filter(input => input.checked);
+        codeInputs.forEach(input => {
+            const label = input.parentElement;
+            label.dataset.title ??= label.title;
+            input.disabled = checked.length === 1 && input.checked;
+            label.title = input.disabled ? 'At least one failure code must stay selected' : label.dataset.title;
+        });
     }
 
     async function sendFaults() {
@@ -639,11 +660,7 @@
     slider.addEventListener('change', sendFaults);
 
     codeInputs.forEach(input => input.addEventListener('change', () => {
-        // At least one failure code must stay selected
-        if (!codeInputs.some(i => i.checked)) {
-            input.checked = true;
-            return;
-        }
+        lockLastCode();
         sendFaults();
     }));
 
@@ -668,12 +685,13 @@
         return new Date(timestamp).toLocaleTimeString();
     }
 
+    // A request without response is still in-flight
     function formatDuration(ms) {
-        return ms ? ms + ' ms' : '-';
+        return ms == null ? '<span class="empty">…</span>' : ms + ' ms';
     }
 
     function formatStatus(status) {
-        if (!status) return '-';
+        if (status == null) return '<span class="empty">in-flight</span>';
         const kind = status >= 500 ? '5xx' : status >= 400 ? '4xx' : '2xx';
         return `<span data-status="${kind}">${status}</span>`;
     }
@@ -715,8 +733,7 @@
     /**
      * @param {{
      *   request: {timestamp: number, mode: string, method: string, targetUrl: string, correlationId: string},
-     *   response: ?{status: number},
-     *   duration: ?number
+     *   response: ?{status: number, responseTimeMs: number}
      * }[]} traffic entries from /api/traffic
      */
     function updateTrafficTable(traffic) {
@@ -736,7 +753,7 @@
                     <td>${req.method}</td>
                     <td class="mono">${req.targetUrl}</td>
                     <td class="mono">${formatStatus(resp ? resp.status : null)}</td>
-                    <td class="mono">${formatDuration(entry.duration)}</td>
+                    <td class="mono">${formatDuration(resp ? resp.responseTimeMs : null)}</td>
                     <td class="mono">${req.correlationId}</td>
                 </tr>`;
         }).join('');

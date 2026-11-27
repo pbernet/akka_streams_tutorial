@@ -62,8 +62,7 @@ object ReverseProxyMonitor {
 
   private case class TrafficEntry(
                                    request: RequestInfo,
-                                   response: Option[ResponseInfo] = None,
-                                   duration: Option[Long] = None
+                                   response: Option[ResponseInfo]
                                  )
 
   private case class CircuitBreakerStatus(
@@ -86,7 +85,9 @@ object ReverseProxyMonitor {
                                )
 
   // In-memory storage for recent traffic (vs proper time-series DB)
-  private val trafficHistory = new ConcurrentLinkedQueue[TrafficEntry]()
+  // Requests stay in arrival order; responses arrive later and are joined by request id
+  private val trafficHistory = new ConcurrentLinkedQueue[RequestInfo]()
+  private val responses = new ConcurrentHashMap[String, ResponseInfo]()
   private val maxHistorySize = 1000
 
   // Circuit breaker states storage
@@ -157,8 +158,7 @@ object ReverseProxyMonitor {
       mode = mode.toString
     )
 
-    val entry = TrafficEntry(requestInfo)
-    addToHistory(entry)
+    addToHistory(requestInfo)
     logger.debug(s"[$correlationId] ReverseProxyMonitor: logged request -> $targetUrl")
     requestId
   }
@@ -175,7 +175,7 @@ object ReverseProxyMonitor {
       errorMessage = errorMessage
     )
 
-    updateHistoryWithResponse(requestId, responseInfo, responseTimeMs)
+    updateHistoryWithResponse(requestId, responseInfo)
     logger.debug(s"[$correlationId] ReverseProxyMonitor: logged response -> ${response.status.intValue()} (${responseTimeMs}ms)")
   }
 
@@ -190,34 +190,32 @@ object ReverseProxyMonitor {
   }
 
 
-  private def addToHistory(entry: TrafficEntry): Unit = {
-    trafficHistory.offer(entry)
+  private def addToHistory(request: RequestInfo): Unit = {
+    trafficHistory.offer(request)
     // Keep history size manageable
     while (trafficHistory.size() > maxHistorySize) {
-      trafficHistory.poll()
+      Option(trafficHistory.poll()).foreach(evicted => responses.remove(evicted.id))
     }
   }
 
-  private def updateHistoryWithResponse(requestId: String, responseInfo: ResponseInfo, duration: Long): Unit = {
-    trafficHistory.asScala.find(_.request.id == requestId) match {
-      case Some(entry) =>
-        trafficHistory.remove(entry)
-        trafficHistory.offer(entry.copy(response = Some(responseInfo), duration = Some(duration)))
-      case None =>
-        logger.warn(s"ReverseProxyMonitor: could not find request entry for response: $requestId")
-    }
+  private def updateHistoryWithResponse(requestId: String, responseInfo: ResponseInfo): Unit = {
+    if (trafficHistory.asScala.exists(_.id == requestId)) responses.put(requestId, responseInfo)
+    else logger.warn(s"ReverseProxyMonitor: could not find request entry for response: $requestId")
   }
+
+  private def trafficEntries: List[TrafficEntry] =
+    trafficHistory.asScala.toList.map(request => TrafficEntry(request, Option(responses.get(request.id))))
 
   private def getCurrentStats: ProxyStats = {
     val faults = ReverseProxy.faultConfig
-    val entries = trafficHistory.asScala.toList
+    val entries = trafficEntries
     val totalRequests = entries.size.toLong
-    val responsesWithData = entries.filter(_.response.isDefined)
+    val responsesWithData = entries.flatMap(_.response)
     val totalResponses = responsesWithData.size.toLong
-    val errors = responsesWithData.count(_.response.exists(_.status >= 400))
+    val errors = responsesWithData.count(_.status >= 400)
     val errorRate = if (totalResponses > 0) errors.toDouble / totalResponses else 0.0
     val avgResponseTime = if (responsesWithData.nonEmpty) {
-      responsesWithData.map(_.duration.getOrElse(0L)).sum.toDouble / responsesWithData.size
+      responsesWithData.map(_.responseTimeMs).sum.toDouble / responsesWithData.size
     } else 0.0
 
     ProxyStats(
@@ -241,7 +239,7 @@ object ReverseProxyMonitor {
       path("traffic") {
         get {
           complete {
-            trafficHistory.asScala.takeRight(100).toList.asJson.noSpaces
+            trafficEntries.takeRight(100).asJson.noSpaces
           }
         }
       } ~
